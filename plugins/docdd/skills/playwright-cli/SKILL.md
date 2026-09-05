@@ -4,19 +4,19 @@ description: Automate browser interactions, test web pages and work with Playwri
 allowed-tools: Bash(playwright-cli:*) Bash(npx:*) Bash(npm:*)
 ---
 
-> **前提（プラグイン版）**: この手順書の `npm run …`・`src/…`・`T-M8-…` は、元のアプリ（Exos AI・Next.js／Supabase）での実例。
-> コマンドはあなたのプロジェクトの `CLAUDE.md`「検証コマンド」表と「変更影響 → 必須の検証」表、`package.json` の `scripts` を正とし、無いものは飛ばして理由を報告する（黙って省略しない）。
-> 手順書の本文そのものを直したいときは、プラグインではなく zip 版（`.claude/skills/` に実ファイルとして置く）へ切り替える。
+> **前提（プラグイン版）**: この手順書の「型検査」「単体テスト」「E2E」「全検査」は、あなたのプロジェクトの `CLAUDE.md`「検証コマンド」表のコマンドを指す。表に無いものは飛ばして理由を報告する（黙って省略しない）。
+> 手順書の本文そのものを直したいときは、配布リポジトリ（https://github.com/no1013kota/claude-docdd-dev-kit）の `plugins/docdd/skills/<名前>/` を自分の `.claude/skills/` へ写して直す（プラグインは外し、写したスキルと `CLAUDE.md` の `docdd:` を消す）。
 
 # playwright-cli：ブラウザ操作の道具箱
 
 他のスキル（`/docdd:ui-polish`・`/docdd:verify-e2e`）から呼ばれる。**ここは入口だけ**——詳しい使い方は
 `references/` に分けてある（必要になったものだけ読む）。全コマンドは `playwright-cli --help`。
 
-## この репо での使い方
+## 基本の使い方
 
 ```bash
-playwright-cli open http://127.0.0.1:3000/login   # localhost ではなく 127.0.0.1（X OAuthの制約）
+# OAuth など外部サービスが localhost を許可しない場合は 127.0.0.1 で開く（ポートは開発サーバーに合わせる）
+playwright-cli open http://127.0.0.1:3000/login
 playwright-cli snapshot                            # 現在の画面（refは e15 のような形で返る）
 playwright-cli find "ログイン"                      # 大きい画面はsnapshot全体より検索が安い
 playwright-cli fill e5 "user@example.com"
@@ -25,22 +25,24 @@ playwright-cli eval "el => el.naturalWidth" e7     # 画像が実際に読めた
 playwright-cli console                             # コンソールエラー
 playwright-cli requests                            # 失敗したリクエスト
 playwright-cli resize 390 844                      # モバイル幅
-playwright-cli screenshot --filename=/tmp/claude/x.png
+playwright-cli screenshot --filename=/tmp/claude/shot.png
 playwright-cli close
 ```
 
 - **ログインが要る画面**は `state-save` / `state-load` でセッションを使い回す（`references/storage-state.md`）。
 - `--raw` を付けると値だけ返る（`playwright-cli --raw eval "document.title"`）。
-- **スクショ・traceはコミットしない。** 置き場はscratchpad。
+- **スクショ・traceはコミットしない。** 置き場はリポジトリ外の一時ディレクトリ（上の例では `/tmp/claude/`）。
+- 接続先は `/docdd:verify-e2e` の「安全な既定」に従う（ローカルの `127.0.0.1`。本番へ向けない）。
 
-## 落とし穴（この repo で実際に踏んだもの）
+## 落とし穴（実際に踏んだもの）
 
 - **要素があること ≠ 表示されていること。** 画像は `naturalWidth > 0` まで見る。CSP違反・署名URLの
-  失効・デコード失敗は、実物を描画したときにしか出ない（T-M7-22）。
-- **`next dev` は初回リクエストでrouteをコンパイルする。** 触った直後の1回目は数十秒かかることがある。
-  「遅い＝壊れている」と決める前に、編集を挟まずもう一度開く。
-- **Next.js 16 は同じディレクトリで2つ目の `next dev` を拒む。** 別ポートで確かめたいときは
-  `npm run build` ＋ `PORT=<別> npx next start`。
+  失効・デコード失敗は、実物を描画したときにしか出ない。
+- **開発サーバーは初回リクエストで画面をコンパイルすることがある**（Next.js を使っていれば `next dev` がそう）。
+  触った直後の1回目は数十秒かかることがある。「遅い＝壊れている」と決める前に、編集を挟まずもう一度開く。
+- **同じディレクトリで開発サーバーを2つ起動できないフレームワークがある**（Next.js を使っていれば、2つ目の
+  `next dev` は拒まれる）。稼働中の開発サーバーを止めずに別ポートで確かめたいときは、CLAUDE.md「検証コマンド」表の
+  ビルドを通してから、別ポートで本番モードのサーバーを起動する（Next.js なら `PORT=<別> npx next start`）。
 
 ## 詳しい話（必要になったら読む）
 
