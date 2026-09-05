@@ -1,7 +1,7 @@
 {
   "name": "docdd",
-  "version": "0.1.1",
-  "description": "非エンジニアが Claude Code で Web アプリを作り続けるための開発キット。CLAUDE.md・仕様書・バックログの雛形と、タスク起票・開発サイクル・docs同期・検証などの手順書（スキル）11本と、雛形を置く init",
+  "version": "0.1.2",
+  "description": "非エンジニアが Claude Code で Web アプリを作り続けるための開発キット。CLAUDE.md・仕様書・バックログの雛形と、タスク起票・開発サイクル・docs同期・検証などの手順書（スキル）12本と、雛形を置く init",
   "author": {
     "name": "no1013kota"
   },
