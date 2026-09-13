@@ -1,23 +1,23 @@
 {
   "name": "claude-docdd-dev-kit",
   "owner": {
-    "name": "no1013kota"
+    "name": "no1013kota",
+    "url": "https://github.com/no1013kota"
   },
-  "metadata": {
-    "description": "非エンジニアが Claude Code で Web アプリを作り続けるための開発キット。CLAUDE.md・仕様書・バックログの雛形と、タスク起票・開発サイクル・docs同期・検証などの手順書（スキル）12本と、雛形を置く init",
-    "version": "0.1.4"
-  },
+  "description": "非エンジニアが Claude Code で Web アプリを作り続けるための開発キット（プラグイン docdd）の配布元",
   "plugins": [
     {
       "name": "docdd",
       "source": "./plugins/docdd",
-      "description": "非エンジニアが Claude Code で Web アプリを作り続けるための開発キット。CLAUDE.md・仕様書・バックログの雛形と、タスク起票・開発サイクル・docs同期・検証などの手順書（スキル）12本と、雛形を置く init",
-      "version": "0.1.4",
+      "description": "1人の非エンジニアが Claude Code で Web アプリを作り続けるための開発キット。約束（CLAUDE.md）・仕様書（docs）・作業キュー（BACKLOG）の雛形を置く init と、タスク起票・開発サイクル・docs 同期・検証・反映の手順書（スキル）、取り消しにくい git 操作を止める hook。",
       "author": {
         "name": "no1013kota"
       },
+      "homepage": "https://github.com/no1013kota/claude-docdd-dev-kit/blob/main/plugins/docdd/README.md",
+      "repository": "https://github.com/no1013kota/claude-docdd-dev-kit",
       "license": "Apache-2.0",
       "keywords": [
+        "spec-driven-development",
         "workflow",
         "docs",
         "backlog",

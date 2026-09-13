@@ -5,18 +5,66 @@
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
+      "Bash(git show:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git mv:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git branch:*)",
       "Bash(ls:*)",
       "Bash(mkdir:*)",
       "Bash(grep:*)",
       "Bash(rg:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(node scripts/check-doc-dates.mjs)",
+      "Bash(node scripts/check-doc-refs.mjs)",
+      "Bash(node scripts/check-doc-placeholders.mjs)",
+      "Bash(node scripts/audit-check.mjs)",
+      "Bash(npm run check:doc-dates)",
+      "Bash(npm run check:doc-refs)",
+      "Bash(npm run check:doc-placeholders)",
+      "Bash(npm run audit:check)"
+    ],
+    "ask": [
+      "Bash(rm -r*)",
+      "Bash(rm -f*)",
+      "Bash(rm -R*)",
+      "Bash(git add -A*)",
+      "Bash(git add --all*)",
+      "Bash(git add .)",
+      "Bash(git add . *)",
+      "Bash(git commit --amend*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean *)",
+      "Bash(git push *)",
+      "Bash(gh pr merge *)",
+      "Bash(npm install *)",
+      "Bash(npm i *)",
+      "Bash(pnpm add *)",
+      "Bash(yarn add *)",
+      "Bash(pip install *)",
+      "Bash(npx playwright install *)",
+      "Bash(playwright-cli install-browser *)"
     ],
     "deny": [
-      "Bash(rm -rf:*)",
-      "Bash(sudo:*)"
+      "Bash(sudo:*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git commit --no-verify*)",
+      "Read(./.env)",
+      "Read(./.env.*)"
     ]
+  },
+  "extraKnownMarketplaces": {
+    "claude-docdd-dev-kit": {
+      "source": {
+        "source": "github",
+        "repo": "no1013kota/claude-docdd-dev-kit"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "docdd@claude-docdd-dev-kit": true
   }
 }

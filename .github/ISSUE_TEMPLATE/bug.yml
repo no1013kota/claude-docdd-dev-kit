@@ -1,0 +1,82 @@
+name: 不具合の報告
+description: docdd（プラグイン・スキル・雛形・検査スクリプト）が思ったとおりに動かないとき
+title: "[不具合] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        報告ありがとうございます。分かる範囲で書いてください。空欄があっても大丈夫です。
+        **API キー・パスワード・`.env` の中身・メールアドレスなどの秘密情報は貼らないでください。**
+
+  - type: input
+    id: claude-version
+    attributes:
+      label: Claude Code の版
+      description: ターミナルで `claude --version` と打ったときの表示
+      placeholder: "例: 2.1.270 (Claude Code)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options:
+        - macOS
+        - Windows（WSL）
+        - Windows（Git for Windows あり）
+        - Windows（Git for Windows なし）
+        - Linux
+        - その他
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Claude Code をどこで使ったか
+      options:
+        - ターミナル（CLI）
+        - Desktop アプリ
+        - VS Code などのエディタ
+        - その他
+
+  - type: input
+    id: docdd-version
+    attributes:
+      label: docdd の版
+      description: Claude Code の中で `/plugin list` と打ったときの docdd の版
+      placeholder: "例: 0.2.0"
+    validations:
+      required: true
+
+  - type: input
+    id: skill
+    attributes:
+      label: 打ったスキル（コマンド）
+      description: 引数も含めてそのまま
+      placeholder: "例: /docdd:init よみログ 読書記録アプリ commit"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 起きたこと
+      description: 何をしたら、何が起きたか
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待したこと
+      description: 本当はどうなってほしかったか
+
+  - type: textarea
+    id: error-text
+    attributes:
+      label: 失敗したときの文面（そのまま貼る）
+      description: 英語のエラーも、訳さずそのまま貼ってください。長ければ前後 20 行ほどで十分です。
+      render: text

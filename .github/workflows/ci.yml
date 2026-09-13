@@ -1,0 +1,43 @@
+# docdd の配布リポジトリの検査。CI が緑のコミットだけをリリースする（RELEASING.md）。
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # tests/init.test.mjs は v0.1.4（f08d4e5）の雛形を git の履歴から読む。浅い clone だとそのテストが skip になる
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Claude Code を入れる
+        # 版を固定する。検証に使う版を上げるときはここも上げる（RELEASING.md の手順 5）
+        run: npm i -g @anthropic-ai/claude-code@2.1.270
+
+      - name: マーケットプレイスの定義を検査
+        run: claude plugin validate --strict .
+
+      - name: プラグインの定義を検査
+        run: claude plugin validate --strict plugins/docdd
+
+      - name: plugin.json とマーケットプレイスの定義の一致を確かめる（タグは作らない）
+        # --force は「タグが既にある」検査だけを飛ばすため（同じ版のまま後続のコミットを push しても落ちないように）
+        run: claude plugin tag --dry-run --force plugins/docdd
+
+      - name: スキル参照・前置き・frontmatter・版の刻印
+        run: npm run check
+
+      - name: テスト
+        run: npm test
