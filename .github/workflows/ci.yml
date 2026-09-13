@@ -13,12 +13,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      # checkout と setup-node は、Node.js 24 で動く版（action.yml が using: node24）を使う
+      - uses: actions/checkout@v7
         with:
           # tests/init.test.mjs は v0.1.4（f08d4e5）の雛形を git の履歴から読む。浅い clone だとそのテストが skip になる
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 

@@ -1,4 +1,4 @@
-// docdd-kit v0.2.0 — scripts/check-doc-refs.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
+// docdd-kit v0.3.0 — scripts/check-doc-refs.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
 // CLAUDE.md・.claude/rules/・docs/ の文書が指しているファイルが、本当にあるかを検査する。
 // 存在しないファイルを指す仕様書は、読んだ人（と Claude）を行き止まりへ送る。
 //
@@ -17,8 +17,16 @@ import path from "node:path";
 
 /** 検査するパスの拡張子。ここに足せば、その拡張子のパスも検査する。 */
 const EXTS = [
+  // Web・サーバー・設定
   "md", "js", "jsx", "ts", "tsx", "mjs", "cjs", "py", "go", "rb", "php",
   "sql", "toml", "json", "yml", "yaml", "css", "sh", "prisma",
+  "html", "scss", "vue", "svelte", "astro",
+  // Unity（C#・シーン・プレハブ・アセット・シェーダー・UI Toolkit・Input System）
+  "cs", "unity", "prefab", "asset", "asmdef", "mat", "shader", "hlsl", "uxml", "uss", "inputactions",
+  // Godot
+  "gd", "tscn", "tres",
+  // ネイティブアプリ（Flutter・Android・Apple）・C/C++・Lua・.NET
+  "dart", "kt", "kts", "java", "gradle", "swift", "c", "cc", "cpp", "h", "hpp", "lua", "csproj", "sln",
 ];
 const TARGETS = ["CLAUDE.md", ".claude/rules/*.md", "docs/*.md"];
 const EXCLUDED = [

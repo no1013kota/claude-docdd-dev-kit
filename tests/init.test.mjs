@@ -176,6 +176,19 @@ function v014Files() {
   return files;
 }
 
+/** templates/.gitignore の塊（「# docdd: 」で始まる見出しと、その下の行）。 */
+function gitignoreTemplateBlocks() {
+  const blocks = [];
+  for (const l of fs.readFileSync(path.join(TEMPLATES, ".gitignore"), "utf8").split("\n").map((s) => s.trim())) {
+    if (l.startsWith("# docdd:")) blocks.push({ header: l, lines: [] });
+    else if (l && !l.startsWith("#")) blocks[blocks.length - 1].lines.push(l);
+  }
+  return blocks;
+}
+
+/** 既存の .gitignore に足すときの並び（塊の中で、肯定の行のあとに否定の行）。 */
+const appendOrder = (lines) => [...lines.filter((l) => !l.startsWith("!")), ...lines.filter((l) => l.startsWith("!"))];
+
 const localDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 /** LF だけの改行（CRLF でない \n）の数。 */
@@ -434,31 +447,30 @@ test("apply を add せずにもう一度実行しても、toStage に .gitignor
   assert.ok(!later.json.toStage.includes(".gitignore"), later.json.toStage.join(" "));
 });
 
-test("既存の .gitignore: 足りない行だけを「# docdd」の下へ足し、2 回目は変えない", () => {
+test("既存の .gitignore: 足りない行だけを塊ごとに「# docdd: 共通」「# docdd: Web（…）」の見出しの下へ足し、2 回目は変えない", () => {
   const original = "node_modules/\n.env\n/custom-output\n";
   const dir = project({ files: { ".gitignore": original } });
-  const tplLines = fs
-    .readFileSync(path.join(TEMPLATES, ".gitignore"), "utf8")
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith("#"));
-  // 否定の行（!.env.example）は、足した行より後ろに置く（.gitignore は後ろの行が勝つ）
-  const missing = [...tplLines.filter((l) => !l.startsWith("!") && l !== "node_modules/" && l !== ".env"), ...tplLines.filter((l) => l.startsWith("!"))];
+  const blocks = gitignoreTemplateBlocks();
+  assert.deepEqual(blocks.map((b) => b.header), ["# docdd: 共通", "# docdd: Web（Node.js・ビルド出力・Playwright）"]);
+  // 否定の行（!.env.example）は、同じ塊で足した行より後ろに置く（.gitignore は後ろの行が勝つ）
+  const [common, web] = blocks.map((b) => appendOrder(b.lines.filter((l) => l !== "node_modules/" && l !== ".env")));
+  const expected = `${original}\n${blocks[0].header}\n${common.join("\n")}\n\n${blocks[1].header}\n${web.join("\n")}\n`;
 
   const a = init(dir, "apply");
   assert.equal(a.status, 0, a.stdout);
-  assert.equal(read(dir, ".gitignore"), `${original}\n# docdd\n${missing.join("\n")}\n`);
-  assert.deepEqual(a.json.gitignore.addedLines, missing);
+  assert.equal(a.json.gitignore.action, "appended");
+  assert.equal(read(dir, ".gitignore"), expected, "package.json も Web 以外の目印も無い（web=null）ので、両方の塊");
+  assert.deepEqual(a.json.gitignore.addedLines, [...common, ...web]);
   assert.ok(a.json.toStage.includes(".gitignore"));
 
   const again = init(dir, "apply");
   assert.equal(again.json.gitignore.action, "unchanged");
-  assert.equal(read(dir, ".gitignore"), `${original}\n# docdd\n${missing.join("\n")}\n`);
+  assert.equal(read(dir, ".gitignore"), expected);
 
-  // 見出しだけ残して行が消えていたら、見出しの下へ戻す（肯定の行を足すので、否定の行もその後ろにもう一度書く）
-  write(dir, { ".gitignore": `${original}\n# docdd\n${missing.slice(1).join("\n")}\n` });
+  // 見出しだけ残して行が消えていたら、その塊の見出しの下へ戻す（肯定の行を足すので、否定の行もその後ろにもう一度書く）
+  write(dir, { ".gitignore": `${original}\n${blocks[0].header}\n${common.slice(1).join("\n")}\n\n${blocks[1].header}\n${web.join("\n")}\n` });
   init(dir, "apply");
-  assert.equal(read(dir, ".gitignore"), `${original}\n# docdd\n${missing.slice(1).join("\n")}\n${missing[0]}\n!.env.example\n`);
+  assert.equal(read(dir, ".gitignore"), `${original}\n${blocks[0].header}\n${common.slice(1).join("\n")}\n${common[0]}\n!.env.example\n\n${blocks[1].header}\n${web.join("\n")}\n`);
 });
 
 test("precommit: .env の除外漏れ・stage された .env とログイン状態・名前とメールの未設定を問題として返す", () => {
@@ -691,8 +703,8 @@ test("テスト基盤の導入: 完了条件に単体・E2E・表の行を含み
   assert.equal(a.status, 0, a.stdout);
   const text = read(dir, "tasks/BACKLOG.md");
   assert.match(text, /^ {2}- 単体の見本テスト 1 件が緑/m);
-  assert.match(text, /^ {2}- 画面があるなら、E2E（実ブラウザ）の見本テストも 1 件緑$/m);
-  assert.match(text, /^ {2}- CLAUDE\.md「検証コマンド」表の該当行が埋まる（『単体・DBテスト』。画面があるなら『E2E（実ブラウザ）』と『全検査（push 前に1回）』も）$/m);
+  assert.match(text, /^ {2}- 画面があるなら、E2E（実際に動かす）の見本テストも 1 件緑$/m);
+  assert.match(text, /^ {2}- CLAUDE\.md「検証コマンド」表の該当行が埋まる（『単体・DBテスト』。画面があるなら『E2E（実際に動かす）』と『全検査（push 前に1回）』も）$/m);
 
   write(dir, { "tasks/BACKLOG.md": text.replace("### T-01: テスト基盤の導入 `todo`", "### T-01: テスト基盤の導入（E2E） `doing`") });
   const again = init(dir, "apply", "--settings", "no", "--tasks", "test-infra");
@@ -751,7 +763,9 @@ test(".gitignore: 先頭・末尾の / の違いは同じ行とみなし、否�
   assert.equal(a.status, 0, a.stdout);
   const added = a.json.gitignore.addedLines;
   assert.ok(!added.includes("node_modules/") && !added.includes("dist/"), added.join(" "));
-  assert.equal(added[added.length - 1], "!.env.example");
+  assert.ok(added.indexOf("!.env.example") > added.indexOf(".env.*"), added.join(" "));
+  const giLines = read(dir, ".gitignore").split("\n");
+  assert.ok(giLines.lastIndexOf("!.env.example") > giLines.indexOf(".env.*"), "否定の行は足した .env.* より後ろ");
   assert.equal(spawnSync("git", ["check-ignore", "-q", "--", ".env.example"], { cwd: dir, env: ENV }).status, 1, ".env.example は除外されない");
   assert.equal(spawnSync("git", ["check-ignore", "-q", "--", ".env"], { cwd: dir, env: ENV }).status, 0);
   assert.equal(init(dir, "apply", "--settings", "no").json.gitignore.action, "unchanged");
@@ -837,6 +851,20 @@ test("apply: サンドボックスなどで .claude/settings.json を書けな�
   assert.equal(refs.status, 0, refs.stdout + refs.stderr);
 });
 
+test("dev が無い Web のプロジェクト: serve・start を開発サーバーとみなし、どちらも無ければ「無い」にせず未記入のまま聞く", () => {
+  const devRow = (dir) => init(dir, "status").json.inferred.find((r) => r.row === "開発サーバー起動");
+  const cra = project({ files: { "package.json": '{\n  "name": "cra",\n  "scripts": { "start": "react-scripts start", "build": "react-scripts build" },\n  "dependencies": { "react": "18.3.1", "react-scripts": "5.0.1" }\n}\n' } });
+  assert.equal(devRow(cra).value, "npm start");
+  const express = project({ files: { "package.json": '{\n  "name": "api",\n  "scripts": { "start": "node server.js" },\n  "dependencies": { "express": "4.21.0" }\n}\n' } });
+  assert.equal(devRow(express).value, "npm start");
+  const vue = project({ files: { "package.json": '{\n  "name": "vue-cli",\n  "scripts": { "serve": "vue-cli-service serve", "start": "node prod.js" },\n  "dependencies": { "vue": "3.5.0", "vite": "5.4.0" }\n}\n' } });
+  assert.equal(devRow(vue).value, "npm run serve", "serve を start より先に使う");
+  const bare = project({ files: { "package.json": '{\n  "name": "bare",\n  "dependencies": { "react": "18.3.1" }\n}\n' } });
+  assert.equal(devRow(bare).value, null, "Web なのに dev・serve・start が無ければ聞く（「無い」にすると Web の門で止まる）");
+  const cli = project({ files: { "package.json": '{\n  "name": "tool",\n  "scripts": { "build": "tsc" }\n}\n' } });
+  assert.equal(devRow(cli).value, "無い", "Web のフレームワークが無い Node のプロジェクトは従来どおり「無い」");
+});
+
 test("precommit: i18n の auth.json などは注意に留め、playwright の保存形式だけを問題にする", () => {
   const dir = project({ files: { ".gitignore": ".env\n.env.*\n", "messages/ja/auth.json": "{}\n", "src/lib/auth-config.json": "{}\n", "e2e/user.auth-state.json": "{}\n" } });
   git(dir, ["add", "--", ".gitignore", "messages/ja/auth.json", "src/lib/auth-config.json"]);
@@ -869,4 +897,224 @@ test("既存の BACKLOG に書式の節が無い: status が返し、--add-backl
   const before = snapshot(dir);
   init(dir, "apply", "--settings", "no", "--add-backlog-sections", "--tasks", "test-infra");
   assert.deepEqual(snapshot(dir), before);
+});
+
+const UNITY_GITIGNORE = "/[Ll]ibrary/\n/[Tt]emp/\n/[Oo]bj/\n/[Bb]uild/\n/[Bb]uilds/\n/[Ll]ogs/\n/[Uu]ser[Ss]ettings/\n*.log\n.gradle/\n*.csproj\n*.sln\n";
+const UNITY_VERSION_TXT = "m_EditorVersion: 6000.3.24f1\nm_EditorVersionWithRevision: 6000.3.24f1 (4e7b9b5b6244)\n";
+const UNITY_WORKFLOW_MD = "# Unity workflow\n\n- Open the project in Unity Hub.\n- Run EditMode tests before pushing.\n";
+
+test("Unity のプロジェクト: status は kind=unity・web=false で、ProjectVersion.txt を仕様書の候補に出さず、雛形の見本スクリプトを既存コードに数えない。apply は Web の行を「無い」にし、.gitignore には共通の塊だけを足す", () => {
+  const dir = project({
+    files: {
+      "ProjectSettings/ProjectVersion.txt": UNITY_VERSION_TXT,
+      "Packages/manifest.json": '{\n  "dependencies": {\n    "com.unity.test-framework": "1.6.0"\n  }\n}\n',
+      ".gitignore": UNITY_GITIGNORE,
+      "Assets/TutorialInfo/Scripts/Readme.cs": "using UnityEngine;\n\npublic class Readme : ScriptableObject\n{\n}\n",
+      "Assets/TutorialInfo/Scripts/Editor/ReadmeEditor.cs": "using UnityEditor;\n\npublic class ReadmeEditor : Editor\n{\n}\n",
+      "Assets/_Project/design-notes.md": "# Design notes\n\n- units\n- buildings\n",
+      "docs/UNITY_WORKFLOW.md": UNITY_WORKFLOW_MD,
+      "docs/game-design.txt": "RTS game design\n\n- two factions\n- cards\n",
+      "docs/notes.txt": "misc\n\nline\nline\n",
+    },
+    commit: true,
+  });
+  git(dir, ["commit", "--allow-empty", "-q", "-m", "second"]);
+
+  const st = init(dir, "status");
+  assert.equal(st.status, 0, st.stderr);
+  assert.equal(st.json.stack.kind, "unity");
+  assert.equal(st.json.stack.web, false);
+  assert.equal(st.json.stack.framework, "Unity 6000.3.24f1");
+  assert.deepEqual(st.json.stack.unity, { editorVersion: "6000.3.24f1" });
+  assert.equal(st.json.scaffold.present, true, "ProjectVersion.txt が土台の目印");
+  assert.equal(st.json.git.commits, 2);
+  assert.equal(st.json.existingCode, false, "Assets/TutorialInfo の見本スクリプトは数えない");
+  assert.deepEqual(
+    st.json.specCandidates.map((c) => c.path),
+    ["docs/game-design.txt", "docs/UNITY_WORKFLOW.md"],
+    "ProjectSettings・Assets の下と、ファイル名に仕様らしい語の無い .txt は候補にしない",
+  );
+  assert.match(st.json.next, /Web 以外のプロジェクトです。検証コマンドは一部しか推定できません。README『Web 以外のプロジェクトで使う』を見て埋め、必要なら『スキルへの追加指示』を書いてください/);
+  const row = (name) => st.json.inferred.find((r) => r.row === name);
+  for (const name of ["開発サーバー起動", "本番モード起動", "依存の脆弱性"]) assert.equal(row(name).value, "無い", name);
+  for (const name of ["単体・DBテスト", "E2E（実際に動かす）", "ビルド"]) {
+    assert.equal(row(name).value, null, name);
+    assert.match(row(name).source, /README『Web 以外のプロジェクトで使う』/, name);
+  }
+  assert.ok(!st.json.gitignore.missingLines.includes("node_modules/"), st.json.gitignore.missingLines.join(" "));
+
+  const a = init(dir, "apply", "--fill-inferred", "--settings", "no", "--tasks", "test-infra");
+  assert.equal(a.status, 0, a.stdout);
+  assert.deepEqual(a.json.filled.map((f) => [f.row, f.cell]), [["開発サーバー起動", "無い"], ["本番モード起動", "無い"], ["依存の脆弱性", "無い"]]);
+  const claude = read(dir, "CLAUDE.md");
+  assert.match(claude, /^\| 開発サーバー起動 \| 無い \|$/m);
+  assert.match(claude, /^\| 本番モード起動 \| 無い \|$/m);
+  assert.match(claude, /^\| 依存の脆弱性 \| 無い \|$/m);
+  assert.match(claude, /^\| 単体・DBテスト \| \{\{単体・DBテスト\}\} \|$/m);
+  assert.match(claude, /^\| E2E（実際に動かす） \| \{\{E2E\}\} \|$/m);
+  const [common] = gitignoreTemplateBlocks();
+  const gi = read(dir, ".gitignore");
+  assert.equal(gi, `${UNITY_GITIGNORE}\n${[common.header, ...appendOrder(common.lines)].join("\n")}\n`);
+  assert.doesNotMatch(gi, /node_modules|\.next|playwright|# docdd: Web/);
+  assert.equal(read(dir, ".mcp.json"), '{\n  "mcpServers": {}\n}\n');
+  assert.match(read(dir, "tasks/BACKLOG.md"), /^### T-01: テスト基盤の導入 `todo`$/m);
+
+  stage(dir, a.json.toStage);
+  const refs = check(dir, "check-doc-refs");
+  assert.equal(refs.status, 0, refs.stdout + refs.stderr);
+  const d = init(dir, "dates");
+  stage(dir, d.json.toStage);
+  assert.equal(init(dir, "precommit").json.ok, true);
+  git(dir, ["commit", "-q", "-m", "chore: docdd キットを導入"]);
+  assert.equal(git(dir, ["status", "--porcelain"]), "");
+
+  // 2 回目の apply と update も、Web の塊を求めない
+  assert.equal(init(dir, "apply", "--fill-inferred", "--settings", "no").json.gitignore.action, "unchanged");
+  assert.equal(init(dir, "update").json.files.find((f) => f.path === ".gitignore").status, "current");
+
+  // git の外（.gitignore が効かない）でも、Library・Temp の下は見ない
+  const loose = project({
+    withGit: false,
+    files: {
+      "ProjectSettings/ProjectVersion.txt": UNITY_VERSION_TXT,
+      "Library/PackageCache/com.unity.test-framework/spec.md": "# spec\n\na\nb\n",
+      "Temp/plan.md": "# plan\n\na\nb\n",
+      "docs/UNITY_WORKFLOW.md": UNITY_WORKFLOW_MD,
+    },
+  });
+  assert.deepEqual(init(loose, "status").json.specCandidates.map((c) => c.path), ["docs/UNITY_WORKFLOW.md"]);
+});
+
+test("Web のプロジェクト: status は kind=web・web=true。.gitignore は、新しく置くときは雛形のまま、既存に足すときも共通と Web の両方の塊", () => {
+  const pkg = '{\n  "name": "web",\n  "scripts": { "dev": "next dev" },\n  "dependencies": { "next": "15.0.0", "react": "19.0.0" }\n}\n';
+  const dir = project({ files: { "package.json": pkg } });
+  const st = init(dir, "status");
+  assert.equal(st.status, 0, st.stderr);
+  assert.deepEqual([st.json.stack.kind, st.json.stack.web, st.json.stack.unity, st.json.stack.framework], ["web", true, null, "Next.js"]);
+  assert.doesNotMatch(st.json.next, /Web 以外/);
+  assert.equal(st.json.inferred.find((r) => r.row === "開発サーバー起動").cell, "`npm run dev`（http://127.0.0.1:3000 で開く）");
+
+  const a = init(dir, "apply", "--settings", "no");
+  assert.equal(a.status, 0, a.stdout);
+  assert.equal(read(dir, ".gitignore"), fs.readFileSync(path.join(TEMPLATES, ".gitignore"), "utf8"));
+  assert.deepEqual(a.json.gitignore.addedLines, gitignoreTemplateBlocks().flatMap((b) => b.lines));
+
+  const dir2 = project({ files: { "package.json": pkg, ".gitignore": "node_modules\n" } });
+  const b = init(dir2, "apply", "--settings", "no");
+  assert.equal(b.status, 0, b.stdout);
+  const [common, web] = gitignoreTemplateBlocks();
+  assert.equal(
+    read(dir2, ".gitignore"),
+    `node_modules\n\n${[common.header, ...appendOrder(common.lines)].join("\n")}\n\n${[web.header, ...web.lines.filter((l) => l !== "node_modules/")].join("\n")}\n`,
+  );
+});
+
+test("前の版の行名「E2E（実ブラウザ）」の CLAUDE.md も読む: --fill-inferred は行名を変えずに埋め、update は E2E の行を足さない", () => {
+  const oldClaude = fs.readFileSync(path.join(TEMPLATES, "CLAUDE.md"), "utf8").replace("| E2E（実際に動かす） | {{E2E}} |", "| E2E（実ブラウザ） | {{E2E}} |");
+  assert.ok(oldClaude.includes("| E2E（実ブラウザ） | {{E2E}} |"), "雛形の行名が変わっていない");
+  const pkg = '{\n  "name": "web",\n  "scripts": { "dev": "vite", "test:e2e": "playwright test" },\n  "devDependencies": { "vite": "5.0.0" }\n}\n';
+  const dir = project({ files: { "CLAUDE.md": oldClaude, "package.json": pkg } });
+
+  const a = init(dir, "apply", "--fill-inferred", "--settings", "no");
+  assert.equal(a.status, 0, a.stdout);
+  assert.equal(a.json.claudeMd.action, "unchanged");
+  const claude = read(dir, "CLAUDE.md");
+  assert.match(claude, /^\| E2E（実ブラウザ） \| `npm run test:e2e` \|$/m);
+  assert.doesNotMatch(claude, /E2E（実際に動かす）/);
+  assert.ok(a.json.filled.some((f) => f.row === "E2E（実ブラウザ）" && f.cell === "`npm run test:e2e`"), JSON.stringify(a.json.filled));
+
+  const up = init(dir, "update");
+  assert.equal(up.status, 0, up.stdout);
+  const additions = up.json.files.find((f) => f.path === "CLAUDE.md").additions ?? [];
+  assert.ok(!additions.some((x) => x.kind === "row" && /E2E/.test(x.row)), JSON.stringify(additions));
+});
+
+test("Web 以外の種類: Godot・Flutter・Android・Apple・.NET は web=false（Godot は依存の脆弱性も「無い」、.gitignore が無ければ共通の塊だけを置く）。Web の依存もあれば web=true、目印が無ければ null", () => {
+  const cases = [
+    { kind: "godot", framework: "Godot", audit: "無い", files: { "project.godot": 'config_version=5\n\n[application]\nconfig/name="Demo"\n' } },
+    { kind: "flutter", framework: "Flutter", audit: null, files: { "pubspec.yaml": "name: demo\ndependencies:\n  flutter:\n    sdk: flutter\n" } },
+    {
+      kind: "android",
+      framework: "Android",
+      audit: null,
+      files: { "settings.gradle.kts": 'pluginManagement {\n    repositories {\n        google {\n            content {\n                includeGroupByRegex("com\\\\.android.*")\n            }\n        }\n    }\n}\n' },
+    },
+    { kind: "apple", framework: "Xcode", audit: null, files: { "Demo.xcodeproj/project.pbxproj": "// !$*UTF8*$!\n" } },
+    { kind: "dotnet", framework: ".NET", audit: null, files: { "Demo.sln": "\nMicrosoft Visual Studio Solution File, Format Version 12.00\n" } },
+  ];
+  for (const c of cases) {
+    const st = init(project({ files: c.files }), "status");
+    assert.equal(st.status, 0, st.stderr);
+    const { stack } = st.json;
+    assert.deepEqual([stack.kind, stack.web, stack.framework, stack.unity], [c.kind, false, c.framework, null], c.kind);
+    assert.equal(st.json.scaffold.present, true, c.kind);
+    const row = (name) => st.json.inferred.find((r) => r.row === name);
+    assert.equal(row("開発サーバー起動").value, "無い", c.kind);
+    assert.equal(row("本番モード起動").value, "無い", c.kind);
+    assert.equal(row("依存の脆弱性").value, c.audit, c.kind);
+  }
+
+  const godot = project({ files: cases[0].files });
+  assert.equal(init(godot, "apply", "--settings", "no").status, 0);
+  const [common] = gitignoreTemplateBlocks();
+  assert.equal(read(godot, ".gitignore"), `${[common.header, ...common.lines].join("\n")}\n`);
+  assert.equal(init(godot, "update").json.files.find((f) => f.path === ".gitignore").status, "current");
+
+  const both = init(project({ files: { ...cases[0].files, "package.json": '{\n  "name": "tool",\n  "devDependencies": { "vite": "5.0.0" }\n}\n' } }), "status").json.stack;
+  assert.deepEqual([both.kind, both.web, both.framework], ["web", true, "Vite"]);
+  assert.ok(both.frameworks.includes("Godot"), both.frameworks.join(" "));
+  const none = init(project({ files: { "pubspec.yaml": "name: pkg\n" } }), "status").json.stack;
+  assert.deepEqual([none.kind, none.web], ["unknown", null]);
+});
+
+test("既存コードの判定: Godot の .gd・Flutter の .dart・C/C++ も数える。Godot の addons/（プラグイン）と、Flutter の android/・ios/ などの土台は数えない", () => {
+  const many = (dir, ext, n, body) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`${dir}/f${i + 1}.${ext}`, body]));
+  const godot = project({
+    files: {
+      "project.godot": 'config_version=5\n\n[application]\nconfig/name="Demo"\n',
+      ...many("scripts", "gd", 10, "extends Node\n"),
+      "src/player.cpp": '#include "player.h"\n',
+      "src/player.h": "#pragma once\n",
+      ...many("addons/dialog", "gd", 20, "@tool\nextends EditorPlugin\n"),
+    },
+    commit: true,
+  });
+  const g = init(godot, "status");
+  assert.equal(g.status, 0, g.stderr);
+  assert.deepEqual([g.json.stack.kind, g.json.git.commits, g.json.scaffold.sourceFileCount, g.json.existingCode], ["godot", 1, 12, true]);
+
+  const runner = {
+    "android/app/src/main/kotlin/com/example/demo/MainActivity.kt": "package com.example.demo\n",
+    "ios/Runner/AppDelegate.swift": "import Flutter\n",
+    "ios/Runner/Runner-Bridging-Header.h": '#import "GeneratedPluginRegistrant.h"\n',
+    "ios/RunnerTests/RunnerTests.swift": "import XCTest\n",
+    "linux/runner/main.cc": '#include "my_application.h"\n',
+    "linux/runner/my_application.cc": '#include "my_application.h"\n',
+    "linux/runner/my_application.h": "#pragma once\n",
+    "macos/Runner/AppDelegate.swift": "import Cocoa\n",
+    "macos/Runner/MainFlutterWindow.swift": "import Cocoa\n",
+    "web/index.html": "<!DOCTYPE html>\n",
+    "windows/runner/main.cpp": '#include "flutter_window.h"\n',
+    "windows/runner/flutter_window.cpp": '#include "flutter_window.h"\n',
+    "windows/runner/flutter_window.h": "#pragma once\n",
+    "windows/runner/utils.cpp": '#include "utils.h"\n',
+  };
+  const flutter = project({
+    files: {
+      "pubspec.yaml": "name: demo\ndependencies:\n  flutter:\n    sdk: flutter\n",
+      "lib/main.dart": "void main() {}\n",
+      "test/widget_test.dart": "void main() {}\n",
+      ...runner,
+    },
+    commit: true,
+  });
+  const f1 = init(flutter, "status");
+  assert.equal(f1.status, 0, f1.stderr);
+  assert.deepEqual([f1.json.stack.kind, f1.json.scaffold.sourceFileCount, f1.json.existingCode], ["flutter", 2, false], "flutter create の土台だけでは既存コードありにしない");
+  git(flutter, ["commit", "--allow-empty", "-q", "-m", "second"]);
+  assert.equal(init(flutter, "status").json.existingCode, true, "lib/ の .dart があり、コミットが 2 つ以上");
+
+  // addons/ を数えないのは Godot のときだけ
+  const other = init(project({ files: { "addons/sale/models.py": "x = 1\n", "web/app.cpp": "int main() {}\n" } }), "status").json;
+  assert.deepEqual([other.stack.kind, other.scaffold.sourceFileCount], ["unknown", 2]);
 });

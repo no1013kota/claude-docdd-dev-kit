@@ -63,6 +63,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
 7. `git.userName` か `git.userEmail` が null なら、コミットに残す名前とメールを運営者に聞く。答えを `git config user.name "<名前>"` と `git config user.email "<メール>"` で**このリポジトリだけ**に設定する（`--global` は使わない。メールは push すると公開される）。設定済みなら「この名前とメールで記録します: <名前> <メール>」と 1 行見せる。
 8. `atGitRoot` が false（git の一番上ではない場所。例: モノレポの `apps/web`）なら、AskUserQuestion で「ここに置く／一番上に置く／中止」を聞く。Claude Code は起動した場所とその上のフォルダの `CLAUDE.md` を読むので、**普段 Claude Code を起動する場所**に置くのがよい、と理由を添える。「一番上」なら、そこで Claude Code を起動し直して `/docdd:init` を打つよう伝えて止まる。
 9. `existingCode` が true なら「既存コードあり」と控える（手順 4 の次の一手に使う）。
+10. `stack.web` が false なら「Web 以外のプロジェクト」と控える（`stack.kind` が `unity`・`godot`・`flutter`・`android`・`apple`・`dotnet` のどれかで、Web のフレームワークが無い。例: Unity のゲーム）。問 11 と手順 4 の報告に使う。
 
 ### 1. ヒアリング（選ぶ問いと書く問いを、まとめて聞く）
 
@@ -95,13 +96,13 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
 #### 書いて答える問い
 
 - **問 1 プロジェクト名と、何を作るか 1 行**（引数で渡されていれば聞かない）
-- **問 2 既にある仕様書やメモ**: `specCandidates` の候補を示し、「この中に仕様書やメモはありますか（README・docs の文書・Notion の書き出しなど）。あればパスを書くか、中身を貼ってください。原文を `docs/_imported/` へ移すか、そのままにするかも書いてください」。
+- **問 2 既にある仕様書やメモ**: `specCandidates` の候補を示し、「この中に仕様書やメモはありますか（README・docs の文書・Notion の書き出しなど）。あればパスを書くか、中身を貼ってください。原文を `docs/_imported/` へ移すか、そのままにするかも書いてください」。移してよいのは Markdown の仕様書・メモ（`.md`）だけ。設定ファイルや、エンジン・ツールが使うファイル（例: `package.json`、Unity の `ProjectSettings/`・`Packages/` の下）は、答えに含まれていても移さない（中身を PRD の下書きに使うのはよい）。
 - **問 3 PRD（何を作るかの仕様書 `docs/PRD.md`）のやること・やらないこと**: 作りたい機能を 3〜7 個（それぞれ Must＝最初の版に必須／Should＝あると良い）と、最初の版ではやらないこと。記入例は `${CLAUDE_PLUGIN_ROOT}/examples/PRD.sample.md`（架空の美容室の予約アプリ）。必要なら読んで、書き方の見本として示す。仕様書があれば、そこから下書きした案を示して「これでよいか」を聞く（下書きを見せるので、この問いだけもう 1 往復してよい）。
 - **問 4 公開先 URL**（まだ公開していなければ「まだ無い」）
 - **問 5 の補足 ブランチ**（問 5 で「まだ公開しない」以外を選んだとき）: 本番ブランチ。`git.branch` を候補に示す（多くは main）。**B を選んだときだけ**、作業ブランチ（本番ブランチと別の名前。staging へ反映するブランチ）も聞く。
 - **問 6 の補足 テスト用 DB の中身**（問 6 で ① か ② を選んだとき）: ① なら DB の起動コマンド（例: `supabase start`）、② なら接続先を入れた `.env` のキー名（例: `DATABASE_URL`。値は書かない）。
 - **問 7 有料の外部 API**（AI など、使った分だけ費用が出るもの）を使うなら、実物で 1 周確かめるときの費用上限（例: 1 周 $0.50 まで）。使わないなら「無い」。
-- **問 11 検証コマンド表の、自動で推定できなかった行**（`inferred` の `value` が null の行のうち、『テスト用 DB』『実物1周の費用上限』を除いたものがあるときだけ）: 行名を並べ、「このプロジェクトでそれぞれを実行するコマンドを書いてください。無いものは『無い』、分からなければ空のままで構いません」。
+- **問 11 検証コマンド表の、自動で推定できなかった行**（`inferred` の `value` が null の行のうち、『テスト用 DB』『実物1周の費用上限』を除いたものがあるときだけ）: 行名を並べ、「このプロジェクトでそれぞれを実行するコマンドを書いてください。無いものは『無い』、分からなければ空のままで構いません」。Web 以外のプロジェクト（手順 0-10）では、`${CLAUDE_PLUGIN_ROOT}/README.md` の「Web 以外のプロジェクトで使う」節と、`${CLAUDE_PLUGIN_ROOT}/templates/CLAUDE.md`「検証コマンド」表の下の例（Unity の例など）を読み、合う例を添えて聞く。
 
 ### 2. 雛形を置き、答えを書き込む
 
@@ -127,7 +128,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
    - **答えられなかった欄は `{{…}}` のまま残す。** 勝手に作らない。日付の `{{YYYY-MM-DD}}` はここでは触らない（手順 3 の dates が埋める）。
 4. 既存の仕様書があった場合:
    - PRD の §1〜§3 を、そこから下書きする（手順 1 で承知を得た内容）。
-   - 原文を移すと答えたなら、`mkdir -p docs/_imported` のあと `git mv <元のパス> docs/_imported/` で移し、原文の冒頭に「正本は docs/PRD.md（<今日の日付> 移行）」の 1 行を足す。git が追跡していないファイルなら、先に `git add <元のパス>` してから `git mv` する。
+   - 原文を移すと答えたなら（Markdown の仕様書・メモだけ。問 2）、`mkdir -p docs/_imported` のあと `git mv <元のパス> docs/_imported/` で移し、原文の冒頭に「正本は docs/PRD.md（<今日の日付> 移行）」の 1 行を足す。git が追跡していないファイルなら、先に `git add <元のパス>` してから `git mv` する。
    - 画面・データの細かい記述は、その場で `docs/requirements/` へ分けない。`tasks/BACKLOG.md` の「## タスク」節の末尾に、「取り込んだ仕様を requirements へ分ける」タスクを 1 件起票する（書式は同ファイルの「運用ルール」。番号はいちばん大きい T-番号の次。参照は `docs/_imported/<ファイル名>`、サイズは M）。
 5. `settings.action` が `skipped`（既にあった）なら、init.mjs は中身に触れていない。問 8 で「2 つだけ足す」と答えていたら、Edit で `extraKnownMarketplaces` と `enabledPlugins` の 2 キーだけを足す（ほかの行は変えない。引数モードでは足さない）。Edit の前に、運営者へ「このあと `.claude/settings.json` を直すときに英語の確認が出たら、Yes を選んでください（"Yes, and allow Claude to edit files in this project's .claude folder for this session" でもよい。版によって文言が少し違うので、`.claude folder` を含む Yes を選ぶ）」と伝えておく。`settings.diff` の `missingDeny`・`missingAsk` は、手順 4 で差分として報告する。
 
@@ -143,7 +144,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
    1. stage していないファイルを指していないか（`toStage` を add し忘れていないか）
    2. `.gitignore` が置いたファイルを除外していないか（apply の `ignored`）
    3. 指している先が本当に無いか（あれば文面どおりに直す）
-   4. `--claude-md append`・`keep` のとき、既存の `CLAUDE.md`（キットが足した表より上）の記述が原因なら、勝手に直さない。運営者の承知を得て直すか、報告に `ファイル:行 → 参照先` を載せてコミットへ進んでよい
+   4. キットが置いていない既存の文書（`--claude-md append`・`keep` のときの `CLAUDE.md` のキットが足した表より上、apply の `created` に無い `docs/` の文書など）の記述が原因なら、勝手に直さない。運営者の承知を得て直すか、報告に `ファイル:行 → 参照先` を載せてコミットへ進んでよい。まだ無いファイルを例として書いた行なら、その行に「例」の字があると検査の対象から外れる
 4. **コミットの承知がある**（問 10 で「はい」、または引数の末尾が `commit`）なら続ける。無ければここで止め、「stage までで止めました。日付（`{{YYYY-MM-DD}}`）は未記入のままです。もう一度 `/docdd:init` を打つとコミットまで進めます」と伝える。
 5. `node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" dates --json` で、未記入の日付（`{{YYYY-MM-DD}}`）と、今回中身を変えた文書の冒頭の『更新日』を今日にする。結果の `toStage` をもう一度 `git add` する。
 6. `node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" precommit --json` を実行する。`ok` が false なら**コミットせずに止まり**、`problems` の文面を報告する（`.env` が除外されていない、`.env` やログイン状態のファイルが stage されている、名前とメールが無い、など）。`warnings` は報告に載せるだけでよい。
@@ -166,6 +167,10 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
 - `--claude-md keep` にした場合は、「表が無いので `/docdd:dev-loop` などのスキルは止まります。`/docdd:init` をもう一度打つと、同じ 3 択で『表だけ末尾に足す』を選び直せます」
 - コミットした場合は、記録に使った名前とメール（`<名前> <メール>`。メールは push すると公開される）
 - `CLAUDE.md.bak` を作った場合は「不要なら消してよい（コミットしていない）」
+- Web 以外のプロジェクト（手順 0-10）なら、「Web 以外のプロジェクトです。検証コマンドは一部しか推定できません。README『Web 以外のプロジェクトで使う』を見て埋め、必要なら『スキルへの追加指示』を書いてください」と伝え、次を添える
+  - `.gitignore` には「# docdd: 共通」の塊だけを使った（Web 向けの `node_modules/` などは足していない）
+  - `/docdd:ui-polish`・`/docdd:speed-up`・`/docdd:playwright-cli` は Web 専用で、このプロジェクトでは「該当なし」と報告して止まる。画面・操作は、`/docdd:verify-e2e` が『E2E（実際に動かす）』行のコマンドで確かめ、自動で確かめられないものは運営者に確かめてもらう
+  - 既存の `CLAUDE.md` や運用文書に、コミットの前に承知を得る・決まったブランチで作業する・手で直さないファイルがある、などの約束があれば、「スキルへの追加指示」表に行を足すよう勧める（スキルは本文より追加指示を優先する）。許可設定（`.claude/settings.json`）の直し方も README の同じ節にある
 - 次の一手（上から最初に当てはまるもの）:
   - 既存コードあり（手順 0-9）→ `/docdd:doc-sync --full`（いまのコードから docs を起こす）
   - PRD に機能を複数書いた → `/docdd:tasks-from-prd`（PRD の機能一覧からタスクをまとめて起票する）

@@ -3,6 +3,54 @@
 版ごとの変更と、プロジェクトに置いた雛形への影響をまとめます。
 「雛形への影響: あり」の版へ上げたら、プロジェクトのフォルダで `/docdd:update-kit` を打ちます（プラグインを更新しただけでは、置いた雛形は変わりません）。
 
+## 0.3.0（2026-09-14）
+
+Web 以外のプロジェクト（Unity などのゲーム・ネイティブアプリ）で害が出ないように直した。細部は `CLAUDE.md`「スキルへの追加指示」と README「Web 以外のプロジェクトで使う（例: Unity）」で合わせる。
+
+### 追加
+
+- **init**: `status` の `stack` に `kind`（`web`・`unity`・`godot`・`flutter`・`android`・`apple`・`dotnet`・`unknown`）・`web`（`true`／`false`／`null`）・`unity`（`editorVersion`）を足した。目印は Unity が `ProjectSettings/ProjectVersion.txt`、Godot が `project.godot`、Flutter が `pubspec.yaml` の `flutter:`、Android が gradle ファイルの `com.android`、Apple が一番上の `*.xcodeproj`・`Package.swift`、.NET が一番上の `*.sln`・`*.csproj`。Web のフレームワークが無く、これらの目印があれば `web` は `false`。
+- **雛形 `.claude/rules/docdd-kit.md`**: 変更影響表に「画面・操作（Web 以外）」行（『E2E（実際に動かす）』行の自動テスト。自動テストで確かめられない見た目・操作は、運営者に確かめてもらう手順を示して「運営者確認待ち」）と、「エンジンやツールが保存するファイル」行（手で書き換えず、対になるファイルの増減を `git status` で確かめる）を足した。
+- **雛形 `CLAUDE.md`**: 検証コマンドの例に「Unity の例」を足した。
+- **verify-e2e**: `references/pitfalls.md` に 3 行（テストが 0 件でも成功の終了コード、Editor が同じプロジェクトを開いている、`-runTests` と `-quit` を一緒に使う）。
+- README に「Web 以外のプロジェクトで使う（例: Unity）」（init の判定・Unity の検証コマンドの例と注意・おすすめの追加指示・許可設定の直し方・Web 以外で変わる動き）。
+- evals に 3 ケース: `init-unity-project`・`tasks-from-prd-waits-for-approval`・`release-not-published`。
+- テスト: Unity・Godot・Flutter・Android・Apple・.NET の判定、Web 以外の `.gitignore`、旧い行名「E2E（実ブラウザ）」の読み取り、`check-doc-refs` の Web 以外の拡張子。
+
+### 変更
+
+- **行名**: `CLAUDE.md`「検証コマンド」表の「E2E（実ブラウザ）」を「E2E（実際に動かす）」にした（トークン `{{E2E}}` は同じ）。`init.mjs` は旧名の行も読んで埋める（行名は書き換えない）。変更影響表の「画面」行を「画面（Web）」にした。
+- **init**: Web 以外（`stack.web` が `false`）では、『開発サーバー起動』『本番モード起動』を「無い」と推定する（Unity と Godot では『依存の脆弱性』も）。『単体・DBテスト』『E2E（実際に動かす）』『ビルド』は推定しない。`.gitignore` は「# docdd: 共通」の塊だけを使う。`status.next` と報告で README の節を案内する。ファイルの走査で `Library`・`Temp`・`Logs`・`UserSettings`・`obj`・`Build`・`Builds`・`.godot`・`Pods`・`DerivedData`・`.gradle` の中を見ない。仕様書の候補から `ProjectSettings/`・`Packages/`・`Assets/`・`addons/`・`Pods/`・`android/`・`ios/` の下を外し、`.txt` はファイル名に仕様らしい語があるときだけにした。既存コードの判定で `Assets/TutorialInfo/`・`Packages/` の下を数えず、Godot の `.gd`・Flutter の `.dart`・C/C++・Lua も数える（Godot の `addons/` と、Flutter の `android/`・`ios/`・`linux/`・`macos/`・`windows/`・`web/` の下は数えない）。Web のプロジェクトで `dev` が無いときは `serve`・`start` を開発サーバーとみなし、どちらも無ければ『開発サーバー起動』を未記入のまま聞く（「無い」にすると Web 専用のスキルの門で止まるため）。`docs/_imported/` へ移すのは Markdown の仕様書・メモだけにした。参照の検査がキットの置いていない既存の文書で落ちたら、勝手に直さず、報告して進めてよい。
+- **update-kit**: 参照の検査がキットの置いていない既存の文書で落ちたら、勝手に直さない。
+- **雛形 `.gitignore`**: 「# docdd: 共通」と「# docdd: Web（Node.js・ビルド出力・Playwright）」の 2 つの塊に分けた。
+- **雛形 `.claude/rules/docdd-kit.md`**: DoD の UI 行を Web と Web 以外に分けた。規約の言語は、既存の文書・コミットが別の言語ならそれに合わせる。コミットの承知・決まったブランチ運用は「スキルへの追加指示」に書く、の 1 行を足した。規約の一時ファイルの行は、`.playwright-cli/` が .gitignore 済みなのを Web のプロジェクトだけにした（Web 以外では Web の塊を足さないため）。
+- **雛形 docs・tasks**: PRD の §3.3 を「主な画面（ゲームならシーン）と利用者の流れ」にし、§2 の例に「プレイヤー」を足した。`development-and-testing.md` §4 に Unity Test Framework（EditMode／PlayMode）と Unity の注意 2 点。`requirements/README.md` に、見出し ID の接頭辞は文書ごとに足してよい（例: RULE-01）。`docs/README.md` は、参照の検査の拡張子を `scripts/check-doc-refs.mjs` に任せる書き方にした。BACKLOG の基盤タスクの見本の行名を揃えた。
+- **検査スクリプト**: `check-doc-refs` の対象の拡張子に 33 個を足した（Web の `html`・`vue` など、Unity の `cs`・`unity`・`prefab`・`asset` など、Godot の `gd`・`tscn` など、ネイティブアプリの `swift`・`kt`・`dart` など、C/C++ など）。既存の文書に、まだ無いファイルを「例」の字なしで書いた行があると、新たに「無いファイル」と出る。4 本の刻印を v0.3.0 にした。
+- **ui-polish・speed-up・playwright-cli**: 手順の最初に「Web の門」を置いた。『開発サーバー起動』行が「無い」なら「該当なし」と報告して止まる。
+- **verify-e2e**: Web 以外は『E2E（実際に動かす）』行のコマンドで確かめる。合否は終了コードだけでなく、結果の件数・失敗数でも見る（0 件は合格にしない）。Editor のロックなどで動かせなければ、Claude はエディタを閉じず、運営者に確かめてもらう（探索的確認）。
+- **release**: 「実ブラウザで確認する」を「公開先で確認する」にした。Web 以外はブラウザで開かず、運営者に確かめてもらう手順を示す（まだなら「運営者確認待ち」）。ホスティングを使わないなら、ビルド成功を待つ手順を飛ばす。
+- **add-task**: 要望の形を「誰が・どの画面（ゲームならシーン・モード）で・何ができるようになるか」にした。見出し ID の接頭辞を文書ごとに足してよい。
+- **refactor**: 振る舞いの保存に、エンジンが保存する値と参照（例: Unity のシリアライズされた値・.meta の GUID）を含めた。
+- **dev-loop**: 行名を揃え、報告に「運営者確認待ち」を載せる。
+- **マニフェスト**: `plugin.json` を 0.3.0 にした。`plugin.json`・`marketplace.json`・README 2 本の説明を「Web アプリやゲームなど」に広げた。
+- **CI**: `actions/checkout` と `actions/setup-node` を v7（Node.js 24 で動く版）にした。
+- 0.2.0 の項の evals の記述を、事実に合わせて直した。
+
+### 雛形への影響: あり
+
+- `/docdd:update-kit` で置き換わるのは、キットのファイルの `.claude/rules/docdd-kit.md` と `scripts/*.mjs`（4 本）だけ。
+- 利用者のファイル（`CLAUDE.md` の行名と Unity の例、`docs/PRD.md` の §3.3 の見出しと §2 の例、`docs/README.md`、`docs/requirements/README.md`、`docs/operations/development-and-testing.md`、`tasks/BACKLOG.md`、`.gitignore` の 2 つの塊）は、update-kit では変わらない（update-kit が足すのは新しい版で増えた節と行だけで、既存の節の中の文言は変えない）。要るなら、雛形（リポジトリの `plugins/docdd/templates/`）と見比べて手で直す。特に v0.2.0 で置いた `CLAUDE.md` の行名「E2E（実ブラウザ）」は、`init.mjs` は旧名も読むが、スキルは新しい行名で書いてあるので、手で「E2E（実際に動かす）」に直す。
+
+### 今回やらなかったこと（理由）
+
+- スタック別の変更影響表・エンジン専用のスキル: Web 以外で害が出ないように直すことを優先した。細部は「スキルへの追加指示」と README の案内で合わせる。
+- v0.2.0 で置いた行名「E2E（実ブラウザ）」と `.gitignore` の見出し「# docdd」を update-kit で移すこと: 既存の利用者がいないため。
+- Unity の PlayMode テストとコマンドでのビルドの実測: README と雛形の例は、Unity 公式ドキュメントと、別の検証用プロジェクトでの EditMode テストの実測に基づく。
+- `check-doc-refs` で、英語の for example に続く箇条を見本として飛ばすこと: 判定は行ごとなので、飛ばすにはその行に「例」の字を入れる。
+- 新しい evals 3 ケースの本実行: ケースの読み込みと、scaffold・grader の形だけ確かめた。本実行は `RELEASING.md` の手順で行う。
+- Unity CLI・MCP サーバーの案内: experimental で、docdd では確かめていない。
+- playwright-cli の `references/` の置き換え（0.2.0 の「次の版の予定」）: 今回は Web 以外への対応を優先した。次以降の版で行う。
+
 ## 0.2.0（2026-09-13）
 
 ### 追加
@@ -53,7 +101,7 @@
 ### 今回やらなかったこと（理由）
 
 - GitHub のリポジトリの説明・トピックの設定（`gh repo edit`）、push・タグ・GitHub Release: 外部への書き込みなので、著者が手で行う（`RELEASING.md`）。
-- evals の本実行: 費用が出るので CI には入れず、`RELEASING.md` の手動の手順で回す（今回はケースの形式だけ確かめた）。
+- evals を CI で回すこと: 費用が出るので CI には入れず、`RELEASING.md` の手動の手順で回す。公開前に 3 ケースを本実行した。サンドボックスが設定ファイルの書き込みを止めて init が雛形を置き切らない不具合が見つかり、直したあとに 3 ケースとも合格した。
 - playwright-cli の `references/` 9 本の置き換え: 次の版で行う（下の「次の版の予定」）。今回は `NOTICE` で出典を示した。
 - `eject` スキル: README「手順書を直したいとき」の写し方で代替する。次以降の版で検討。
 - 導入済みかを決まった形で判定するスクリプト（`docdd-status.sh`）: スキルの前置きの文章で代替する。次以降の版で検討。

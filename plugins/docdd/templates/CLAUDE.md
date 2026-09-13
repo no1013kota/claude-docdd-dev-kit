@@ -36,7 +36,7 @@
 | 単体・DBテスト | {{単体・DBテスト}} |
 | ビルド | {{ビルド}} |
 | 本番モード起動 | {{本番モード起動}} |
-| E2E（実ブラウザ） | {{E2E}} |
+| E2E（実際に動かす） | {{E2E}} |
 | 全検査（push 前に1回） | {{全検査}} |
 | docs の検査 | `node scripts/check-doc-dates.mjs && node scripts/check-doc-refs.mjs` |
 | 未記入欄の検査 | `node scripts/check-doc-placeholders.mjs` |
@@ -48,6 +48,7 @@
 - npm の例: 開発サーバー起動 `npm run dev`（http://127.0.0.1:3000 で開く）／型検査 `npx tsc --noEmit`／単体・DBテスト `npm test`／E2E `npx playwright test`／全検査 `npx tsc --noEmit && npm run lint && npm test && npm run build && npx playwright test`
 - pnpm の例: lint `pnpm lint`／ビルド `pnpm build`／本番モード起動 `pnpm build && PORT=3100 pnpm start`（http://127.0.0.1:3100 で開く）
 - Python の例: 型検査 `mypy .`／lint `ruff check .`／単体・DBテスト `pytest`／依存の脆弱性 `pip-audit`
+- Unity の例（Unity の場所は macOS の Unity Hub の既定で、環境で違う。`<版>` は ProjectSettings/ProjectVersion.txt の m_EditorVersion）: 開発サーバー起動・本番モード起動・依存の脆弱性は「無い」／テスト用 DB は ③／型検査・lint は「無い」（コンパイルエラーは EditMode テストで出る）／単体・DBテスト `mkdir -p Logs && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/MacOS/Unity -batchmode -nographics -projectPath "$(pwd)" -runTests -testPlatform EditMode -testResults "$(pwd)/Logs/editmode.xml" -logFile "$(pwd)/Logs/editmode.log"`（EditMode テスト）／E2E は同じコマンドの EditMode を PlayMode に、editmode を playmode に変え、`-nographics` を外す（PlayMode テスト）。Editor で同じプロジェクトを開いていると動かない。`-runTests` に `-quit` を付けない
 - テスト用 DB の例（3 種から選ぶ）: ① ローカル: `supabase start`／② ホスト型の開発専用: 接続先は .env の `DATABASE_URL`（本番と別・開発専用・破棄可能）／③ DB 無し
 - 依存の脆弱性の例: npm で package-lock.json があるなら `node scripts/audit-check.mjs`、pnpm なら `pnpm audit --audit-level=high`
 - 実物1周の費用上限の例: 1 周 $0.50 まで（金額はバッククォートで囲まない。外部 AI や有料 API を使わないなら「無い」）

@@ -36,7 +36,7 @@ cat > CLAUDE.md <<'MD'
 | 単体・DBテスト | `npm test` |
 | ビルド | `npm run build` |
 | 本番モード起動 | 無い |
-| E2E（実ブラウザ） | 無い |
+| E2E（実際に動かす） | 無い |
 | 全検査（push 前に1回） | `npm test && npm run build` |
 | docs の検査 | 無い |
 | 未記入欄の検査 | 無い |

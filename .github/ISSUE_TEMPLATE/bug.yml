@@ -47,7 +47,7 @@ body:
     attributes:
       label: docdd の版
       description: Claude Code の中で `/plugin list` と打ったときの docdd の版
-      placeholder: "例: 0.2.0"
+      placeholder: "例: 0.3.0"
     validations:
       required: true
 
