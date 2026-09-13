@@ -1,7 +1,7 @@
 # 非エンジニアのための Claude Code 開発キット（プラグイン `docdd`）
 
 このキットは、**1人の非エンジニアが Claude Code で Web アプリを作り続ける**ための最小セットです。
-ブログ記事「[非エンジニアが Claude Code でアプリを作り続けるための仕組み](https://exosai.net/blog/claude-code-non-engineer-workflow)」で説明している
+ブログ記事「[コードを書けなくても Claude Code でアプリを壊さず作り続ける「4つのファイル」の仕組み](https://exosai.net/blog/claude-code-non-engineer-workflow)」で説明している
 「守る約束（CLAUDE.md）」「仕様の正本（docs）」「作業キュー（BACKLOG）」「決まった手順（skills）」の4点に、
 仕様書の検査スクリプトと設定ファイルを足したものです。特定のアプリやフレームワークには依存しません。
 

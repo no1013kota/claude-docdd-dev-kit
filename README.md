@@ -2,7 +2,7 @@
 
 このリポジトリは Claude Code の**プラグイン マーケットプレイス**です。
 1人の非エンジニアが Claude Code で Web アプリを作り続けるための「約束（CLAUDE.md）・仕様書（docs）・作業キュー（BACKLOG）・手順書（skills）」を、プラグイン1本で入れられるようにしています。特定のアプリやフレームワークには依存しません。
-背景と使い方の全体像はブログ記事「[非エンジニアが Claude Code でアプリを作り続けるための仕組み](https://exosai.net/blog/claude-code-non-engineer-workflow)」にあります。
+背景と使い方の全体像はブログ記事「[コードを書けなくても Claude Code でアプリを壊さず作り続ける「4つのファイル」の仕組み](https://exosai.net/blog/claude-code-non-engineer-workflow)」にあります。
 
 ## 入れ方（3コマンド）
 
