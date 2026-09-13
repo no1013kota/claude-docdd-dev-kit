@@ -1,8 +1,8 @@
 {
   "name": "docdd",
   "displayName": "docdd — 非エンジニアのための開発キット",
-  "version": "0.2.0",
-  "description": "1人の非エンジニアが Claude Code で Web アプリを作り続けるための開発キット。約束（CLAUDE.md）・仕様書（docs）・作業キュー（BACKLOG）の雛形を置く init と、タスク起票・開発サイクル・docs 同期・検証・反映の手順書（スキル）、取り消しにくい git 操作を止める hook。",
+  "version": "0.3.0",
+  "description": "1人の非エンジニアが Claude Code で Web アプリやゲームなどを作り続けるための開発キット。約束（CLAUDE.md）・仕様書（docs）・作業キュー（BACKLOG）の雛形を置く init と、タスク起票・開発サイクル・docs 同期・検証・反映の手順書（スキル）、取り消しにくい git 操作を止める hook。",
   "author": {
     "name": "no1013kota",
     "url": "https://github.com/no1013kota"

@@ -1,6 +1,6 @@
 ---
 name: playwright-cli
-description: ブラウザ操作の道具箱。画面を開く・操作する・スクショを撮る・コンソールや通信を確かめるときに使う。ui-polish・verify-e2e・release から使う。接続先はローカル（公開先の確認は release のときだけ）。
+description: ブラウザ操作の道具箱。画面を開く・操作する・スクショを撮る・コンソールや通信を確かめるときに使う。ui-polish・verify-e2e・release から使う。接続先はローカル（公開先の確認は release のときだけ）。Web 以外のプロジェクト（ゲーム・ネイティブアプリなど）では使わない。
 allowed-tools: Bash(playwright-cli *) Bash(npx playwright-cli *) Bash(npx @playwright/cli *) Bash(npx playwright cli *)
 ---
 
@@ -9,6 +9,8 @@ allowed-tools: Bash(playwright-cli *) Bash(npx playwright-cli *) Bash(npx @playw
 `/docdd:ui-polish`・`/docdd:verify-e2e`・`/docdd:release`（公開先の確認）から使う。**ここは入口だけ**。詳しい使い方は `references/` に分けてある（必要になったものだけ読む）。全コマンドは `playwright-cli --help`。
 
 `references/` は英語で、上流（Playwright の CLI `@playwright/cli` 0.1.17）に同梱のスキルと同じ内容。上流のスキルそのものは `playwright-cli install --skills` で入れられる。
+
+**最初に（Web の門）**: `CLAUDE.md`「検証コマンド」表の『開発サーバー起動』行が「無い」なら（Web の画面が無いプロジェクト。例: Unity・Godot のゲーム、ネイティブアプリ）、このスキルは使わない。「該当なし」と報告して止まる（画面の確認は変更影響表の「画面・操作（Web 以外）」行）。
 
 ## インストール
 
@@ -21,7 +23,7 @@ allowed-tools: Bash(playwright-cli *) Bash(npx playwright-cli *) Bash(npx @playw
 
 ## 接続先
 
-- 開くのはローカルだけ。アドレスは `CLAUDE.md`「検証コマンド」表の『開発サーバー起動』行に従う（行が「無い」か未記入なら、推測で起動せず理由を報告する）。
+- 開くのはローカルだけ。アドレスは `CLAUDE.md`「検証コマンド」表の『開発サーバー起動』行に従う（行が未記入なら、推測で起動せず理由を報告する）。
 - OAuth など外部サービスが `localhost` を許可しない場合は `127.0.0.1` で開く。
 - 公開先（本番）を開くのは `/docdd:release` の公開先確認のときだけ。そのときも見るだけ（`open`・`snapshot`・`console`・`requests`・`eval`）にし、入力・送信・ログインなど中身を変える操作をしない。
 - 本番へ向けないための決まりは `/docdd:verify-e2e` の「安全な既定」。

@@ -1,17 +1,19 @@
-# docdd
-node_modules/
+# docdd: 共通
 .env
 .env.*
 !.env.example
 .claude/settings.local.json
 CLAUDE.local.md
-*.auth-state.json
+.DS_Store
+
+# docdd: Web（Node.js・ビルド出力・Playwright）
+node_modules/
+/.next/
+/dist/
+/test-results/
+/playwright-report/
+/traces/
 .playwright-cli/
-traces/
-playwright-report/
-test-results/
-.next/
-dist/
+*.auth-state.json
 tmp-*
 *.tmp.*
-.DS_Store

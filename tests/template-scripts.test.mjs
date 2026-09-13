@@ -247,6 +247,60 @@ test("refs: 取り込んだ原文と見本は除外し、参照が 0 件なら�
   assert.match(r.out, /相対リンク/);
 });
 
+test("refs: Unity の .cs・.unity の無いファイルを検出して exit 1（実在するもの・拡張子だけの記述は通す）", () => {
+  const dir = repo({
+    "CLAUDE.md": [
+      "- 移動は `Assets/Scripts/Units/UnitMover.cs` で行う",
+      "- 戦闘の場面は `Assets/Scenes/Battle.unity`",
+      "- 実在する `Assets/Scripts/Player.cs:12` と `Assets/Scenes/Main.unity`",
+      "- 拡張子だけの `.unity`・`.prefab`・`.meta` はパスとして読まない",
+      "",
+    ].join("\n"),
+    "Assets/Scripts/Player.cs": "\n",
+    "Assets/Scenes/Main.unity": "\n",
+  });
+  const r = run(REFS, dir);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /無いファイルを指す記述が 2 件あります（4 件を検査）/);
+  assert.match(r.out, /CLAUDE\.md:1 {2}→ {2}Assets\/Scripts\/Units\/UnitMover\.cs/);
+  assert.match(r.out, /CLAUDE\.md:2 {2}→ {2}Assets\/Scenes\/Battle\.unity/);
+  assert.doesNotMatch(r.out, /Player\.cs|Main\.unity/);
+});
+
+test("refs: Web 以外の拡張子（Unity・Godot・ネイティブアプリ・C/C++ など）と html・vue なども検査する", () => {
+  const exts = [
+    "cs", "unity", "prefab", "asset", "asmdef", "mat", "shader", "hlsl", "uxml", "uss", "inputactions",
+    "gd", "tscn", "tres", "dart", "kt", "kts", "java", "swift", "c", "cc", "cpp", "h", "hpp", "lua",
+    "gradle", "csproj", "sln", "html", "scss", "vue", "svelte", "astro",
+  ];
+  const dir = repo({ "CLAUDE.md": `${exts.map((ext) => `- \`missing/file.${ext}\``).join("\n")}\n` });
+  const r = run(REFS, dir);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, new RegExp(`${exts.length} 件あります（${exts.length} 件を検査）`));
+  exts.forEach((ext, i) => {
+    assert.match(r.out, new RegExp(`CLAUDE\\.md:${i + 1} {2}→ {2}missing/file\\.${ext}\\n`), ext);
+  });
+});
+
+test("refs: 「例」を含む行とコードブロックの中の .cs・.unity は検査しない", () => {
+  const dir = repo({
+    "CLAUDE.md": [
+      "例: `Assets/Scripts/Nothing.cs` のように書く",
+      "- シーンの例: `Assets/Scenes/Nothing.unity`",
+      "```text",
+      "`Assets/Scenes/InFence.unity`",
+      "`Assets/Scripts/Editor/InFence.cs`",
+      "```",
+      "本物は `Assets/Scripts/Player.cs`",
+      "",
+    ].join("\n"),
+    "Assets/Scripts/Player.cs": "\n",
+  });
+  const r = run(REFS, dir);
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /1 件すべて実在しました/);
+});
+
 // ---------------------------------------------------------------------------
 // check-doc-dates.mjs
 // ---------------------------------------------------------------------------

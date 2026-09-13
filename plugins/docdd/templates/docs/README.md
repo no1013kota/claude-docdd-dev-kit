@@ -6,7 +6,7 @@
 
 | 文書 | 何が書いてあるか | 主な節 | 更新するとき |
 |---|---|---|---|
-| [PRD](./PRD.md) | 何を作るか・なぜ。スコープ、料金、上限 | 機能一覧＝§3.1、やらないこと＝§3.2、主な画面と利用者の流れ＝§3.3、料金・上限＝§4、変更履歴＝§6 | 要件・料金・スコープ・上限が変わる |
+| [PRD](./PRD.md) | 何を作るか・なぜ。スコープ、料金、上限 | 機能一覧＝§3.1、やらないこと＝§3.2、主な画面（ゲームならシーン）と利用者の流れ＝§3.3、料金・上限＝§4、変更履歴＝§6 | 要件・料金・スコープ・上限が変わる |
 | [要件詳細](./requirements/README.md) | どう作るか（画面・データ・処理・API） | 文書の分け方＝§1、見出し ID の規則（S=画面、D=データ、P=処理、API=API）＝§2。雛形は [00_template.md](./requirements/00_template.md) | 実装の構造が変わる |
 | [開発とテストの進め方](./operations/development-and-testing.md) | テストの層と盲点、検証を回すタイミング | テストの層＝§1、いつ回すか＝§2、テスト基盤が無いとき＝§4、落とし穴＝§5 | 検証手段が変わる |
 | [ADR](./decisions/README.md) | 上記で表現しきれない技術判断 | 1判断1ファイル。雛形は [0000-template.md](./decisions/0000-template.md) | 後から変えにくい選択をしたとき |
@@ -42,7 +42,7 @@ PRD や要件を自前の書式で持ち込んだら、「主な節」の列を�
 | `scripts/check-doc-placeholders.mjs` | 未記入欄の検査 | 二重波かっこ（`{{…}}`）の埋める欄が残っていないか。対象は `CLAUDE.md`・`.claude/rules/`・`docs/`・`tasks/` の Markdown。インラインコード・コードブロック・HTML コメントの中は数えない |
 | `scripts/audit-check.mjs` | 依存の脆弱性 | 依存ライブラリの high 以上の脆弱性（docs の検査ではない）。据え置くものは `scripts/audit-allowlist.json` に理由を添えて書く |
 
-**参照の検査の対象**: `CLAUDE.md`・`.claude/rules/`・`docs/` の Markdown のうち、(1) バッククォートで囲んだファイルパスで、拡張子が md・js・jsx・ts・tsx・mjs・cjs・py・go・rb・php・sql・toml・json・yml・yaml・css・sh・prisma のもの、(2) `[PRD](./PRD.md)` のような `](./…)` の形の相対リンク。「例」という字を含む行と HTML コメントの中は見ない（例に出すファイル名は実在しなくてよい）。
+**参照の検査の対象**: `CLAUDE.md`・`.claude/rules/`・`docs/` の Markdown のうち、(1) バッククォートで囲んだファイルパスで、拡張子が `scripts/check-doc-refs.mjs` の EXTS にあるもの（md・js・ts・py・cs・unity・prefab・gd・dart・swift など）、(2) `[PRD](./PRD.md)` のような `](./…)` の形の相対リンク。「例」という字を含む行、HTML コメントの中、コードブロックの中は見ない（例に出すファイル名は実在しなくてよい）。「例」の判定は行ごと（前の行に「例」や for example があっても、その行に「例」の字が無ければ検査する）。
 
 どの検査も git が追跡しているファイルだけを見る（**新しく作ったファイルは先に `git add` する**）。`docs/_imported/` 配下と、雛形の `docs/requirements/00_template.md`・`docs/decisions/0000-template.md` は対象外。更新日の表を持たない文書（README・ADR）は日付の検査の対象外。
 

@@ -68,7 +68,7 @@ v0.1 系では、キット共通の約束（5原則・変更影響 → 必須の
 ### 3. 検査して、コミットする
 
 1. 結果の `toStage` を**パスを明示して** `git add` する（`git add -A` は使わない）。
-2. `node scripts/check-doc-dates.mjs && node scripts/check-doc-refs.mjs` を実行する（`CLAUDE.md`「検証コマンド」表の『docs の検査』行）。落ちたら文面をそのまま報告する。
+2. `node scripts/check-doc-dates.mjs && node scripts/check-doc-refs.mjs` を実行する（`CLAUDE.md`「検証コマンド」表の『docs の検査』行）。落ちたら文面をそのまま報告する。キットが置いていない既存の文書の記述が原因なら、勝手に直さない（運営者の承知を得て直すか、報告に `ファイル:行 → 参照先` を載せる）。
    - 移行で足した表の行は `{{…}}` のままになる。`node scripts/check-doc-placeholders.mjs` の一覧を報告に載せ、`/docdd:init` をもう一度打つと推定と聞き直しで埋められる、と伝える。
 3. 運営者の承知があれば `git commit -m "chore: docdd キットを v<kitVersion> に更新"` でコミットする。承知が無ければ stage までで止める。
 

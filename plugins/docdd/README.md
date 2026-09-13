@@ -1,7 +1,7 @@
 # docdd — 非エンジニアのための Claude Code 開発キット
 
 **何か**: Claude Code のプラグインです。約束ごと・仕様書・作業キューの雛形と、決まった手順書（スキル）をまとめて入れます。
-**誰向けか**: 1 人で Web アプリを作り続ける非エンジニア（日本語で使う人）。
+**誰向けか**: 1 人で Web アプリやゲームなどを作り続ける非エンジニア（日本語で使う人）。
 **何ができるか**: 要望をタスクにし、実装・検証・仕様書の更新・コミット・本番反映までを、毎回同じ手順で Claude Code に進めさせます。
 
 ## 前提
@@ -13,9 +13,10 @@
 | 必須 | Node.js 18 以上（LTS＝長く保守される版を推奨） | init・検査スクリプト・hook | init が止まる。hook は起動できず（会話に hook error の通知が出る）、止めるはずの操作もそのまま実行される |
 | 必須（release を使うなら） | GitHub のリポジトリ | `/docdd:release` | PR と CI 待ちの手順が使えない |
 | 任意 | gh（GitHub をコマンドで操作する道具） | `/docdd:release` の PR 作成と CI 待ち | push の前に止まり、`gh auth login` するか GitHub の画面で PR を作るかを聞く |
-| 任意 | playwright-cli とブラウザ | `/docdd:ui-polish`・`/docdd:verify-e2e`・release の公開先確認 | 手作業の確認に切り替えて、その旨を報告する |
+| 任意 | playwright-cli とブラウザ | Web のプロジェクトの `/docdd:ui-polish`・`/docdd:verify-e2e`・release の公開先確認 | 手作業の確認に切り替えて、その旨を報告する |
 
 - フレームワークは問いません（React・Vue・Python など）。ただし、検査スクリプトは Node.js、`/docdd:release` は GitHub を前提にしています。
+- Web アプリが中心です。Unity などのゲーム・ネイティブアプリでも、仕様書・タスク・検証の表の進め方は使えます。Web 専用のスキルは「該当なし」で止まります（下の「Web 以外のプロジェクトで使う（例: Unity）」）。
 - playwright-cli は、入れてよいかを聞いてから、動作を確かめた `@playwright/cli@0.1.17` を入れます。ブラウザは手元の Google Chrome を使い、無ければ Playwright 用のブラウザ（初回に数百 MB のダウンロード）を、聞いてから取得します。
 - Windows: Git for Windows を入れるのがおすすめです。入れると Claude Code は bash でコマンドを実行します（無いと PowerShell で実行し、bash で書いた手順がそのまま動かないことがあります）。
 - Desktop アプリ: 配布元（マーケットプレイス）の追加はターミナルで行います（ターミナルで使う Claude Code が要ります）。`claude plugin marketplace add no1013kota/claude-docdd-dev-kit` → `claude plugin install docdd@claude-docdd-dev-kit` を打ち、そのあと Desktop の入力欄の横の ＋ → Plugins で docdd が入っていることを確かめます。
@@ -56,9 +57,9 @@ Claude Code の中で次を順に打ちます。1・2 はどのフォルダで�
 - git で管理していなければ `git init` の承知を取ります。コミットに残す名前とメールが無ければ聞き、このリポジトリだけに設定します。
 - 分からないことだけを聞きます: プロジェクト名と何を作るか、既にある仕様書、PRD のやること・やらないこと、公開先 URL、反映の方式と本番ブランチ、テスト用 DB、有料 API の費用上限、`.claude/settings.json` を置いてよいか、既存の `CLAUDE.md` の扱い、既存の `tasks/BACKLOG.md` に書式の節を足すか、コミットしてよいか。選んで答える問い（反映の方式・テスト用 DB など）を先に選択の画面で、書いて答える問い（名前・機能・URL など）をあとで番号付きの 1 つのメッセージで、**分けて**聞きます。選ぶ問いが多いときは、選択の画面が 2 回になります。
 - テスト用 DB は「① 手元で起動する／② ホスト型の開発専用／③ 使わない」から選びます。ホスト型の DB は、本番と別・開発専用・破棄可能な接続先だけにします（`CLAUDE.md` にこの語が無いと `/docdd:verify-integration` は止まります）。
-- **検証コマンド（型検査・lint・テストなど）は聞きません。** `package.json`・`pyproject.toml` などから推定して表に書きます（違っていたら直します）。
+- **検証コマンド（型検査・lint・テストなど）は聞きません。** `package.json`・`pyproject.toml` などから推定して表に書きます（違っていたら直します）。Web 以外のプロジェクトでは一部しか推定できません（下の「Web 以外のプロジェクトで使う（例: Unity）」）。
 - 雛形はスクリプト（`init.mjs`）がまとめて置くので、ファイルを 1 つずつ確認されることはありません。その代わり、`.claude/settings.json` だけは置く前に 1 回聞きます。置き場所がふさがっているとき（例: `tasks` という名前のファイルがある）は、1 つも置かずに止まって理由を伝えます（退けてから、もう一度 `/docdd:init`）。
-- **既存のファイルは上書きしません。** 既存の `.claude/settings.json`・`.mcp.json` には触らず、雛形との差分を報告するだけです。既存の `CLAUDE.md` は「置き換える（元は `CLAUDE.md.bak` に残す）／表だけ末尾に足す（おすすめ）／そのまま（表が無いので、スキルは『先に `/docdd:init` を実行してください』で止まります）」から選びます。`.gitignore` は足りない行だけを足します。既存の `tasks/BACKLOG.md` にキットの書式の節（運用ルール・タスク・要決定）が無ければ、足すかを聞きます（書いてある内容は変えません）。
+- **既存のファイルは上書きしません。** 既存の `.claude/settings.json`・`.mcp.json` には触らず、雛形との差分を報告するだけです。既存の `CLAUDE.md` は「置き換える（元は `CLAUDE.md.bak` に残す）／表だけ末尾に足す（おすすめ）／そのまま（表が無いので、スキルは『先に `/docdd:init` を実行してください』で止まります）」から選びます。`.gitignore` は足りない行だけを足します（Web 以外のプロジェクトでは、`.env` などの共通の行だけ）。既存の `tasks/BACKLOG.md` にキットの書式の節（運用ルール・タスク・要決定）が無ければ、足すかを聞きます（書いてある内容は変えません）。
 - `git add`（パスを指定）→ 参照の検査 → 日付の記入 → コミット前の安全確認（`.env` が除外されているか、ログイン状態のファイルが入っていないか）→ コミット → 日付の検査 → 未記入の欄の一覧、の順に進めます。
 - 最後に、置いたもの・推定した行・未記入の欄（`ファイル:行`）・次の一手を報告します。
 
@@ -107,6 +108,97 @@ init は既存のコードを見つけると、次の一手に `/docdd:doc-sync 
 これは、いまのコードと docs を突き合わせます。docs が雛形のままなら、実装済みの機能を `docs/requirements/` の文書と PRD の機能一覧に書き起こし、1 コミットにします。
 料金やスコープなど、あなたが決めることは書かずに `tasks/BACKLOG.md` の「要決定」へ回します。済んだら `/docdd:tasks-from-prd` か `/docdd:add-task` へ進みます。
 
+## Web 以外のプロジェクトで使う（例: Unity）
+
+docdd は Web アプリが中心です。Unity などのゲーム・ネイティブアプリでも、仕様書・タスク・検証の表の進め方は使えます。Web の画面を前提にした所は、`CLAUDE.md` の「検証コマンド」表と「スキルへの追加指示」表で、このプロジェクトに合わせます。
+
+### init が判定すること
+
+`/docdd:init` は、次の目印でプロジェクトの種類を見分けます。
+
+| 種類 | 目印 |
+|---|---|
+| Unity | `ProjectSettings/ProjectVersion.txt`（版は中の `m_EditorVersion`） |
+| Godot | `project.godot` |
+| Flutter | `pubspec.yaml` に `flutter:` がある |
+| Android | `settings.gradle`・`build.gradle`（`.kts` も）に `com.android` がある |
+| Xcode・Swift | 一番上の `*.xcodeproj`・`Package.swift` |
+| .NET | 一番上の `*.sln`・`*.csproj`（Unity でないとき） |
+
+目印があり、Web のフレームワーク（Next.js・Vite・React・Django・FastAPI・Flask・Rails など）が無ければ「Web 以外」として進めます。両方あれば Web として扱います。
+
+- 「検証コマンド」表の『開発サーバー起動』『本番モード起動』を「無い」にします。Unity と Godot では『依存の脆弱性』も「無い」にします。
+- 『単体・DBテスト』『E2E（実際に動かす）』『ビルド』は推定しません。下の例（雛形の `CLAUDE.md` の例にも同じ内容があります）を見て書きます。
+- `.gitignore` には「# docdd: 共通」の塊（`.env` など）だけを足します。Web 向けの塊（`node_modules/` など）は足しません。
+- `Library/`・`Temp/` など、エンジンやツールが作るフォルダの中は見ません。`ProjectSettings/`・`Packages/`・`Assets/` の下のファイルは、既にある仕様書の候補に出しません。
+
+### 検証コマンド表の書き方（Unity の例）
+
+- 先に Unity Hub にサインインし、ライセンスを有効にしておきます（Unity Personal はコマンドラインで認証できません）。
+- コマンドの Unity の場所は、macOS の Unity Hub の既定の場所の例です。環境で違います。`<版>` は `ProjectSettings/ProjectVersion.txt` の `m_EditorVersion` です。
+- 結果とログは `Logs/` に出します。Unity 向けの一般的な `.gitignore` は `Logs/` を除外しています（無ければ足します）。
+
+| 行 | 書く値 |
+|---|---|
+| 開発サーバー起動・本番モード起動・依存の脆弱性 | 無い |
+| テスト用 DB | ③ DB 無し |
+| 型検査・lint | 無い（コンパイルエラーは EditMode テストの実行で出ます） |
+| 単体・DBテスト | 下の EditMode テストのコマンド |
+| E2E（実際に動かす） | 下の PlayMode テストのコマンド |
+| ビルド | ビルド用のスクリプト（`Editor` フォルダーに置いた static メソッド。`-executeMethod` で呼ぶ）を作るまでは「無い」。作ったら `-batchmode -quit` と `-buildTarget`（例: `StandaloneOSX`）も付けて呼ぶ（テストと違い、ビルドには `-quit` を付ける）。コマンドでのビルドは docdd では確かめていません |
+| 全検査（push 前に1回） | 『単体・DBテスト』と『E2E（実際に動かす）』のコマンドを `&&` でつなぐ |
+
+EditMode テスト（表にはバッククォートで囲んで書きます）:
+
+```sh
+mkdir -p Logs && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/MacOS/Unity -batchmode -nographics -projectPath "$(pwd)" -runTests -testPlatform EditMode -testResults "$(pwd)/Logs/editmode.xml" -logFile "$(pwd)/Logs/editmode.log"
+```
+
+PlayMode テスト:
+
+```sh
+mkdir -p Logs && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/MacOS/Unity -batchmode -projectPath "$(pwd)" -runTests -testPlatform PlayMode -testResults "$(pwd)/Logs/playmode.xml" -logFile "$(pwd)/Logs/playmode.log"
+```
+
+注意:
+
+- **Editor で同じプロジェクトを開いていると動きません**（batchmode で開けません）。Editor を閉じてから回すか、Editor の Test Runner で回します。`/docdd:verify-e2e` は Editor を閉じません。閉じてから回すかをあなたに 1 回聞き、閉じられなければ、あなたに確かめてもらう手順を示します（探索的確認）。
+- **`-runTests` に `-quit` を付けません。** テストが終わる前に Editor が閉じます。
+- **テストが 0 件でも終了コードは 0（成功）です。** `-testResults` の XML の件数（`total`）も見ます（`/docdd:verify-e2e` は件数も見ます）。
+- **PlayMode テストには `-nographics` を付けません**（付けてよいかの公式の記載が見つからないため）。
+- Unity CLI（`unity test`・`unity mcp` など）は experimental（試験提供）で、docdd では確かめていません。
+
+公式ドキュメント: https://docs.unity3d.com/6000.3/Documentation/Manual/test-framework/reference-command-line.html ／ https://docs.unity3d.com/6000.3/Documentation/Manual/EditorCommandLineArguments.html ／ https://docs.unity3d.com/6000.3/Documentation/Manual/build-command-line.html
+
+### おすすめの「スキルへの追加指示」
+
+既存の `CLAUDE.md` や運用文書に、コミットの前に承知を得る・決まったブランチで作業する・手で直さないファイルがある、などの約束があれば、`CLAUDE.md`「スキルへの追加指示」表に行を足します。行があるスキルは、その行を本文より優先します。
+
+```markdown
+| `/docdd:dev-loop` | コミットの前に差分を見せて運営者の承知を得る。作業は feature ブランチ（例: feature/unit-movement）で行い、main へ直接コミットしない。シーン（.unity）・プレハブ（.prefab）・.meta は手で書き換えず、Unity Editor か Editor スクリプトで変える |
+```
+
+コミットするほかのスキル（`/docdd:add-task`・`/docdd:tasks-from-prd`・`/docdd:refactor` など）にも、同じ約束の行を足します。
+
+### 許可設定の直し方
+
+`.claude/settings.json` の雛形では、`git commit` とファイルの編集は確認なしで進みます。約束に合わせて、Claude Code に次のように頼みます。
+
+- コミットの前に必ず確認を出す: 「`.claude/settings.json` の allow にある `Bash(git commit:*)` を ask へ移して」
+- エンジンが保存するファイルを Claude に書き換えさせない: 「deny に `Edit(**/*.meta)`・`Edit(**/*.unity)`・`Edit(**/*.prefab)` を足して」
+
+`Edit` の deny は、Claude のファイル編集と、Claude Code が見分けられる一部の Bash のファイル操作（`sed` など）に効きます。スクリプトの中でファイルを書き換える処理までは止まりません（公式: https://code.claude.com/docs/en/permissions）。
+
+### Web 以外で変わる動き
+
+| スキル・検査 | Web 以外のプロジェクトでは |
+|---|---|
+| `/docdd:ui-polish`・`/docdd:speed-up`・`/docdd:playwright-cli` | 「該当なし」と報告して止まる（『開発サーバー起動』行が「無い」とき） |
+| `/docdd:verify-e2e` | ブラウザを使わず、『E2E（実際に動かす）』行のコマンドで確かめる。結果の件数・失敗数も見る。動かせなければ、運営者に確かめてもらう手順を示す（探索的確認） |
+| `/docdd:release` | 公開先をブラウザで開かず、運営者に確かめてもらう手順（入れ方・起動・操作・期待する見え方）を示す。確かめてもらうまでは「運営者確認待ち」。ホスティングを使わなければ、ビルド成功を待つ手順を飛ばす |
+| 変更影響表（`.claude/rules/docdd-kit.md`） | 「画面・操作（Web 以外）」行（自動テストと運営者の確認）と、「エンジンやツールが保存するファイル」行（手で書き換えず、対になる .meta などの増減を `git status` で確かめる）を使う |
+| `scripts/check-doc-refs.mjs` | `.cs`・`.unity`・`.prefab`・`.asset` などへの参照も検査する。既存の文書に、まだ無いファイルを例として書いた行があると「無いファイル」と出る。その行に「例」の字を入れるか、コードブロックか HTML コメントの中に書く |
+
 ## 中身
 
 ### init がプロジェクトへ置くもの
@@ -116,7 +208,7 @@ init は既存のコードを見つけると、次の一手に `/docdd:doc-sync 
 | `CLAUDE.md` | このプロジェクトのコマンドの表（検証コマンド・反映コマンド）と「スキルへの追加指示」 | あなた |
 | `.claude/rules/docdd-kit.md` | キット共通の約束（5 原則・変更影響 → 必須の検証・Definition of Done・規約）。毎回自動で読まれる | キット（直すと update-kit が聞く） |
 | `.claude/settings.json` | 許可設定と、プラグインの取得元（別の PC で開いたとき、Claude Code がプラグインの入れ方を案内する）。置く前に聞く | あなた |
-| `.gitignore` | `.env`・ログイン状態・一時ファイルを git に入れない。既にあれば足りない行だけ足す | あなた |
+| `.gitignore` | `.env`・ログイン状態・一時ファイルを git に入れない。塊は「# docdd: 共通」と「# docdd: Web（Node.js・ビルド出力・Playwright）」の 2 つで、Web 以外のプロジェクトでは共通の塊だけ。既にあれば足りない行だけ足す | あなた |
 | `.mcp.json` | MCP サーバーの設定。Next.js なら shadcn/ui と Next.js DevTools（版を固定）、それ以外は空 | あなた |
 | `docs/README.md` | 仕様書の地図と「どこに何を書くか」 | あなた |
 | `docs/PRD.md` | 何を作るか | あなた |
@@ -143,15 +235,17 @@ init は既存のコードを見つけると、次の一手に `/docdd:doc-sync 
 | `/docdd:dev-loop` | 起票したタスクを 1 件進めるとき（`/docdd:dev-loop T-01` で指定もできる） | 実装・検証・docs の更新・コミットと報告 |
 | `/docdd:doc-sync` | コミットの前（dev-loop が呼ぶ）。`--full` でコード全体と docs のずれを監査 | docs の更新と検査の結果 |
 | `/docdd:verify-integration` | DB・migration（DB の変更手順）・権限・サーバー側の処理を変えたあと | テスト用 DB で通した統合検証の結果 |
-| `/docdd:verify-e2e` | 利用者の操作の流れを変えたあと | ブラウザで最後まで通した確認の結果 |
-| `/docdd:ui-polish` | 画面や UI 部品を作る・直すとき | 主な状態・画面幅・アクセシビリティ・実ブラウザの確認 |
-| `/docdd:playwright-cli` | ブラウザ操作の道具箱（ほかのスキルから使う） | 画面の操作・スクショ・コンソールの確認 |
+| `/docdd:verify-e2e` | 利用者の操作の流れを変えたあと | 最後まで通した確認の結果（Web はブラウザで、Web 以外は『E2E（実際に動かす）』行のテストで） |
+| `/docdd:ui-polish` | 画面や UI 部品を作る・直すとき（**Web 専用**） | 主な状態・画面幅・アクセシビリティ・実ブラウザの確認 |
+| `/docdd:playwright-cli` | ブラウザ操作の道具箱（ほかのスキルから使う。**Web 専用**） | 画面の操作・スクショ・コンソールの確認 |
 | `/docdd:refactor` | 振る舞いを変えずに中身を整えるとき（単体テストが無ければ監査だけ） | `tasks/REFACTOR_PLAN.md` と小さな改善のコミット |
-| `/docdd:speed-up` | 画面が遅いと感じたとき（サーバー描画の Web アプリ向け。単体テストが無ければ計測と候補出しだけ） | 計測結果と改善のコミット |
+| `/docdd:speed-up` | 画面が遅いと感じたとき（**Web 専用**。サーバー描画の Web アプリ向け。単体テストが無ければ計測と候補出しだけ） | 計測結果と改善のコミット |
 | `/docdd:security-audit` | 公開前や、認証・課金・外部連携を触ったあと | 見つけた穴の報告。直すのは 1 件ずつあなたの「はい」を得てから |
 | `/docdd:maintenance` | 週 1 回（`/docdd:maintenance monthly` で月次も） | 外部 API の変化・脆弱性・溜まったデータ・費用の点検結果 |
-| `/docdd:release` | 依頼を全部終えたあと（自分で打ったときだけ動く） | 反映の方式（A: push で自動公開／B: staging → PR／C: 反映コマンド／まだ公開しない）で経路を選ぶ。本番へ出す前に必ずあなたの「はい」を得る。公開先の確認結果 |
+| `/docdd:release` | 依頼を全部終えたあと（自分で打ったときだけ動く） | 反映の方式（A: push で自動公開／B: staging → PR／C: 反映コマンド／まだ公開しない）で経路を選ぶ。本番へ出す前に必ずあなたの「はい」を得る。公開先の確認結果（Web 以外は、あなたに確かめてもらう手順） |
 | `/docdd:update-kit` | プラグインを更新したあと（自分で打ったときだけ動く） | 置いた雛形を新しい版へ（手付かずは置き換え、手を入れたものは 1 件ずつ決める） |
+
+**Web 専用**のスキルは、`CLAUDE.md`「検証コマンド」表の『開発サーバー起動』行が「無い」プロジェクト（Web 以外）では、「該当なし」と報告して止まります。
 
 ### hook（取り消しにくい操作を止める柵）
 
@@ -195,7 +289,7 @@ docdd を入れたプロジェクト（`.claude/settings.json` で有効にし�
 | `.claude/settings.json` の `extraKnownMarketplaces`（「自分だけ無効にする」を選んだときは `enabledPlugins` も） | フォルダを開くと配布元が追加され、`enabledPlugins` が残っていればプラグインの入れ方が表示される | 残ったキーを消す（許可設定は残してよい） |
 | `.mcp.json` | MCP サーバーの設定が残る | 使っていなければ消す |
 | `scripts/` の 4 本と `package.json` に足した行（npm は 4 行、それ以外は 3 行） | 害はない（そのまま動く） | 消すなら `CLAUDE.md` の「docs の検査」「未記入欄の検査」「依存の脆弱性」行と、`docs/README.md` の検査の説明も直す |
-| `.docdd/manifest.json`・`.gitignore` の `# docdd` の塊 | 害はない | 消してよい（`.gitignore` は残すのがおすすめ） |
+| `.docdd/manifest.json`・`.gitignore` の `# docdd:` で始まる見出しの塊 | 害はない | 消してよい（`.gitignore` は残すのがおすすめ） |
 | `docs/`・`tasks/` | あなたの仕様書と作業キュー | 残してよい |
 
 消すときは Claude Code に「docdd の参照（`/docdd:`）と、上の表のファイルを消して」と頼み、差分を確かめてからコミットします。
