@@ -8,6 +8,7 @@
 6. `node scripts/check-skill-refs.mjs`（3・6 はまとめて `npm run check`）。
 7. 空の git リポジトリで `claude --plugin-dir <このリポジトリ>/plugins/docdd` を起動し、`/docdd:init` を最後まで通す。
 8. 雛形の `.mcp.json` の版を `npm view shadcn version` と `npm view next-devtools-mcp version` で確かめて上げ、Next.js のプロジェクトで 1 回起動確認する。
-9. evals（手動・費用が出る）: `claude plugin eval plugins/docdd --trust-plugin --scaffold --runs 1 --ablation none --threshold 0.8 --no-publish --max-cost-usd 5 --allow-tools Bash Write Edit`。
+9. evals（手動・費用が出る）: `claude plugin eval plugins/docdd --trust-plugin --scaffold --runs 1 --ablation none --threshold 0.8 --no-publish --max-cost-usd 10 --allow-tools Bash Write Edit`。
+   - 6 ケースで約 4 ドル（2026-09-14 の実績）。macOS では評価のサンドボックスの中で `/usr/bin/git`（xcrun）が一時キャッシュを書けず、git が動かないことがある（ログに `xcrun_db` と `Operation not permitted`）。そのケースだけ `--case <名前>` で回し直し、ログで原因を確かめてから判断する。
 10. コミットの件名に変更内容を書く（版番号だけにしない）。push し、CI が緑になったコミットだけをリリースする。
 11. `claude plugin tag plugins/docdd --push`（タグ `docdd--vX.Y.Z`）。
