@@ -1,0 +1,17 @@
+# docdd
+node_modules/
+.env
+.env.*
+!.env.example
+.claude/settings.local.json
+CLAUDE.local.md
+*.auth-state.json
+.playwright-cli/
+traces/
+playwright-report/
+test-results/
+.next/
+dist/
+tmp-*
+*.tmp.*
+.DS_Store

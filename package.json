@@ -1,0 +1,12 @@
+{
+  "name": "docdd-dev-kit-repo",
+  "private": true,
+  "description": "docdd プラグインの配布リポジトリで使う検査とテスト（プラグインには同梱しない）",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "check": "node scripts/check-skill-refs.mjs && node scripts/check-version-stamps.mjs"
+  }
+}

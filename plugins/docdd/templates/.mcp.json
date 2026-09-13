@@ -3,7 +3,8 @@
     "shadcn": {
       "command": "npx",
       "args": [
-        "shadcn@latest",
+        "-y",
+        "shadcn@4.21.0",
         "mcp"
       ]
     },
@@ -11,7 +12,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "next-devtools-mcp@latest"
+        "next-devtools-mcp@0.4.0"
       ]
     }
   }

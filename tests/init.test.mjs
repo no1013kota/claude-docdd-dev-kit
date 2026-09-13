@@ -1,0 +1,872 @@
+// plugins/docdd/scripts/init.mjs（/docdd:init と /docdd:update-kit の処理）のテスト。依存なし・Node 18 以上。
+//
+//   node --test tests/init.test.mjs
+//
+// 使い捨ての git リポジトリを os.tmpdir() に作り、init.mjs をそのフォルダ（cwd）で実行する。
+// 置いた雛形の検査スクリプト（templates/scripts）も実際に回し、「導入 → 検査 → コミット」が通ることを固定する。
+// 通信は使わない。「空の Node プロジェクト」は npm init -y の出力と同じ package.json を直接書く（npm の起動と通信を避けるため）。
+// v0.1.4 の雛形を使うテストは、このリポジトリの履歴（f08d4e5）が無い浅い clone では飛ばす。
+import assert from "node:assert/strict";
+import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import fs from "node:fs";
+import { devNull, tmpdir } from "node:os";
+import path from "node:path";
+import { test } from "node:test";
+import { fileURLToPath } from "node:url";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const INIT = path.join(ROOT, "plugins/docdd/scripts/init.mjs");
+const TEMPLATES = path.join(ROOT, "plugins/docdd/templates");
+const PLUGIN_VERSION = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(ROOT, "plugins/docdd/.claude-plugin/plugin.json"), "utf8")).version;
+  } catch {
+    return "0.2.0";
+  }
+})();
+const V014 = "f08d4e5";
+
+const ENV = { ...process.env, GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_NOSYSTEM: "1", NPM_CONFIG_UPDATE_NOTIFIER: "false" };
+for (const key of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE"]) delete ENV[key];
+
+const made = [];
+process.on("exit", () => {
+  for (const dir of made) fs.rmSync(dir, { recursive: true, force: true });
+});
+
+const sha = (buf) => createHash("sha256").update(buf).digest("hex");
+const today = () => {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+function git(cwd, args) {
+  return execFileSync("git", args, { cwd, env: ENV, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+}
+
+function write(dir, files) {
+  for (const [rel, body] of Object.entries(files)) {
+    const file = path.join(dir, rel);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, body);
+  }
+}
+
+const read = (dir, rel) => fs.readFileSync(path.join(dir, rel), "utf8");
+const exists = (dir, rel) => fs.existsSync(path.join(dir, rel));
+
+/** mkdtemp →（git init → 名前とメール）→ ファイル →（コミット）。 */
+function project({ files = {}, identity = true, withGit = true, commit = false } = {}) {
+  const dir = fs.mkdtempSync(path.join(tmpdir(), "docdd-init-"));
+  made.push(dir);
+  if (withGit) {
+    git(dir, ["init", "-q"]);
+    git(dir, ["config", "commit.gpgsign", "false"]);
+    if (identity) {
+      git(dir, ["config", "user.name", "docdd test"]);
+      git(dir, ["config", "user.email", "test@example.com"]);
+    }
+  }
+  write(dir, files);
+  if (commit) {
+    git(dir, ["add", "--", ...Object.keys(files)]);
+    git(dir, ["-c", "user.name=seed", "-c", "user.email=seed@example.com", "commit", "-q", "-m", "seed"]);
+  }
+  return dir;
+}
+
+/** init.mjs を --json で実行する。 */
+function init(cwd, ...args) {
+  const r = spawnSync(process.execPath, [INIT, ...args, "--json"], { cwd, env: ENV, encoding: "utf8" });
+  let json = null;
+  try {
+    json = JSON.parse(r.stdout);
+  } catch {
+    // 出力が JSON でなければ null のまま（assert で文面を見せる）
+  }
+  return { status: r.status, json, stdout: r.stdout, stderr: r.stderr };
+}
+
+/** 置いた雛形の検査スクリプトを実行する。 */
+function check(cwd, name) {
+  return spawnSync(process.execPath, [`scripts/${name}.mjs`], { cwd, env: ENV, encoding: "utf8" });
+}
+
+function stage(cwd, paths) {
+  if (paths.length) git(cwd, ["add", "--", ...paths]);
+}
+
+function listTemplates(dir = TEMPLATES, prefix = "") {
+  const out = [];
+  for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+    const rel = prefix ? `${prefix}/${ent.name}` : ent.name;
+    if (ent.isDirectory()) out.push(...listTemplates(path.join(dir, ent.name), rel));
+    else if (rel !== "package.scripts.json" && ent.name !== ".DS_Store") out.push(rel);
+  }
+  return out.sort();
+}
+
+/** プロジェクトの全ファイルの sha256（.git を除く）。冪等性の確認に使う。 */
+function snapshot(dir) {
+  const out = {};
+  const walk = (d, prefix) => {
+    for (const ent of fs.readdirSync(d, { withFileTypes: true })) {
+      if (ent.name === ".git") continue;
+      const rel = prefix ? `${prefix}/${ent.name}` : ent.name;
+      if (ent.isDirectory()) walk(path.join(d, ent.name), rel);
+      else out[rel] = sha(fs.readFileSync(path.join(d, ent.name)));
+    }
+  };
+  walk(dir, "");
+  return out;
+}
+
+const SCRIPTS_TO_ADD = JSON.parse(fs.readFileSync(path.join(TEMPLATES, "package.scripts.json"), "utf8"));
+
+// `npm init -y`（npm 10）が書く package.json と同じ中身。
+const NPM_INIT_PACKAGE = `{
+  "name": "demo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \\"Error: no test specified\\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
+`;
+
+const BUILTIN_CLAUDE_MD = `# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+- \`npm run dev\` starts the dev server
+`;
+
+function tablesBlock() {
+  const t = fs.readFileSync(path.join(TEMPLATES, "CLAUDE.md"), "utf8");
+  return t.slice(t.indexOf("<!-- docdd:tables:begin -->"), t.indexOf("<!-- docdd:tables:end -->") + "<!-- docdd:tables:end -->".length);
+}
+
+/** v0.1.4 の雛形で導入し、v0.1 の init が埋めたあとの姿に近づけたファイル一式。履歴（f08d4e5）が無ければ null。 */
+function v014Files() {
+  const has = spawnSync("git", ["-C", ROOT, "cat-file", "-e", `${V014}^{commit}`], { env: ENV });
+  if (has.status !== 0) return null;
+  const files = {};
+  const list = git(ROOT, ["ls-tree", "-r", "--name-only", V014, "plugins/docdd/templates"]).split("\n").filter(Boolean);
+  for (const f of list) {
+    const rel = f.replace("plugins/docdd/templates/", "");
+    if (rel === "package.scripts.json") continue;
+    files[rel] = execFileSync("git", ["-C", ROOT, "show", `${V014}:${f}`], { env: ENV });
+  }
+  const fill = (s) =>
+    s
+      .toString("utf8")
+      .replace("<プロジェクト名>", "よみログ")
+      .replace("`<型検査。例: npm run typecheck。無ければ「無い」>`", "`npm run typecheck`")
+      .replaceAll("<YYYY-MM-DD>", "2026-01-15");
+  for (const rel of ["CLAUDE.md", "docs/PRD.md", "docs/operations/development-and-testing.md", "tasks/REFACTOR_PLAN.md"]) files[rel] = fill(files[rel]);
+  files["package.json"] = '{\n  "name": "yomi",\n  "scripts": {\n    "check:doc-dates": "node scripts/check-doc-dates.mjs",\n    "check:doc-refs": "node scripts/check-doc-refs.mjs",\n    "audit:check": "node scripts/audit-check.mjs"\n  }\n}\n';
+  return files;
+}
+
+const localDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/** LF だけの改行（CRLF でない \n）の数。 */
+const bareLf = (s) => s.split("\n").length - 1 - (s.match(/\r\n/g) || []).length;
+
+// ---------------------------------------------------------------------------------------------
+
+test("空の Node プロジェクト: status → apply → git add → 検査 → dates → precommit → commit → 検査、2 回目の apply は何も変えない", () => {
+  const dir = project({ files: { "package.json": NPM_INIT_PACKAGE } });
+
+  const st = init(dir, "status");
+  assert.equal(st.status, 0, st.stderr);
+  assert.equal(st.json.state, "not-installed");
+  assert.equal(st.json.atGitRoot, true);
+  assert.equal(st.json.packageManager, "npm");
+  assert.equal(st.json.scaffold.present, true);
+  const unit = st.json.inferred.find((r) => r.row === "単体・DBテスト");
+  assert.equal(unit.value, "無い", "npm init の既定の test は「無い」扱い");
+  assert.equal(st.json.inferred.find((r) => r.row === "テスト用 DB").value, null);
+  assert.equal(st.json.inferred.find((r) => r.row === "依存の脆弱性").value, "node scripts/audit-check.mjs", "lock がまだ無い npm でも audit-check を使う");
+  assert.equal(st.json.claudeMd.exists, false);
+
+  const a = init(dir, "apply", "--fill-inferred", "--tasks", "test-infra");
+  assert.equal(a.status, 0, a.stdout + a.stderr);
+  assert.deepEqual([...a.json.created].sort(), listTemplates(), "package.scripts.json 以外の雛形を全部置く");
+  assert.equal(exists(dir, "package.scripts.json"), false);
+  assert.deepEqual(a.json.modified.map((m) => m.path), ["package.json"]);
+
+  // package.json: 元のインデント（2 スペース）・キーの並び・末尾改行を保って scripts に 4 行を足す
+  const expected = NPM_INIT_PACKAGE.replace(
+    '"test": "echo \\"Error: no test specified\\" && exit 1"',
+    ['"test": "echo \\"Error: no test specified\\" && exit 1"', ...Object.entries(SCRIPTS_TO_ADD).map(([k, v]) => `    ${JSON.stringify(k)}: ${JSON.stringify(v)}`)].join(",\n"),
+  );
+  assert.equal(read(dir, "package.json"), expected);
+
+  // manifest
+  const man = JSON.parse(read(dir, ".docdd/manifest.json"));
+  assert.equal(man.kitVersion, PLUGIN_VERSION);
+  assert.equal(man.files["scripts/check-doc-refs.mjs"].owner, "kit");
+  assert.equal(man.files["scripts/check-doc-refs.mjs"].sha256, sha(fs.readFileSync(path.join(TEMPLATES, "scripts/check-doc-refs.mjs"))));
+  assert.equal(man.files[".claude/rules/docdd-kit.md"].owner, "kit");
+  assert.equal(man.files["docs/requirements/00_template.md"].owner, "sample");
+  assert.equal(man.files["docs/PRD.md"].owner, "user");
+
+  // toStage: 置いたもの＋変えた package.json＋manifest
+  for (const p of [...a.json.created, "package.json", ".docdd/manifest.json"]) assert.ok(a.json.toStage.includes(p), `toStage に ${p}`);
+
+  // --fill-inferred と --tasks
+  const claude = read(dir, "CLAUDE.md");
+  assert.match(claude, /^\| 単体・DBテスト \| 無い \|$/m);
+  assert.match(claude, /^\| 依存の脆弱性 \| `node scripts\/audit-check\.mjs` \|$/m, "lock がまだ無い npm でも推定する（lock が無ければスクリプトが npm install を案内する）");
+  assert.match(claude, /^\| lint \| 無い \|$/m, "package.json はあるが script が無い行は「無い」");
+  assert.match(claude, /^\| テスト用 DB \| \{\{テスト用 DB\}\} \|$/m, "推定できない行は {{…}} のまま");
+  const backlog = read(dir, "tasks/BACKLOG.md");
+  assert.match(backlog, /^### T-01: テスト基盤の導入 `todo`$/m);
+  assert.match(backlog, /参照: docs\/operations\/development-and-testing\.md §4 \/ 依存: なし \/ サイズ: S/);
+  assert.ok(backlog.indexOf("### T-01: テスト基盤の導入") > backlog.indexOf("## タスク"));
+  assert.ok(backlog.indexOf("### T-01: テスト基盤の導入") < backlog.indexOf("## 要決定・外部準備"));
+
+  stage(dir, a.json.toStage);
+  const refs = check(dir, "check-doc-refs");
+  assert.equal(refs.status, 0, refs.stdout + refs.stderr);
+
+  const d = init(dir, "dates");
+  assert.equal(d.status, 0, d.stdout);
+  assert.deepEqual(d.json.changed.map((c) => c.file).sort(), ["docs/PRD.md", "docs/operations/development-and-testing.md", "tasks/REFACTOR_PLAN.md"]);
+  assert.ok(read(dir, "docs/requirements/00_template.md").includes("{{YYYY-MM-DD}}"), "見本の日付は埋めない");
+  assert.ok(read(dir, "docs/decisions/0000-template.md").includes("{{YYYY-MM-DD}}"), "見本の日付は埋めない");
+  assert.ok(!read(dir, "docs/PRD.md").includes("{{YYYY-MM-DD}}"));
+  stage(dir, d.json.toStage);
+
+  const pc = init(dir, "precommit");
+  assert.equal(pc.status, 0, pc.stdout);
+  assert.equal(pc.json.ok, true);
+  assert.deepEqual(pc.json.identity, { name: "docdd test", email: "test@example.com" });
+
+  git(dir, ["commit", "-q", "-m", "chore: docdd キットを導入"]);
+  const dates = check(dir, "check-doc-dates");
+  assert.equal(dates.status, 0, dates.stdout + dates.stderr);
+
+  const ph = check(dir, "check-doc-placeholders");
+  assert.equal(ph.status, 1, "未記入の欄が残っているので 1");
+  const phOut = ph.stdout + ph.stderr;
+  assert.match(phOut, /CLAUDE\.md:1 +\{\{プロジェクト名\}\}/);
+  assert.match(phOut, /docs\/PRD\.md:\d+ +\{\{機能名\}\}/);
+  assert.doesNotMatch(phOut, /CLAUDE\.md:\d+ +\{\{型検査\}\}/, "推定で埋めた行は残らない");
+  assert.doesNotMatch(phOut, /\{\{YYYY-MM-DD\}\}/, "dates で埋めた");
+
+  const after = init(dir, "status");
+  assert.equal(after.json.state, "partial", "未記入の欄が残っているので partial");
+  assert.equal(after.json.manifest.tracked, true);
+
+  // 2 回目: 何も上書き・追記しない
+  const before = snapshot(dir);
+  const again = init(dir, "apply", "--fill-inferred", "--tasks", "test-infra");
+  assert.equal(again.status, 0, again.stdout);
+  assert.deepEqual(again.json.created, []);
+  assert.deepEqual(again.json.modified, []);
+  assert.equal(again.json.manifest.written, false);
+  assert.deepEqual(again.json.tasks, [{ kind: "test-infra", id: "T-01", title: "テスト基盤の導入", action: "exists" }]);
+  assert.deepEqual(snapshot(dir), before);
+  assert.equal(git(dir, ["status", "--porcelain"]), "");
+});
+
+test("package.json: 4 スペース・scripts 無し・末尾改行なし／タブ・既存の script は変えない", () => {
+  const four = '{\n    "name": "four",\n    "private": true\n}';
+  const dir = project({ files: { "package.json": four } });
+  const a = init(dir, "apply", "--settings", "no");
+  assert.equal(a.status, 0, a.stdout);
+  const scripts = Object.entries(SCRIPTS_TO_ADD).map(([k, v]) => `        ${JSON.stringify(k)}: ${JSON.stringify(v)}`).join(",\n");
+  assert.equal(read(dir, "package.json"), `{\n    "name": "four",\n    "private": true,\n    "scripts": {\n${scripts}\n    }\n}`);
+  assert.equal(a.json.packageJson.reformatted, false);
+
+  const tab = '{\n\t"name": "tab",\n\t"scripts": {\n\t\t"check:doc-refs": "echo mine",\n\t\t"files": ["a", "b"]\n\t},\n\t"keywords": ["x", "y"]\n}\n';
+  const dir2 = project({ files: { "package.json": tab } });
+  const b = init(dir2, "apply");
+  assert.equal(b.status, 0, b.stdout);
+  const added = Object.entries(SCRIPTS_TO_ADD).filter(([k]) => k !== "check:doc-refs");
+  assert.deepEqual(b.json.packageJson.added, added.map(([k]) => k));
+  assert.deepEqual(b.json.packageJson.alreadyPresent, ["check:doc-refs"]);
+  assert.equal(
+    read(dir2, "package.json"),
+    `{\n\t"name": "tab",\n\t"scripts": {\n\t\t"check:doc-refs": "echo mine",\n\t\t"files": ["a", "b"]${added.map(([k, v]) => `,\n\t\t${JSON.stringify(k)}: ${JSON.stringify(v)}`).join("")}\n\t},\n\t"keywords": ["x", "y"]\n}\n`,
+  );
+});
+
+test("package.json の無いプロジェクト: 検証表は未記入のまま・scripts は足さない・settings を置かなくても参照の検査は通る", () => {
+  const dir = project({ files: { "README.md": "# memo\n" } });
+  const st = init(dir, "status");
+  assert.equal(st.json.scaffold.present, false, "package.json もソースも無い＝土台が無い");
+  assert.ok(st.json.inferred.every((r) => r.value === null), "推定できる材料が無い");
+
+  const a = init(dir, "apply", "--fill-inferred", "--settings", "no", "--tasks", "scaffold,test-infra");
+  assert.equal(a.status, 0, a.stdout);
+  assert.equal(exists(dir, "package.json"), false);
+  assert.equal(a.json.packageJson.exists, false);
+  assert.ok(!a.json.toStage.includes("package.json"));
+  assert.deepEqual(a.json.filled, []);
+  assert.match(read(dir, "CLAUDE.md"), /^\| 型検査 \| \{\{型検査\}\} \|$/m);
+  assert.equal(exists(dir, ".claude/settings.json"), false);
+  assert.equal(a.json.settings.action, "declined");
+  assert.equal(read(dir, ".mcp.json"), '{\n  "mcpServers": {}\n}\n', "Next.js ではないので空");
+
+  const backlog = read(dir, "tasks/BACKLOG.md");
+  assert.match(backlog, /^### T-01: アプリの土台を作る `todo`$/m);
+  assert.match(backlog, /^### T-02: テスト基盤の導入 `todo`$/m);
+  assert.match(backlog, /依存: T-01 \/ サイズ: S/);
+  assert.ok(backlog.indexOf("### T-01: アプリの土台を作る") < backlog.indexOf("### T-02: テスト基盤の導入"));
+  assert.ok(backlog.includes("### T-NN: <基盤・環境のタスク名> `todo`"), "運用ルールのコードブロックの見本は変えない（実タスクと番号が重ならない T-NN）");
+
+  stage(dir, a.json.toStage);
+  const refs = check(dir, "check-doc-refs");
+  assert.equal(refs.status, 0, refs.stdout + refs.stderr);
+});
+
+test("既存の BACKLOG: 実タスクの番号の続きで、最初のタスクの前に足す", () => {
+  const backlog = "# 開発バックログ\n\n## タスク\n\n### T-05: ログインできる `doing`\n- 参照: PRD A-1\n\n## 要決定・外部準備（ユーザー作業）\n";
+  const dir = project({ files: { "tasks/BACKLOG.md": backlog, "package.json": '{\n  "name": "x"\n}\n' } });
+  const a = init(dir, "apply", "--tasks", "test-infra");
+  assert.equal(a.status, 0, a.stdout);
+  assert.deepEqual(a.json.tasks, [{ kind: "test-infra", id: "T-06", title: "テスト基盤の導入", action: "added" }]);
+  const text = read(dir, "tasks/BACKLOG.md");
+  assert.ok(text.indexOf("### T-06: テスト基盤の導入") < text.indexOf("### T-05: ログインできる"));
+  assert.ok(text.startsWith("# 開発バックログ\n\n## タスク\n\n### T-06"));
+  assert.ok(a.json.modified.some((m) => m.path === "tasks/BACKLOG.md"));
+});
+
+test("既存の CLAUDE.md（組み込み /init 風）: status が検出し、append は表だけ末尾に足し、replace は .bak を残す", () => {
+  const dir = project({ files: { "CLAUDE.md": BUILTIN_CLAUDE_MD, "package.json": '{\n  "name": "x"\n}\n' } });
+  const st = init(dir, "status");
+  assert.equal(st.json.claudeMd.exists, true);
+  assert.equal(st.json.claudeMd.builtinInit, true);
+  assert.equal(st.json.claudeMd.hasMarkers, false);
+
+  const a = init(dir, "apply", "--claude-md", "append");
+  assert.equal(a.status, 0, a.stdout);
+  assert.equal(read(dir, "CLAUDE.md"), `${BUILTIN_CLAUDE_MD}\n${tablesBlock()}\n`);
+  assert.equal(a.json.claudeMd.action, "appended");
+  assert.ok(a.json.toStage.includes("CLAUDE.md"));
+  const again = init(dir, "apply", "--claude-md", "append");
+  assert.equal(again.json.claudeMd.action, "unchanged", "マーカーがあれば二重に足さない");
+  assert.equal(read(dir, "CLAUDE.md"), `${BUILTIN_CLAUDE_MD}\n${tablesBlock()}\n`);
+
+  const dir2 = project({ files: { "CLAUDE.md": BUILTIN_CLAUDE_MD } });
+  const r = init(dir2, "apply", "--claude-md", "replace");
+  assert.equal(r.status, 0, r.stdout);
+  assert.equal(read(dir2, "CLAUDE.md"), fs.readFileSync(path.join(TEMPLATES, "CLAUDE.md"), "utf8"));
+  assert.equal(read(dir2, "CLAUDE.md.bak"), BUILTIN_CLAUDE_MD);
+  assert.deepEqual(r.json.backups, ["CLAUDE.md.bak"]);
+  assert.ok(!r.json.toStage.some((p) => p.startsWith("CLAUDE.md.bak")), ".bak は stage しない");
+  assert.equal(JSON.parse(read(dir2, ".docdd/manifest.json")).files["CLAUDE.md"].owner, "user");
+
+  const dir3 = project({ files: { "CLAUDE.md": BUILTIN_CLAUDE_MD } });
+  const k = init(dir3, "apply", "--claude-md", "keep");
+  assert.equal(read(dir3, "CLAUDE.md"), BUILTIN_CLAUDE_MD);
+  assert.equal(k.json.claudeMd.action, "kept");
+  assert.ok(k.json.warnings.some((w) => w.includes("検証コマンド")));
+});
+
+test("既存の .claude/settings.json と .mcp.json は上書きもマージもせず、差分を返す", () => {
+  const settings = '{ "permissions": { "allow": ["Bash(ls:*)"] } }\n';
+  const mcp = '{ "mcpServers": { "mine": { "command": "x" } } }\n';
+  const pkg = '{\n  "name": "web",\n  "dependencies": { "next": "15.0.0" }\n}\n';
+  const dir = project({ files: { ".claude/settings.json": settings, ".mcp.json": mcp, "package.json": pkg } });
+
+  const st = init(dir, "status");
+  assert.equal(st.json.settings.exists, true);
+  assert.ok(st.json.settings.missingDeny.includes("Bash(sudo:*)"));
+  assert.ok(st.json.settings.missingDeny.includes("Read(./.env)"));
+  assert.equal(st.json.settings.missingMarketplace, true);
+  assert.equal(st.json.settings.missingEnabledPlugin, true);
+  assert.deepEqual(st.json.mcp.missingServers, ["shadcn", "next-devtools"]);
+
+  const a = init(dir, "apply", "--settings", "yes");
+  assert.equal(a.status, 0, a.stdout);
+  assert.equal(read(dir, ".claude/settings.json"), settings);
+  assert.equal(read(dir, ".mcp.json"), mcp);
+  assert.equal(a.json.settings.action, "skipped");
+  assert.ok(a.json.settings.diff.missingAsk.includes("Bash(git push *)"));
+  assert.equal(a.json.mcp.action, "skipped");
+  assert.deepEqual(a.json.mcp.missingServers, ["shadcn", "next-devtools"]);
+  assert.ok(!a.json.created.includes(".claude/settings.json"));
+});
+
+test("apply を add せずにもう一度実行しても、toStage に .gitignore と package.json が残る（.gitignore の例外の行を足す流れ）。コミット後は、キットと関係ない package.json の変更を stage しない", () => {
+  const dir = project({ files: { "package.json": NPM_INIT_PACKAGE, ".gitignore": "node_modules/\n.claude/\n" }, commit: true });
+  const first = init(dir, "apply", "--fill-inferred");
+  assert.equal(first.status, 0, first.stdout);
+  assert.deepEqual(first.json.ignored, [".claude/rules/docdd-kit.md", ".claude/settings.json"]);
+  for (const p of [".gitignore", "package.json"]) assert.ok(first.json.toStage.includes(p), `1 回目の toStage に ${p}`);
+
+  // add せずにもう一度 apply しても残る
+  const rerun = init(dir, "apply", "--fill-inferred");
+  for (const p of [".gitignore", "package.json"]) assert.ok(rerun.json.toStage.includes(p), `2 回目の toStage に ${p}`);
+
+  // init/SKILL.md 手順 3-1: .claude/ を .claude/* と例外の 2 行に直し、apply をもう一度実行する
+  write(dir, { ".gitignore": read(dir, ".gitignore").replace(".claude/\n", ".claude/*\n!.claude/rules/\n!.claude/settings.json\n") });
+  const second = init(dir, "apply", "--fill-inferred");
+  assert.deepEqual(second.json.ignored, []);
+  for (const p of [".gitignore", "package.json", ".claude/rules/docdd-kit.md", ".claude/settings.json"]) assert.ok(second.json.toStage.includes(p), `toStage に ${p}`);
+  stage(dir, second.json.toStage);
+  const d = init(dir, "dates");
+  stage(dir, d.json.toStage);
+  assert.equal(init(dir, "precommit").json.ok, true);
+  git(dir, ["commit", "-q", "-m", "chore: docdd キットを導入"]);
+  assert.equal(git(dir, ["status", "--porcelain"]), "", "コミットし残したファイルが無い");
+  assert.match(git(dir, ["show", "HEAD:.gitignore"]), /^\.env$/m, "コミットした .gitignore に .env の除外がある");
+  const committedScripts = JSON.parse(git(dir, ["show", "HEAD:package.json"])).scripts;
+  for (const k of Object.keys(SCRIPTS_TO_ADD)) assert.ok(k in committedScripts, `コミットした package.json に ${k}`);
+
+  // コミットのあと: 依存の追加だけの package.json と、変えていない .gitignore は stage しない
+  write(dir, { "package.json": read(dir, "package.json").replace('"license": "ISC"', '"license": "ISC",\n  "dependencies": {\n    "zod": "^3.0.0"\n  }') });
+  const later = init(dir, "apply", "--fill-inferred");
+  assert.equal(later.status, 0, later.stdout);
+  assert.ok(!later.json.toStage.includes("package.json"), later.json.toStage.join(" "));
+  assert.ok(!later.json.toStage.includes(".gitignore"), later.json.toStage.join(" "));
+});
+
+test("既存の .gitignore: 足りない行だけを「# docdd」の下へ足し、2 回目は変えない", () => {
+  const original = "node_modules/\n.env\n/custom-output\n";
+  const dir = project({ files: { ".gitignore": original } });
+  const tplLines = fs
+    .readFileSync(path.join(TEMPLATES, ".gitignore"), "utf8")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("#"));
+  // 否定の行（!.env.example）は、足した行より後ろに置く（.gitignore は後ろの行が勝つ）
+  const missing = [...tplLines.filter((l) => !l.startsWith("!") && l !== "node_modules/" && l !== ".env"), ...tplLines.filter((l) => l.startsWith("!"))];
+
+  const a = init(dir, "apply");
+  assert.equal(a.status, 0, a.stdout);
+  assert.equal(read(dir, ".gitignore"), `${original}\n# docdd\n${missing.join("\n")}\n`);
+  assert.deepEqual(a.json.gitignore.addedLines, missing);
+  assert.ok(a.json.toStage.includes(".gitignore"));
+
+  const again = init(dir, "apply");
+  assert.equal(again.json.gitignore.action, "unchanged");
+  assert.equal(read(dir, ".gitignore"), `${original}\n# docdd\n${missing.join("\n")}\n`);
+
+  // 見出しだけ残して行が消えていたら、見出しの下へ戻す（肯定の行を足すので、否定の行もその後ろにもう一度書く）
+  write(dir, { ".gitignore": `${original}\n# docdd\n${missing.slice(1).join("\n")}\n` });
+  init(dir, "apply");
+  assert.equal(read(dir, ".gitignore"), `${original}\n# docdd\n${missing.slice(1).join("\n")}\n${missing[0]}\n!.env.example\n`);
+});
+
+test("precommit: .env の除外漏れ・stage された .env とログイン状態・名前とメールの未設定を問題として返す", () => {
+  const dir = project({ files: { "README.md": "# x\n", ".env": "SECRET=1\n" }, identity: false });
+  git(dir, ["add", "--", "README.md"]);
+  const a = init(dir, "precommit");
+  assert.equal(a.status, 1);
+  const codes = a.json.problems.map((p) => p.code);
+  assert.ok(codes.includes("env-not-ignored"), JSON.stringify(a.json.problems));
+  assert.ok(codes.includes("no-identity"));
+
+  const dir2 = project({ files: { ".gitignore": ".env\n.env.*\n!.env.example\n", ".env": "SECRET=1\n", "playwright/.auth/user.json": "{}\n", ".env.example": "SECRET=\n" } });
+  git(dir2, ["add", "--", ".gitignore", "playwright/.auth/user.json", ".env.example"]);
+  git(dir2, ["add", "-f", "--", ".env"]);
+  const b = init(dir2, "precommit");
+  assert.equal(b.status, 1);
+  const bcodes = b.json.problems.map((p) => `${p.code}:${p.path ?? ""}`);
+  assert.ok(bcodes.includes("env-staged:.env"), bcodes.join(" "));
+  assert.ok(bcodes.includes("auth-state-staged:playwright/.auth/user.json"), bcodes.join(" "));
+  assert.ok(!bcodes.some((c) => c.includes(".env.example")), ".env.example は問題にしない");
+  assert.ok(!bcodes.some((c) => c.startsWith("env-not-ignored")));
+
+  const dir3 = project({ files: { ".gitignore": ".env\n.env.*\n" } });
+  const c = init(dir3, "precommit");
+  assert.deepEqual(c.json.problems.map((p) => p.code), ["nothing-staged"]);
+});
+
+test("サブディレクトリ（モノレポ）: status が atGitRoot=false を返し、一番上の lock から依存の脆弱性を推定する", () => {
+  const dir = project({
+    files: {
+      "package.json": '{\n  "name": "mono",\n  "private": true\n}\n',
+      "package-lock.json": '{\n  "lockfileVersion": 3,\n  "packages": {}\n}\n',
+      "apps/web/package.json": '{\n  "name": "web",\n  "scripts": { "dev": "vite", "test": "vitest run" },\n  "devDependencies": { "vite": "5.0.0" }\n}\n',
+    },
+  });
+  const web = path.join(dir, "apps/web");
+  const st = init(web, "status");
+  assert.equal(st.status, 0, st.stderr);
+  assert.equal(st.json.atGitRoot, false);
+  assert.equal(st.json.git.pathFromRoot, "apps/web");
+  assert.equal(st.json.lockfile, "../../package-lock.json");
+  const row = (name) => st.json.inferred.find((r) => r.row === name);
+  assert.equal(row("依存の脆弱性").value, "node scripts/audit-check.mjs");
+  assert.equal(row("開発サーバー起動").cell, "`npm run dev`（http://127.0.0.1:5173 で開く）");
+  assert.equal(row("単体・DBテスト").value, "npm test");
+});
+
+test("--dry-run は何も書かない・使い方の誤りは終了コード 2", () => {
+  const dir = project({ files: { "package.json": NPM_INIT_PACKAGE } });
+  const before = snapshot(dir);
+  const a = init(dir, "apply", "--dry-run", "--fill-inferred", "--tasks", "test-infra");
+  assert.equal(a.status, 0, a.stdout);
+  assert.ok(a.json.created.length > 10);
+  assert.equal(a.json.manifest.written, false);
+  assert.deepEqual(snapshot(dir), before);
+
+  const bad = init(dir, "apply", "--claude-md", "merge");
+  assert.equal(bad.status, 2);
+  assert.equal(bad.json.ok, false);
+  assert.match(bad.json.error, /--claude-md/);
+
+  const noManifest = init(dir, "dates");
+  assert.equal(noManifest.status, 2);
+  assert.match(noManifest.json.error, /manifest/);
+});
+
+test("update（v0.2 で導入済み）: 手付かずのキットのファイルは current、手を入れたら review と差分、manifest の記録どおりなら replace", () => {
+  const dir = project({ files: { "package.json": NPM_INIT_PACKAGE } });
+  const a = init(dir, "apply");
+  assert.equal(a.status, 0, a.stdout);
+
+  const clean = init(dir, "update");
+  assert.equal(clean.status, 0, clean.stdout);
+  assert.equal(clean.json.basis, "manifest");
+  assert.deepEqual(clean.json.applicable, [], JSON.stringify(clean.json.summary));
+
+  // 利用者が手を入れた
+  write(dir, { "scripts/check-doc-refs.mjs": `${read(dir, "scripts/check-doc-refs.mjs")}// my change\n` });
+  const mod = init(dir, "update");
+  const e = mod.json.files.find((f) => f.path === "scripts/check-doc-refs.mjs");
+  assert.equal(e.status, "modified");
+  assert.equal(e.action, "review");
+  assert.match(e.diff, /^-\/\/ my change$/m);
+
+  // manifest に記録した中身のまま（＝キットが置いたまま）で、雛形だけが新しい場合
+  const man = JSON.parse(read(dir, ".docdd/manifest.json"));
+  man.files["scripts/check-doc-refs.mjs"].sha256 = sha(fs.readFileSync(path.join(dir, "scripts/check-doc-refs.mjs")));
+  write(dir, { ".docdd/manifest.json": `${JSON.stringify(man, null, 2)}\n` });
+  const up = init(dir, "update");
+  const e2 = up.json.files.find((f) => f.path === "scripts/check-doc-refs.mjs");
+  assert.equal(e2.status, "untouched");
+  assert.equal(e2.action, "replace");
+
+  const applied = init(dir, "update", "--apply", "scripts/check-doc-refs.mjs");
+  assert.equal(applied.status, 0, applied.stdout);
+  assert.equal(read(dir, "scripts/check-doc-refs.mjs"), fs.readFileSync(path.join(TEMPLATES, "scripts/check-doc-refs.mjs"), "utf8"));
+  assert.deepEqual(applied.json.toStage, [".docdd/manifest.json", "scripts/check-doc-refs.mjs"]);
+
+  const wrong = init(dir, "update", "--apply", "docs/PRD.md");
+  assert.equal(wrong.status, 2);
+  assert.equal(wrong.json.errors[0].path, "docs/PRD.md");
+});
+
+test("v0.1.4 の雛形で導入したプロジェクト: status は legacy、update は scripts を「手付かず→置換」に分類し、移行後は参照の検査が通る", (t) => {
+  const files = v014Files();
+  if (!files) {
+    t.skip(`このリポジトリに ${V014}（v0.1.4）の履歴が無い（浅い clone）`);
+    return;
+  }
+  const dir = project({ files, commit: true });
+
+  const st = init(dir, "status");
+  assert.equal(st.json.state, "legacy");
+  assert.equal(st.json.claudeMd.legacyTables, true);
+
+  const refused = init(dir, "apply");
+  assert.equal(refused.status, 2);
+  assert.match(refused.json.error, /update-kit/);
+
+  const up = init(dir, "update");
+  assert.equal(up.status, 0, up.stdout);
+  assert.equal(up.json.state, "legacy");
+  assert.equal(up.json.basis, "known-hashes");
+  const f = (p) => up.json.files.find((x) => x.path === p);
+  for (const p of ["scripts/check-doc-dates.mjs", "scripts/check-doc-refs.mjs", "scripts/audit-check.mjs"]) {
+    assert.equal(f(p).status, "untouched", p);
+    assert.equal(f(p).action, "replace", p);
+    assert.equal(f(p).matchedVersion, "0.1.1〜0.1.4", p);
+  }
+  assert.equal(f("scripts/check-doc-placeholders.mjs").action, "add");
+  assert.equal(f(".claude/rules/docdd-kit.md").action, "add");
+  assert.equal(f("CLAUDE.md").action, "migrate");
+  assert.equal(up.json.legacy.removals.length, 8);
+  assert.ok(up.json.legacy.removals.every((r) => r.customized === false), JSON.stringify(up.json.legacy.removals.map((r) => r.heading)));
+  const devAdds = f("docs/operations/development-and-testing.md").additions.map((a) => a.heading);
+  assert.ok(devAdds.some((h) => h.includes("テスト基盤が無いとき")), devAdds.join(" / "));
+  assert.ok(devAdds.some((h) => h.includes("落とし穴")), devAdds.join(" / "));
+  assert.deepEqual(f("package.json").additions, ["check:doc-placeholders"]);
+  // v0.1 の雛形のまま手が入っていない利用者のファイルは、節を足すのではなく置き換える（重複を作らない）
+  assert.equal(f("docs/requirements/README.md").status, "untouched");
+  assert.equal(f("docs/requirements/README.md").action, "replace");
+  assert.equal(f("docs/operations/development-and-testing.md").action, "append", "日付を埋めた文書は節だけ足す");
+
+  const applied = init(dir, "update", "--apply", up.json.applicable.join(","));
+  assert.equal(applied.status, 0, applied.stdout);
+  assert.deepEqual(applied.json.errors, []);
+
+  const claude = read(dir, "CLAUDE.md");
+  assert.ok(claude.startsWith("# よみログ 開発ガイド"));
+  assert.ok(claude.includes("<!-- docdd:tables:begin -->") && claude.includes("<!-- docdd:tables:end -->"));
+  assert.doesNotMatch(claude, /^## 変更影響/m);
+  assert.doesNotMatch(claude, /^## 規約/m);
+  assert.match(claude, /^\| 型検査 \| `npm run typecheck` \|$/m, "記入済みの値は移る");
+  assert.match(claude, /^\| 開発サーバー起動 \| \{\{開発サーバー起動\}\} \|$/m, "新しい行は未記入で足す");
+  assert.match(claude, /^\| docs の検査 \| `node scripts\/check-doc-dates\.mjs && node scripts\/check-doc-refs\.mjs` \|$/m);
+  assert.match(claude, /^## スキルへの追加指示$/m);
+  assert.match(claude, /`\.docdd\/manifest\.json`/);
+  assert.equal(read(dir, ".claude/rules/docdd-kit.md"), fs.readFileSync(path.join(TEMPLATES, ".claude/rules/docdd-kit.md"), "utf8"));
+  assert.equal(read(dir, "scripts/check-doc-dates.mjs"), fs.readFileSync(path.join(TEMPLATES, "scripts/check-doc-dates.mjs"), "utf8"));
+  const dev = read(dir, "docs/operations/development-and-testing.md");
+  assert.match(dev, /^## 4\. テスト基盤が無いとき$/m);
+  assert.match(dev, /^## 5\. 落とし穴$/m);
+  assert.match(dev, /^## 6\. 変更履歴$/m);
+  assert.ok(dev.includes(`| 更新日 | ${today()} |`), "節を足した文書の更新日を今日にする");
+  assert.equal(read(dir, "docs/requirements/README.md"), fs.readFileSync(path.join(TEMPLATES, "docs/requirements/README.md"), "utf8"));
+  assert.ok(JSON.parse(read(dir, "package.json")).scripts["check:doc-placeholders"]);
+  assert.equal(JSON.parse(read(dir, ".docdd/manifest.json")).kitVersion, PLUGIN_VERSION);
+
+  assert.notEqual(init(dir, "status").json.state, "legacy");
+  stage(dir, applied.json.toStage);
+  const refs = check(dir, "check-doc-refs");
+  assert.equal(refs.status, 0, refs.stdout + refs.stderr);
+  git(dir, ["commit", "-q", "-m", "chore: docdd キットを更新"]);
+  const dates = check(dir, "check-doc-dates");
+  assert.equal(dates.status, 0, dates.stdout + dates.stderr);
+
+  const again = init(dir, "update");
+  assert.deepEqual(again.json.applicable, [], JSON.stringify(again.json.summary));
+});
+
+test("v0.1.4 から一部だけ update --apply しても v0.1 系の判定と CLAUDE.md の移行は残り、apply は拒否する。<…> の未記入は {{…}} にし、できない箇所は報告する", (t) => {
+  const files = v014Files();
+  if (!files) {
+    t.skip(`このリポジトリに ${V014}（v0.1.4）の履歴が無い（浅い clone）`);
+    return;
+  }
+  // 利用者が 1 セルだけ書いた行（雛形と一致しないので置き換えず、報告に出す）
+  files["docs/PRD.md"] = files["docs/PRD.md"].replace("| A-1 | <機能名> | <1行> | Must |", "| A-1 | <機能名> | <1行> | Must |\n| A-2 | 本を登録 | <1行> | Should |");
+  const dir = project({ files, commit: true });
+
+  const scripts = ["scripts/check-doc-dates.mjs", "scripts/check-doc-refs.mjs", "scripts/audit-check.mjs"];
+  const part = init(dir, "update", "--apply", scripts.join(","));
+  assert.equal(part.status, 0, part.stdout);
+  assert.equal(JSON.parse(read(dir, ".docdd/manifest.json")).kitVersion, "0.1.1〜0.1.4", "移行が済むまで版を上げない");
+  assert.equal(init(dir, "status").json.state, "legacy");
+
+  const up = init(dir, "update");
+  assert.equal(up.json.state, "legacy");
+  assert.deepEqual(up.json.summary.migrate, ["CLAUDE.md"]);
+  assert.equal(up.json.installedVersion, "0.1.1〜0.1.4");
+  assert.ok(up.json.files.find((f) => f.path === "docs/PRD.md").additions.some((a) => a.kind === "placeholder" && a.from === "| A-1 | <機能名> | <1行> | Must |"));
+
+  const refused = init(dir, "apply", "--claude-md", "append");
+  assert.equal(refused.status, 2);
+  assert.match(refused.json.error, /update-kit/);
+  assert.equal((read(dir, "CLAUDE.md").match(/^## 検証コマンド/gm) || []).length, 1, "表を二重に足さない");
+
+  const rest = init(dir, "update", "--apply", up.json.applicable.join(","));
+  assert.equal(rest.status, 0, rest.stdout);
+  assert.deepEqual(rest.json.errors, []);
+  assert.equal(JSON.parse(read(dir, ".docdd/manifest.json")).kitVersion, PLUGIN_VERSION, "移行が済んだら新しい版");
+  assert.equal((read(dir, "CLAUDE.md").match(/^## 検証コマンド$/gm) || []).length, 1);
+  assert.doesNotMatch(read(dir, "CLAUDE.md"), /<使う道具に合わせて足す>/);
+
+  const prd = read(dir, "docs/PRD.md");
+  assert.match(prd, /^# PRD：\{\{プロダクト名\}\}$/m);
+  assert.match(prd, /^\| A-1 \| \{\{機能名\}\} \| \{\{機能の説明1行\}\} \| Must \|$/m);
+  assert.match(prd, /^- \{\{やらないこと（例: 複数人での共同編集）\}\}$/m);
+  assert.doesNotMatch(prd, /<AI の月間上限>|<誰の・どんな困りごとを・どう解決するか>/);
+  assert.deepEqual(
+    rest.json.legacyPlaceholders.filter((p) => p.file === "docs/PRD.md"),
+    [{ file: "docs/PRD.md", line: prd.split("\n").findIndex((l) => l.includes("本を登録")) + 1, token: "<1行>" }],
+  );
+  assert.equal(init(dir, "status").json.state === "legacy", false);
+});
+
+test("テスト基盤の導入: 完了条件に単体・E2E・表の行を含み、「テスト基盤の導入」で始まる未完了のタスクがあれば起票しない（done なら起票する）", () => {
+  const dir = project({ files: { "package.json": '{\n  "name": "x"\n}\n' } });
+  const a = init(dir, "apply", "--settings", "no", "--tasks", "test-infra");
+  assert.equal(a.status, 0, a.stdout);
+  const text = read(dir, "tasks/BACKLOG.md");
+  assert.match(text, /^ {2}- 単体の見本テスト 1 件が緑/m);
+  assert.match(text, /^ {2}- 画面があるなら、E2E（実ブラウザ）の見本テストも 1 件緑$/m);
+  assert.match(text, /^ {2}- CLAUDE\.md「検証コマンド」表の該当行が埋まる（『単体・DBテスト』。画面があるなら『E2E（実ブラウザ）』と『全検査（push 前に1回）』も）$/m);
+
+  write(dir, { "tasks/BACKLOG.md": text.replace("### T-01: テスト基盤の導入 `todo`", "### T-01: テスト基盤の導入（E2E） `doing`") });
+  const again = init(dir, "apply", "--settings", "no", "--tasks", "test-infra");
+  assert.deepEqual(again.json.tasks, [{ kind: "test-infra", id: "T-01", title: "テスト基盤の導入（E2E）", action: "exists" }]);
+
+  write(dir, { "tasks/BACKLOG.md": read(dir, "tasks/BACKLOG.md").replace("（E2E） `doing`", "（E2E） `done`") });
+  const done = init(dir, "apply", "--settings", "no", "--tasks", "test-infra");
+  assert.deepEqual(done.json.tasks.map((x) => [x.id, x.action]), [["T-02", "added"]]);
+});
+
+test("未記入の欄を埋め、従量課金が無いので PRD §4 を消すと、コミット後の state は installed", () => {
+  const dir = project({ files: { "package.json": NPM_INIT_PACKAGE } });
+  const a = init(dir, "apply", "--settings", "no", "--fill-inferred");
+  assert.equal(a.status, 0, a.stdout);
+  write(dir, { "docs/PRD.md": read(dir, "docs/PRD.md").replace(/^## 4\. 料金・上限（従量課金があるとき）\n[\s\S]*?(?=^## )/m, "") });
+  const ph = init(dir, "status").json.placeholders;
+  assert.ok(!ph.some((p) => p.file === "docs/PRD.md" && /上限|数値|原価/.test(p.token)), JSON.stringify(ph));
+  for (const p of ph.filter((x) => x.token !== "{{YYYY-MM-DD}}")) {
+    const lines = read(dir, p.file).split("\n");
+    lines[p.line - 1] = lines[p.line - 1].replace(p.token, "無い");
+    write(dir, { [p.file]: lines.join("\n") });
+  }
+  stage(dir, a.json.toStage);
+  const d = init(dir, "dates");
+  stage(dir, d.json.toStage);
+  git(dir, ["commit", "-q", "-m", "chore: docdd キットを導入"]);
+  const left = check(dir, "check-doc-placeholders");
+  assert.equal(left.status, 0, left.stdout + left.stderr);
+  assert.equal(init(dir, "status").json.state, "installed");
+});
+
+test("dates: 前の日にコミットした文書を別の日に直すと更新日も今日にし、check-doc-dates が通る", () => {
+  const dir = project({ files: { "package.json": '{\n  "name": "x"\n}\n' } });
+  const a = init(dir, "apply", "--settings", "no");
+  stage(dir, a.json.toStage);
+  const yd = localDate(new Date(Date.now() - 86400000));
+  const d1 = init(dir, "dates", "--date", yd);
+  stage(dir, d1.json.toStage);
+  execFileSync("git", ["commit", "-q", "-m", "day1"], { cwd: dir, env: { ...ENV, GIT_AUTHOR_DATE: `${yd}T10:00:00`, GIT_COMMITTER_DATE: `${yd}T10:00:00` } });
+  assert.deepEqual(init(dir, "dates").json.changed, [], "中身を変えていなければ何もしない");
+
+  write(dir, { "docs/PRD.md": read(dir, "docs/PRD.md").replace("{{プロダクト名}}", "よみログ") });
+  const d2 = init(dir, "dates");
+  assert.deepEqual(d2.json.changed, [{ file: "docs/PRD.md", count: 0, updatedDate: true }]);
+  assert.ok(read(dir, "docs/PRD.md").includes(`| 更新日 | ${today()} |`));
+  stage(dir, d2.json.toStage);
+  git(dir, ["commit", "-q", "-m", "day2"]);
+  const dates = check(dir, "check-doc-dates");
+  assert.equal(dates.status, 0, dates.stdout + dates.stderr);
+});
+
+test(".gitignore: 先頭・末尾の / の違いは同じ行とみなし、否定の行を足した行の後ろに置いて .env.example を除外しない", () => {
+  const original = "node_modules\n/dist\n.env*\n!.env.example\n";
+  const dir = project({ files: { ".gitignore": original, ".env.example": "KEY=\n" } });
+  const a = init(dir, "apply", "--settings", "no");
+  assert.equal(a.status, 0, a.stdout);
+  const added = a.json.gitignore.addedLines;
+  assert.ok(!added.includes("node_modules/") && !added.includes("dist/"), added.join(" "));
+  assert.equal(added[added.length - 1], "!.env.example");
+  assert.equal(spawnSync("git", ["check-ignore", "-q", "--", ".env.example"], { cwd: dir, env: ENV }).status, 1, ".env.example は除外されない");
+  assert.equal(spawnSync("git", ["check-ignore", "-q", "--", ".env"], { cwd: dir, env: ENV }).status, 0);
+  assert.equal(init(dir, "apply", "--settings", "no").json.gitignore.action, "unchanged");
+});
+
+test("package.json: audit:check は npm と package-lock.json のときだけ足す（pnpm には足さず理由を返す）", () => {
+  const dir = project({ files: { "package.json": '{\n  "name": "p"\n}\n', "pnpm-lock.yaml": "lockfileVersion: '9.0'\n" } });
+  assert.ok(!init(dir, "status").json.packageJson.missingScripts.includes("audit:check"));
+  const a = init(dir, "apply", "--settings", "no");
+  assert.equal(a.status, 0, a.stdout);
+  assert.ok(!a.json.packageJson.added.includes("audit:check"), a.json.packageJson.added.join(" "));
+  assert.equal(a.json.packageJson.skipped[0].name, "audit:check");
+  assert.equal(JSON.parse(read(dir, "package.json")).scripts["audit:check"], undefined);
+  assert.equal(init(dir, "update").json.files.find((f) => f.path === "package.json").action, "none");
+
+  const dir2 = project({ files: { "package.json": '{\n  "name": "n"\n}\n', "package-lock.json": '{\n  "lockfileVersion": 3\n}\n' } });
+  assert.ok(init(dir2, "apply", "--settings", "no").json.packageJson.added.includes("audit:check"));
+});
+
+test("CRLF の文書: apply --claude-md append と update --apply の追記で CRLF を保つ", () => {
+  const dir = project({ files: { "CLAUDE.md": BUILTIN_CLAUDE_MD.replace(/\n/g, "\r\n"), "package.json": '{\n  "name": "x"\n}\n' } });
+  const a = init(dir, "apply", "--claude-md", "append", "--settings", "no");
+  assert.equal(a.status, 0, a.stdout);
+  assert.equal(bareLf(read(dir, "CLAUDE.md")), 0, "LF だけの行が混ざらない");
+
+  const dev = read(dir, "docs/operations/development-and-testing.md");
+  write(dir, { "docs/operations/development-and-testing.md": dev.replace(/^## 5\. 落とし穴\n[\s\S]*?(?=^## 6\.)/m, "").replace(/\n/g, "\r\n") });
+  const up = init(dir, "update");
+  assert.equal(up.json.files.find((f) => f.path === "docs/operations/development-and-testing.md").action, "append");
+  const ap = init(dir, "update", "--apply", "docs/operations/development-and-testing.md");
+  assert.equal(ap.status, 0, ap.stdout);
+  const after = read(dir, "docs/operations/development-and-testing.md");
+  assert.match(after, /^## \d\. 落とし穴\r$/m);
+  assert.equal(bareLf(after), 0);
+});
+
+test("apply: 置き場所がふさがっていれば何も書かず終了コード 2。既にある雛形と同じファイルは manifest に記録し、dates は manifest に無い文書も埋める", () => {
+  const dir = project({ files: { tasks: "memo\n", "package.json": '{\n  "name": "x"\n}\n' } });
+  const before = snapshot(dir);
+  const a = init(dir, "apply", "--settings", "no");
+  assert.equal(a.status, 2, a.stdout);
+  assert.equal(a.json.ok, false);
+  assert.match(a.json.error, /tasks がフォルダではなくファイル/);
+  assert.deepEqual(snapshot(dir), before, "何も書かない");
+  fs.renameSync(path.join(dir, "tasks"), path.join(dir, "tasks.txt"));
+  const b = init(dir, "apply", "--settings", "no");
+  assert.equal(b.status, 0, b.stdout);
+
+  const dir2 = project({ files: { "docs/PRD.md": fs.readFileSync(path.join(TEMPLATES, "docs/PRD.md")), "scripts/check-doc-refs.mjs": fs.readFileSync(path.join(TEMPLATES, "scripts/check-doc-refs.mjs")) } });
+  assert.equal(init(dir2, "apply", "--settings", "no").status, 0);
+  const man = JSON.parse(read(dir2, ".docdd/manifest.json"));
+  assert.ok(man.files["docs/PRD.md"] && man.files["scripts/check-doc-refs.mjs"], Object.keys(man.files).join(" "));
+  delete man.files["docs/PRD.md"];
+  write(dir2, { ".docdd/manifest.json": `${JSON.stringify(man, null, 2)}\n` });
+  const d = init(dir2, "dates");
+  assert.ok(d.json.changed.some((x) => x.file === "docs/PRD.md"), JSON.stringify(d.json.changed));
+  assert.ok(!read(dir2, "docs/PRD.md").includes("{{YYYY-MM-DD}}"));
+});
+
+test("apply: サンドボックスなどで .claude/settings.json を書けなくても、残りの雛形は置き切り notWritten で返す", { skip: process.getuid?.() === 0 ? "root では書き込み拒否を再現できない" : false }, () => {
+  const dir = project({ files: { "package.json": '{\n  "name": "sandboxed"\n}\n' } });
+  fs.mkdirSync(path.join(dir, ".claude/rules"), { recursive: true });
+  fs.chmodSync(path.join(dir, ".claude"), 0o555);
+  let a;
+  try {
+    a = init(dir, "apply", "--fill-inferred", "--settings", "yes");
+  } finally {
+    fs.chmodSync(path.join(dir, ".claude"), 0o755);
+  }
+  assert.equal(a.status, 0, a.stdout);
+  assert.equal(a.json.ok, true);
+  assert.deepEqual(a.json.notWritten.map((n) => n.path), [".claude/settings.json"]);
+  assert.ok(["EACCES", "EPERM"].includes(a.json.notWritten[0].code), a.json.notWritten[0].code);
+  assert.ok(JSON.parse(a.json.notWritten[0].content).permissions, "Claude が Write で置き直せる中身を返す");
+  assert.equal(exists(dir, ".claude/settings.json"), false);
+  for (const rel of ["CLAUDE.md", ".claude/rules/docdd-kit.md", "tasks/BACKLOG.md", "scripts/check-doc-refs.mjs", ".mcp.json", ".docdd/manifest.json"]) assert.ok(exists(dir, rel), `${rel} は置く`);
+  assert.equal(JSON.parse(read(dir, ".docdd/manifest.json")).files[".claude/settings.json"], undefined, "置けなかったファイルは manifest に載せない");
+  assert.ok(!a.json.toStage.includes(".claude/settings.json"));
+  assert.ok(a.json.warnings.some((w) => w.includes(".claude/settings.json")));
+
+  stage(dir, a.json.toStage);
+  const refs = check(dir, "check-doc-refs");
+  assert.equal(refs.status, 0, refs.stdout + refs.stderr);
+});
+
+test("precommit: i18n の auth.json などは注意に留め、playwright の保存形式だけを問題にする", () => {
+  const dir = project({ files: { ".gitignore": ".env\n.env.*\n", "messages/ja/auth.json": "{}\n", "src/lib/auth-config.json": "{}\n", "e2e/user.auth-state.json": "{}\n" } });
+  git(dir, ["add", "--", ".gitignore", "messages/ja/auth.json", "src/lib/auth-config.json"]);
+  const a = init(dir, "precommit");
+  assert.equal(a.status, 0, a.stdout);
+  assert.deepEqual(a.json.warnings.map((w) => w.path).sort(), ["messages/ja/auth.json", "src/lib/auth-config.json"]);
+  git(dir, ["add", "--", "e2e/user.auth-state.json"]);
+  const b = init(dir, "precommit");
+  assert.equal(b.status, 1);
+  assert.deepEqual(b.json.problems.map((p) => `${p.code}:${p.path}`), ["auth-state-staged:e2e/user.auth-state.json"]);
+});
+
+test("既存の BACKLOG に書式の節が無い: status が返し、--add-backlog-sections で雛形の節を足す（中身は変えず、2 回目は変えない）", () => {
+  const mine = "# 自分のバックログ\n\n- ログイン画面を作る\n- 一覧画面を作る\n";
+  const dir = project({ files: { "tasks/BACKLOG.md": mine, "package.json": '{\n  "name": "x"\n}\n' } });
+  const sections = ["運用ルール", "タスク", "要決定・外部準備（ユーザー作業）"];
+  assert.deepEqual(init(dir, "status").json.backlog.missingSections, sections);
+  assert.deepEqual(init(dir, "apply", "--settings", "no", "--dry-run").json.backlog, { missingSections: sections, added: [] });
+
+  const a = init(dir, "apply", "--settings", "no", "--add-backlog-sections", "--tasks", "test-infra");
+  assert.equal(a.status, 0, a.stdout);
+  const text = read(dir, "tasks/BACKLOG.md");
+  const at = (s) => text.indexOf(s);
+  assert.ok(text.startsWith("# 自分のバックログ\n\n## 運用ルール\n"), text.slice(0, 80));
+  assert.ok(at("## 運用ルール") < at("## タスク") && at("## タスク") < at("- ログイン画面を作る"), text);
+  assert.ok(at("- 一覧画面を作る") < at("### T-01: テスト基盤の導入") && at("### T-01: テスト基盤の導入") < at("## 要決定・外部準備（ユーザー作業）"), text);
+  assert.deepEqual(a.json.backlog.added, sections);
+  assert.deepEqual(init(dir, "status").json.backlog.missingSections, []);
+
+  const before = snapshot(dir);
+  init(dir, "apply", "--settings", "no", "--add-backlog-sections", "--tasks", "test-infra");
+  assert.deepEqual(snapshot(dir), before);
+});
