@@ -811,6 +811,32 @@ test("apply: 置き場所がふさがっていれば何も書かず終了コー�
   assert.ok(!read(dir2, "docs/PRD.md").includes("{{YYYY-MM-DD}}"));
 });
 
+test("apply: サンドボックスなどで .claude/settings.json を書けなくても、残りの雛形は置き切り notWritten で返す", { skip: process.getuid?.() === 0 ? "root では書き込み拒否を再現できない" : false }, () => {
+  const dir = project({ files: { "package.json": '{\n  "name": "sandboxed"\n}\n' } });
+  fs.mkdirSync(path.join(dir, ".claude/rules"), { recursive: true });
+  fs.chmodSync(path.join(dir, ".claude"), 0o555);
+  let a;
+  try {
+    a = init(dir, "apply", "--fill-inferred", "--settings", "yes");
+  } finally {
+    fs.chmodSync(path.join(dir, ".claude"), 0o755);
+  }
+  assert.equal(a.status, 0, a.stdout);
+  assert.equal(a.json.ok, true);
+  assert.deepEqual(a.json.notWritten.map((n) => n.path), [".claude/settings.json"]);
+  assert.ok(["EACCES", "EPERM"].includes(a.json.notWritten[0].code), a.json.notWritten[0].code);
+  assert.ok(JSON.parse(a.json.notWritten[0].content).permissions, "Claude が Write で置き直せる中身を返す");
+  assert.equal(exists(dir, ".claude/settings.json"), false);
+  for (const rel of ["CLAUDE.md", ".claude/rules/docdd-kit.md", "tasks/BACKLOG.md", "scripts/check-doc-refs.mjs", ".mcp.json", ".docdd/manifest.json"]) assert.ok(exists(dir, rel), `${rel} は置く`);
+  assert.equal(JSON.parse(read(dir, ".docdd/manifest.json")).files[".claude/settings.json"], undefined, "置けなかったファイルは manifest に載せない");
+  assert.ok(!a.json.toStage.includes(".claude/settings.json"));
+  assert.ok(a.json.warnings.some((w) => w.includes(".claude/settings.json")));
+
+  stage(dir, a.json.toStage);
+  const refs = check(dir, "check-doc-refs");
+  assert.equal(refs.status, 0, refs.stdout + refs.stderr);
+});
+
 test("precommit: i18n の auth.json などは注意に留め、playwright の保存形式だけを問題にする", () => {
   const dir = project({ files: { ".gitignore": ".env\n.env.*\n", "messages/ja/auth.json": "{}\n", "src/lib/auth-config.json": "{}\n", "e2e/user.auth-state.json": "{}\n" } });
   git(dir, ["add", "--", ".gitignore", "messages/ja/auth.json", "src/lib/auth-config.json"]);

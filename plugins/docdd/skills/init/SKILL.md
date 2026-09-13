@@ -114,7 +114,8 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
    - `--tasks`: 手順 0-5 で B を選んだら `scaffold`。`inferred` の『単体・DBテスト』行の `value` が「無い」か null なら `test-infra`。両方なら `scaffold,test-infra`（「テスト基盤の導入」は「アプリの土台を作る」に依存する）。タイトルが「テスト基盤の導入」で始まり状態が `done`・`dropped` 以外のタスクが既にあれば、新しく起票せず、その ID を `tasks` に `exists` で返す。
    - `--add-backlog-sections`: 問 12 で「足す」と答えたときだけ付ける。
    - `.mcp.json` は既定（`--mcp auto`）でよい。依存に `next` があれば Next.js 向け、無ければ空で置く。
-   - `ok` が false（例: `tasks` という名前のファイルが置き場所をふさいでいる）なら、何も置かれていない。`error` の文面をそのまま報告して止まる。
+   - `ok` が false なら、`error` の文面をそのまま報告して止まる（置き場所がふさがっているとき、例えば `tasks` という名前のファイルがあるときは、何も書いていない）。
+   - `notWritten` が空でなければ、Claude Code のサンドボックスなどが設定ファイル（`.claude/settings.json`・`.mcp.json`）への書き込みを止めている。残りの雛形は置けている。`notWritten` の各 `path` へ、その `content` を Write で書く（英語の確認が出たら Yes）。書けたファイルは、手順 3 で `toStage` と一緒に `git add` する。Write も拒否されたら置かずに進め、手順 4 で報告する。この 2 つが無くても導入は続けられる（許可設定と MCP が効かないだけ）。
 2. 結果の `filled` が、推定で埋めた検証コマンドの行。`placeholders` が、まだ埋まっていない欄（ファイル・行・トークン）。
 3. ヒアリングの答えを、Edit で該当の `{{…}}` へ書き込む。
    - `CLAUDE.md`: `{{プロジェクト名}}` `{{何を作っているか1行}}`、`{{フレームワーク名}}`（`stack.framework` を使う。null なら聞いた答え）、「検証コマンド」表の『テスト用 DB』『実物1周の費用上限』と問 11 で答えた行、「反映コマンド」表の 6 行。
@@ -156,6 +157,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
 
 - 置いたファイル（`created`）／変えたファイル（`modified`）／飛ばしたファイル（`skipped` と理由）
 - apply の `warnings` と `ignored`（コミットに入らなかったファイル）。`packageJson.skipped` があれば、その理由（例: pnpm のプロジェクトには `audit:check` を足さない。依存の脆弱性は `CLAUDE.md`「検証コマンド」表の『依存の脆弱性』行のコマンドを使う）
+- 置けなかった設定ファイル（`notWritten` のうち、Write でも置けなかったもの）。「Claude Code のサンドボックスなどが書き込みを止めました。必要なら、サンドボックスを使わない状態で `/docdd:init` をもう一度打つか、次の中身を手で置いてください」と添え、`content` を載せる
 - 既存の `.claude/settings.json`・`.mcp.json` があった場合の差分（`settings.diff`・`mcp.missingServers`）。足したいときは「Claude に『.claude/settings.json の deny に … を足して』と頼む」と添える
 - 推定で埋めた行（`filled`。「推定です。違っていたら `CLAUDE.md` の該当行を直してください」と添える）
 - 未記入の欄（`ファイル:行  {{トークン}}` の形。「答えられる欄は `/docdd:init` をもう一度打つと聞き直します。自動で推定できない行は `CLAUDE.md` を直接直してください」と添える）

@@ -275,6 +275,9 @@ function pathConflict(rel) {
   return null;
 }
 
+// Claude Code のサンドボックスなどが書き込みを止めることがある設定ファイル。無くても導入は進められるので、書けなければ記録して先へ進む
+const PROTECTED_CONFIG = new Set([".claude/settings.json", ".mcp.json"]);
+
 function writeFile(rel, content) {
   fs.mkdirSync(path.dirname(abs(rel)), { recursive: true });
   fs.writeFileSync(abs(rel), content);
@@ -1706,18 +1709,18 @@ function cmdApply(opts) {
     }
   }
   const manifestWritten = !manifest.exists || placed.size > 0 || adopted > 0;
-  let manifestText = null;
-  if (manifestWritten) {
-    manifestText = `${JSON.stringify(
+  const buildManifestText = () =>
+    `${JSON.stringify(
       { kitVersion: base.kitVersion ?? KIT_VERSION, installedAt: base.installedAt ?? today(), updatedAt: today(), files: sortKeys(manFiles) },
       null,
       2,
     )}\n`;
-  }
+  let manifestText = manifestWritten ? buildManifestText() : null;
 
   // 書く前に、置き場所がふさがっていないか（例: tasks という名前のファイルがある）を全部確かめる。1 つでもあれば何も書かない
   const conflicts = [...out.keys(), ...(manifestText ? [MANIFEST] : [])].map(pathConflict).filter(Boolean);
   const written = [];
+  const notWritten = [];
   let failed = null;
   if (conflicts.length) failed = { path: conflicts[0].path, message: conflicts.map((c) => c.message).join(" ／ ") };
   else if (!dryRun) {
@@ -1729,10 +1732,20 @@ function cmdApply(opts) {
       }
       for (const [rel, content] of out) {
         current = rel;
-        writeFile(rel, content);
+        try {
+          writeFile(rel, content);
+        } catch (e) {
+          if (PROTECTED_CONFIG.has(rel) && ["EPERM", "EACCES", "EROFS"].includes(e?.code)) {
+            notWritten.push({ path: rel, code: e.code, content: String(content) });
+            delete manFiles[rel];
+            continue;
+          }
+          throw e;
+        }
         written.push(rel);
       }
       if (manifestText) {
+        if (notWritten.length) manifestText = buildManifestText();
         current = MANIFEST;
         writeFile(MANIFEST, manifestText);
         written.push(MANIFEST);
@@ -1746,6 +1759,12 @@ function cmdApply(opts) {
   for (const rel of Object.keys(manFiles)) if (isFile(rel) || out.has(rel)) stage.add(rel);
   if (gi.isRepo) for (const rel of uncommittedKitChanges(pm)) stage.add(rel);
   if (failed) for (const rel of [...stage]) if (!written.includes(rel)) stage.delete(rel);
+  for (const n of notWritten) {
+    stage.delete(n.path);
+    warnings.push(
+      `${n.path} を書けませんでした（${n.code}。Claude Code のサンドボックスなどが設定ファイルへの書き込みを止めています）。残りの雛形は置きました。notWritten の content を Claude の Write で置くか、手で置いてください。`,
+    );
+  }
   let ignored = [];
   if (gi.isRepo && stage.size) {
     const r = git(["check-ignore", "--", ...stage]);
@@ -1765,6 +1784,7 @@ function cmdApply(opts) {
       : undefined,
     written,
     failed,
+    notWritten,
     conflicts,
     kitVersion: KIT_VERSION,
     options: { settings: settingsMode, claudeMd: claudeMode, mcp: mcpMode, tasks: taskKinds, fillInferred: fill, addBacklogSections: addBacklog },

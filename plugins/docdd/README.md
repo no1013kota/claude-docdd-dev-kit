@@ -212,6 +212,7 @@ docdd を入れたプロジェクト（`.claude/settings.json` で有効にし�
   ```
 
 - `.env` と `.env.*` は `.claude/settings.json` で**読み取り禁止**にしています。`.env.example` も読めなくなります。変数名を Claude に見せたいときは、その部分をチャットに貼るか、deny の `Read(./.env.*)` を `Read(./.env.local)` などの個別の名前に書き換えてもらいます。
+- Claude Code のサンドボックス（`/sandbox`）を有効にしていると、init が `.claude/settings.json` と `.mcp.json` を書けないことがあります。その場合も残りの雛形は置き、Claude が確認つきで書き直すか、置けなかった中身を報告に載せます。
 - hook と許可設定は「うっかり」を止める柵で、完全な守りではありません。別の書き方（`bash -c '…'` など）までは止められません（安全の仕組みの補助です）。
 - `claude -p` のような確認を出せない実行では、`rm -r`・`rm -f` は実行されずに終わります。`/loop` は開いている会話の中で動くので確認が出て、答えるまでそこで止まります。
 - コミットの名前やメールを間違えたときは、push する前なら `git commit --amend --reset-author` で直せます。hook は Claude の `--amend` を止めるので、Claude Code の外のターミナルで自分で打ちます。

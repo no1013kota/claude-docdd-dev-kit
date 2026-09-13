@@ -17,7 +17,7 @@
 | `scripts/` | docs の検査・未記入欄の検査・依存の脆弱性の検査。下の「検証コマンド」表から使う。据え置く脆弱性は `scripts/audit-allowlist.json` に理由を添えて書く |
 | `.claude/rules/docdd-kit.md` | キット共通の約束。キットが管理するので直接は直さない（このプロジェクトだけの指示は下の「スキルへの追加指示」へ） |
 | `.claude/settings.json` | Claude Code の許可設定（例: 検査コマンドは確認なしで進め、削除や push は必ず確認する）と、プラグインの取得元 |
-| `.mcp.json` | Claude Code から使う MCP サーバー（外部の道具とつなぐ設定）。Next.js なら shadcn/ui・Next.js DevTools を初期設定、それ以外は空で置く。使う道具に合わせて足す |
+| `.mcp.json` | Claude Code から使う MCP サーバー（外部の道具とつなぐ設定）。使う道具に合わせて足す（例: Next.js なら shadcn/ui・Next.js DevTools を初期設定し、それ以外は空で置く） |
 | `.docdd/manifest.json` | キットの版と、キットが置いたファイルの記録（`/docdd:update-kit` が使う。手で直さない） |
 | アプリ本体 | {{フレームワーク名}} |
 
