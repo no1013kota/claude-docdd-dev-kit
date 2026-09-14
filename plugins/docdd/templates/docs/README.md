@@ -40,9 +40,15 @@ PRD や要件を自前の書式で持ち込んだら、「主な節」の列を�
 | `scripts/check-doc-refs.mjs` | docs の検査 | docs が指すファイルの実在（対象は下の「参照の検査の対象」） |
 | `scripts/check-doc-dates.mjs` | docs の検査 | 更新日が、その文書の内容を最後に変えたコミットより古くないか。冒頭の version と変更履歴が合っているか |
 | `scripts/check-doc-placeholders.mjs` | 未記入欄の検査 | 二重波かっこ（`{{…}}`）の埋める欄が残っていないか。対象は `CLAUDE.md`・`.claude/rules/`・`docs/`・`tasks/` の Markdown。インラインコード・コードブロック・HTML コメントの中は数えない |
-| `scripts/audit-check.mjs` | 依存の脆弱性 | 依存ライブラリの high 以上の脆弱性（docs の検査ではない）。据え置くものは `scripts/audit-allowlist.json` に理由を添えて書く |
+| `scripts/audit-check.mjs` | 依存の脆弱性 | 依存ライブラリの high 以上の脆弱性（docs の検査ではない。npm と package-lock.json のプロジェクト用）。据え置くものは `scripts/audit-allowlist.json` に、脆弱性の ID（`ids`。GHSA- で始まる）・理由（`why`）・期限（`until`）を書く（3 つとも必須）。npm 以外は『依存の脆弱性』行のコマンドを使い、この一覧は読まれないので、据え置くなら `tasks/BACKLOG.md` の「要決定・外部準備」に ID・理由・期限を書く |
 
-**参照の検査の対象**: `CLAUDE.md`・`.claude/rules/`・`docs/` の Markdown のうち、(1) バッククォートで囲んだファイルパスで、拡張子が `scripts/check-doc-refs.mjs` の EXTS にあるもの（md・js・ts・py・cs・unity・prefab・gd・dart・swift など）、(2) `[PRD](./PRD.md)` のような `](./…)` の形の相対リンク。「例」という字を含む行、HTML コメントの中、コードブロックの中は見ない（例に出すファイル名は実在しなくてよい）。「例」の判定は行ごと（前の行に「例」や for example があっても、その行に「例」の字が無ければ検査する）。
+**参照の検査の対象**: `CLAUDE.md`・`.claude/rules/`・`docs/` の Markdown のうち、(1) バッククォートで囲んだファイルパスで、拡張子が `scripts/check-doc-refs.mjs` の EXTS にあるもの（md・js・ts・py・cs・unity・prefab・gd・dart・swift など）、(2) `[PRD](./PRD.md)` のような `](./…)` の形の相対リンク。
+
+次の所は書き方の見本として見ない（見本に出すファイル名は実在しなくてよい）。判定は行ごとで、これ以外の行は、前の行に「例」があっても検査する。
+
+- 「例」という字を含む行。ただし「例外」の「例」は数えない（「例外」のほかに「例」が無い行は検査する）。
+- HTML コメントの中と、コードブロックの中。
+- 見本の前置きの行のすぐ下に続く箇条。前置きの行は、行末が「for example」「e.g.」「for instance」「例えば」「たとえば」で終わる行（末尾のコロンは無視し、英語の大文字小文字は問わない）。箇条は `-`・`*`・`+`・`1.` で始まる行と、その字下げの続きの行。前置きの行との間に空行が 1 行あってもよい。空行のあとに箇条でない行が来たら、そこで終わる。
 
 どの検査も git が追跡しているファイルだけを見る（**新しく作ったファイルは先に `git add` する**）。`docs/_imported/` 配下と、雛形の `docs/requirements/00_template.md`・`docs/decisions/0000-template.md` は対象外。更新日の表を持たない文書（README・ADR）は日付の検査の対象外。
 

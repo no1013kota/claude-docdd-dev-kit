@@ -83,8 +83,8 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
   - 「C: 反映コマンドを実行」— 公開用のコマンドを打つ
   - 「まだ公開しない」
 - **問 6 テスト用 DB**: 「① 手元で起動する DB（例: supabase start）」「② ホスト型の開発専用 DB（本番と別・開発専用・破棄可能。接続先は .env のキー名）」「③ DB を使わない」「分からない（あとで決める）」。
-- **問 8 `.claude/settings.json` を置いてよいか**: 「置くと、以降ファイルの編集と `git add`／`git commit` は確認なしで進みます。`rm -r`（まとめて削除）や `git push` などは必ず確認が出ます」。選択肢は「置く（おすすめ）」「置かない」「分からない（あとで決める）」。「分からない」は置かない（`--settings no`）として扱う。
-  `settings.exists` が true なら、置く問いはしない（既存は上書きしない）。代わりに `settings.missingMarketplace` か `settings.missingEnabledPlugin` が true のときだけ、「プラグインの取得元（`extraKnownMarketplaces`）と有効化（`enabledPlugins`）の 2 つだけを足しますか。足すと、別の PC や入れ直したあとにこのフォルダを開いたとき、Claude Code がプラグインの入れ方を案内します」と聞く。
+- **問 8 `.claude/settings.json` を置いてよいか**（`settings.exists` が false のときだけ）: 「置くと、`git add`／`git commit` と docs の検査は確認なしで進みます。`rm -r`（まとめて削除）や `git push` などは必ず確認が出ます。`sudo` と `.env` の読み取りは止めます。ファイルを編集するたびに確認が出るかどうかは、Claude Code のモードで決まります（この設定では変えません）」。選択肢は「置く（おすすめ）」「置かない」「分からない（あとで決める）」。「分からない」は置かない（`--settings no`）として扱う。
+  `settings.exists` が true なら聞かない。既存は上書きもマージもせず、差分を手順 4 で報告する。
 - **問 9 既存の `CLAUDE.md`**（`claudeMd.exists` が true で、`claudeMd.hasMarkers` が false のときだけ）: 次の 3 択。おすすめは「表だけ末尾に足す」。`claudeMd.builtinInit` が true なら「Claude Code 組み込みの `/init` が作ったものに見えます」と添える。
   - いまのまま、キットの表（検証コマンド・反映コマンド・スキルへの追加指示）だけ末尾に足す（おすすめ）→ `--claude-md append`
   - 置き換える（元は `CLAUDE.md.bak` に残す）→ `--claude-md replace`
@@ -130,7 +130,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
    - PRD の §1〜§3 を、そこから下書きする（手順 1 で承知を得た内容）。
    - 原文を移すと答えたなら（Markdown の仕様書・メモだけ。問 2）、`mkdir -p docs/_imported` のあと `git mv <元のパス> docs/_imported/` で移し、原文の冒頭に「正本は docs/PRD.md（<今日の日付> 移行）」の 1 行を足す。git が追跡していないファイルなら、先に `git add <元のパス>` してから `git mv` する。
    - 画面・データの細かい記述は、その場で `docs/requirements/` へ分けない。`tasks/BACKLOG.md` の「## タスク」節の末尾に、「取り込んだ仕様を requirements へ分ける」タスクを 1 件起票する（書式は同ファイルの「運用ルール」。番号はいちばん大きい T-番号の次。参照は `docs/_imported/<ファイル名>`、サイズは M）。
-5. `settings.action` が `skipped`（既にあった）なら、init.mjs は中身に触れていない。問 8 で「2 つだけ足す」と答えていたら、Edit で `extraKnownMarketplaces` と `enabledPlugins` の 2 キーだけを足す（ほかの行は変えない。引数モードでは足さない）。Edit の前に、運営者へ「このあと `.claude/settings.json` を直すときに英語の確認が出たら、Yes を選んでください（"Yes, and allow Claude to edit files in this project's .claude folder for this session" でもよい。版によって文言が少し違うので、`.claude folder` を含む Yes を選ぶ）」と伝えておく。`settings.diff` の `missingDeny`・`missingAsk` は、手順 4 で差分として報告する。
+5. `settings.action` が `skipped`（既にあった）なら、init.mjs は中身に触れていない。Claude も直さない。`settings.diff` は手順 4 で差分として報告する。
 
 ### 3. 検査を通し、承知を得てコミットする
 
@@ -159,7 +159,8 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
 - 置いたファイル（`created`）／変えたファイル（`modified`）／飛ばしたファイル（`skipped` と理由）
 - apply の `warnings` と `ignored`（コミットに入らなかったファイル）。`packageJson.skipped` があれば、その理由（例: pnpm のプロジェクトには `audit:check` を足さない。依存の脆弱性は `CLAUDE.md`「検証コマンド」表の『依存の脆弱性』行のコマンドを使う）
 - 置けなかった設定ファイル（`notWritten` のうち、Write でも置けなかったもの）。「Claude Code のサンドボックスなどが書き込みを止めました。必要なら、サンドボックスを使わない状態で `/docdd:init` をもう一度打つか、次の中身を手で置いてください」と添え、`content` を載せる
-- 既存の `.claude/settings.json`・`.mcp.json` があった場合の差分（`settings.diff`・`mcp.missingServers`）。足したいときは「Claude に『.claude/settings.json の deny に … を足して』と頼む」と添える
+- 既存の `.claude/settings.json`・`.mcp.json` があった場合の差分（`settings.diff` の `missingAllow`・`missingAsk`・`missingDeny` と、`mcp.missingServers`）。足したいときは「Claude に『.claude/settings.json の deny に … を足して』と頼む」と添える
+- `settings.diff.currentDefaultMode` が null でなければ、その値（始まりのモード）を載せる。値が `auto`・`bypassPermissions` なら、「プロジェクトの `.claude/settings.json` に書いたこの値は効きません（毎回確認するモードなどで始まります）」と添える。それ以外の値なら、「ターミナルで起動した Claude Code は、このモードで始まります。auto モードで始めたいときは、Pro・Max・Team なら Claude に『.claude/settings.json の permissions から defaultMode を消して』と頼みます（`~/.claude/settings.json` に別の defaultMode があれば、そちらで始まります）。Enterprise や Console の API キーでは、消すと毎回確認するモード（Manual）で始まるので、`~/.claude/settings.json` の permissions に "defaultMode": "auto" を書きます（auto モードが使えるときだけ）」と添える
 - 推定で埋めた行（`filled`。「推定です。違っていたら `CLAUDE.md` の該当行を直してください」と添える）
 - 未記入の欄（`ファイル:行  {{トークン}}` の形。「答えられる欄は `/docdd:init` をもう一度打つと聞き直します。自動で推定できない行は `CLAUDE.md` を直接直してください」と添える）
 - 起票した定型タスク（`tasks`。`exists` は既にあったタスク）
@@ -168,7 +169,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
 - コミットした場合は、記録に使った名前とメール（`<名前> <メール>`。メールは push すると公開される）
 - `CLAUDE.md.bak` を作った場合は「不要なら消してよい（コミットしていない）」
 - Web 以外のプロジェクト（手順 0-10）なら、「Web 以外のプロジェクトです。検証コマンドは一部しか推定できません。README『Web 以外のプロジェクトで使う』を見て埋め、必要なら『スキルへの追加指示』を書いてください」と伝え、次を添える
-  - `.gitignore` には「# docdd: 共通」の塊だけを使った（Web 向けの `node_modules/` などは足していない）
+  - `.gitignore` には「# docdd: 共通」の塊を使った（`stack.languages` に Python があるときは「# docdd: Python」の塊も使った）。Web 向けの塊（`node_modules/` など）は足していない
   - `/docdd:ui-polish`・`/docdd:speed-up`・`/docdd:playwright-cli` は Web 専用で、このプロジェクトでは「該当なし」と報告して止まる。画面・操作は、`/docdd:verify-e2e` が『E2E（実際に動かす）』行のコマンドで確かめ、自動で確かめられないものは運営者に確かめてもらう
   - 既存の `CLAUDE.md` や運用文書に、コミットの前に承知を得る・決まったブランチで作業する・手で直さないファイルがある、などの約束があれば、「スキルへの追加指示」表に行を足すよう勧める（スキルは本文より追加指示を優先する）。許可設定（`.claude/settings.json`）の直し方も README の同じ節にある
 - 次の一手（上から最初に当てはまるもの）:

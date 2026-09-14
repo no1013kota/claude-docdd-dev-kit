@@ -6,59 +6,10 @@ body:
   - type: markdown
     attributes:
       value: |
-        報告ありがとうございます。分かる範囲で書いてください。空欄があっても大丈夫です。
+        報告ありがとうございます。日本語でも英語でも書けます（You can write in Japanese or English.）。
+        必ず書いてほしいのは「起きたこと」と「docdd の版」の 2 つだけです。ほかの欄は分かる範囲で書いてください。空欄のままでも送れます。
+        エラーは出ていないけれど使い方が分からない、というときは「質問・分かりにくい所」から送ってください。
         **API キー・パスワード・`.env` の中身・メールアドレスなどの秘密情報は貼らないでください。**
-
-  - type: input
-    id: claude-version
-    attributes:
-      label: Claude Code の版
-      description: ターミナルで `claude --version` と打ったときの表示
-      placeholder: "例: 2.1.270 (Claude Code)"
-    validations:
-      required: true
-
-  - type: dropdown
-    id: os
-    attributes:
-      label: OS
-      options:
-        - macOS
-        - Windows（WSL）
-        - Windows（Git for Windows あり）
-        - Windows（Git for Windows なし）
-        - Linux
-        - その他
-    validations:
-      required: true
-
-  - type: dropdown
-    id: surface
-    attributes:
-      label: Claude Code をどこで使ったか
-      options:
-        - ターミナル（CLI）
-        - Desktop アプリ
-        - VS Code などのエディタ
-        - その他
-
-  - type: input
-    id: docdd-version
-    attributes:
-      label: docdd の版
-      description: Claude Code の中で `/plugin list` と打ったときの docdd の版
-      placeholder: "例: 0.3.0"
-    validations:
-      required: true
-
-  - type: input
-    id: skill
-    attributes:
-      label: 打ったスキル（コマンド）
-      description: 引数も含めてそのまま
-      placeholder: "例: /docdd:init よみログ 読書記録アプリ commit"
-    validations:
-      required: true
 
   - type: textarea
     id: what-happened
@@ -67,6 +18,22 @@ body:
       description: 何をしたら、何が起きたか
     validations:
       required: true
+
+  - type: input
+    id: docdd-version
+    attributes:
+      label: docdd の版
+      description: Claude Code の中で `/plugin list` と打ったときの docdd の版。分からなければ「分からない」と書いてください
+      placeholder: "例: 0.4.0"
+    validations:
+      required: true
+
+  - type: input
+    id: skill
+    attributes:
+      label: 打ったスキル（コマンド）
+      description: 引数も含めてそのまま。スキルを打っていなければ空欄で大丈夫です
+      placeholder: "例: /docdd:init よみログ 読書記録アプリ commit"
 
   - type: textarea
     id: expected
@@ -80,3 +47,32 @@ body:
       label: 失敗したときの文面（そのまま貼る）
       description: 英語のエラーも、訳さずそのまま貼ってください。長ければ前後 20 行ほどで十分です。
       render: text
+
+  - type: input
+    id: claude-version
+    attributes:
+      label: Claude Code の版
+      description: ターミナルで `claude --version` と打ったときの表示
+      placeholder: "例: 2.1.270 (Claude Code)"
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options:
+        - macOS
+        - Windows（WSL）
+        - Windows（Git for Windows あり）
+        - Windows（Git for Windows なし）
+        - Linux
+        - その他
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Claude Code をどこで使ったか
+      options:
+        - ターミナル（CLI）
+        - Desktop アプリ
+        - VS Code などのエディタ
+        - その他

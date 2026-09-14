@@ -1,0 +1,38 @@
+name: 要望
+description: docdd に「こうなってほしい」「これがほしい」があるとき
+title: "[要望] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        日本語でも英語でも書けます（You can write in Japanese or English.）。
+        必ず書いてほしいのは「こうなってほしい」だけです。ほかの欄は空欄のままでも送れます。
+        **API キー・パスワード・`.env` の中身・メールアドレスなどの秘密情報は貼らないでください。**
+
+  - type: textarea
+    id: request
+    attributes:
+      label: こうなってほしい
+      description: 何ができるとうれしいか
+    validations:
+      required: true
+
+  - type: textarea
+    id: situation
+    attributes:
+      label: 困っている場面
+      description: いつ、何をしているときに困るか
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: 今どうしているか
+      description: 代わりにしていることがあれば
+
+  - type: input
+    id: docdd-version
+    attributes:
+      label: docdd の版（分かれば）
+      description: Claude Code の中で `/plugin list` と打ったときの docdd の版
+      placeholder: "例: 0.4.0"

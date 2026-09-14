@@ -1,4 +1,5 @@
-# docdd の配布リポジトリの検査。CI が緑のコミットだけをリリースする（RELEASING.md）。
+# docdd の配布リポジトリの検査。
+# main はいつ配布されてもよい状態に保つ。PR の CI で緑にしてから入れる（main に入れた時点で配布される。RELEASING.md）。
 name: CI
 
 on:
@@ -16,7 +17,9 @@ jobs:
       # checkout と setup-node は、Node.js 24 で動く版（action.yml が using: node24）を使う
       - uses: actions/checkout@v7
         with:
-          # tests/init.test.mjs は v0.1.4（f08d4e5）の雛形を git の履歴から読む。浅い clone だとそのテストが skip になる
+          # 履歴とタグをすべて取る。浅い clone だと次の 2 つが飛ばされる
+          # - tests/init.test.mjs: v0.1.4（f08d4e5）の雛形を git の履歴から読む
+          # - scripts/check-version-bump.mjs（npm run check）: 最新のタグ docdd--vX.Y.Z と比べて、版の上げ忘れを見る
           fetch-depth: 0
 
       - uses: actions/setup-node@v7
@@ -24,7 +27,7 @@ jobs:
           node-version: 22
 
       - name: Claude Code を入れる
-        # 版を固定する。検証に使う版を上げるときはここも上げる（RELEASING.md の手順 5）
+        # 版を固定する。検証に使う版を上げるときはここも上げる（RELEASING.md）
         run: npm i -g @anthropic-ai/claude-code@2.1.270
 
       - name: マーケットプレイスの定義を検査
@@ -37,8 +40,42 @@ jobs:
         # --force は「タグが既にある」検査だけを飛ばすため（同じ版のまま後続のコミットを push しても落ちないように）
         run: claude plugin tag --dry-run --force plugins/docdd
 
-      - name: スキル参照・前置き・frontmatter・版の刻印
+      - name: スキル参照・前置き・frontmatter・版の刻印・版の上げ忘れ
         run: npm run check
 
       - name: テスト
+        run: npm test
+
+  # 案内している最低の版（Node.js 18）で、テストだけを回す。
+  # Claude Code の npm 版は Node.js 22 以上が要るので、validate などは上の check だけで回す。
+  test-node18:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 18
+
+      - name: テスト（Node.js 18）
+        run: npm test
+
+  # Windows で、テストだけを回す。落ちても CI 全体は止めない（Windows だけで起きる失敗を知るためのジョブ）。
+  test-windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: テスト（Windows）
         run: npm test

@@ -7,7 +7,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 Third-party material / 第三者に由来する部分
 ------------------------------------------------------------------------
 
-This product includes material from microsoft/playwright-cli
+This product includes material derived from microsoft/playwright-cli
 (npm package @playwright/cli 0.1.17, bundled skill).
   Source:    https://github.com/microsoft/playwright-cli
   License:   Apache License, Version 2.0
@@ -15,22 +15,17 @@ This product includes material from microsoft/playwright-cli
 
 Files (paths relative to the repository root):
 
-  plugins/docdd/skills/playwright-cli/references/element-attributes.md
-  plugins/docdd/skills/playwright-cli/references/playwright-tests.md
-  plugins/docdd/skills/playwright-cli/references/request-mocking.md
-  plugins/docdd/skills/playwright-cli/references/running-code.md
-  plugins/docdd/skills/playwright-cli/references/session-management.md
-  plugins/docdd/skills/playwright-cli/references/storage-state.md
-  plugins/docdd/skills/playwright-cli/references/test-generation.md
-  plugins/docdd/skills/playwright-cli/references/tracing.md
-  plugins/docdd/skills/playwright-cli/references/video-recording.md
-    -> Same content as the files bundled with @playwright/cli 0.1.17 (not modified).
-
   plugins/docdd/skills/playwright-cli/SKILL.md
     -> The frontmatter (name, description, allowed-tools) is derived from the
        upstream skill. The body was rewritten in Japanese, and the description
        and allowed-tools were changed (modified).
 
-上の 9 ファイル（references/*.md）は @playwright/cli 0.1.17 に同梱のスキルと同じ内容で、改変していません。
+Since docdd 0.4.0, the upstream reference files (references/*.md, 9 files)
+are no longer bundled. The playwright-cli skill instead tells Claude to read
+the upstream skill that ships inside the installed Playwright CLI (the file
+named on the "Agent skill:" line of `playwright-cli --help`).
+
 playwright-cli/SKILL.md は、frontmatter（name・description・allowed-tools）が上流のスキルに由来します。
 本文は日本語で書き直し、description と allowed-tools も変えています（改変あり）。
+docdd 0.4.0 から、上流の手順書（references/*.md の 9 本）は同梱していません。
+playwright-cli スキルは、入っている道具の中にある公式の手順書（`playwright-cli --help` の「Agent skill:」行が指すファイル）を読みます。

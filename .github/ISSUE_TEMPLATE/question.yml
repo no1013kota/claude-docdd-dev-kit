@@ -1,0 +1,44 @@
+name: 質問・分かりにくい所
+description: 使い方が分からない、次に何をすればいいか分からない、説明が分かりにくいとき
+title: "[質問] "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        日本語でも英語でも書けます（You can write in Japanese or English.）。
+        必ず書いてほしいのは「困っていること」だけです。ほかの欄は空欄のままでも送れます。エラーが出ていなくても大丈夫です。
+        **API キー・パスワード・`.env` の中身・メールアドレスなどの秘密情報は貼らないでください。**
+
+  - type: textarea
+    id: question
+    attributes:
+      label: 困っていること
+      description: 何をしようとして、どこで困ったか。思ったことをそのまま書いてください。
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: 試したこと
+      description: 読んだ説明や、打ったコマンドがあれば
+
+  - type: input
+    id: docdd-version
+    attributes:
+      label: docdd の版（分かれば）
+      description: Claude Code の中で `/plugin list` と打ったときの docdd の版
+      placeholder: "例: 0.4.0"
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS（分かれば）
+      options:
+        - macOS
+        - Windows（WSL）
+        - Windows（Git for Windows あり）
+        - Windows（Git for Windows なし）
+        - Linux
+        - その他

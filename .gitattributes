@@ -1,0 +1,24 @@
+# 改行を LF に固定する。Windows の git は既定で CRLF に変えて取り出すことがあり、
+# そのままだとテスト（LF を前提にした比較）や evals の scaffold.sh（bash が「set: pipefail: invalid option name」で止まる）が壊れ、
+# 雛形も CRLF で置かれてしまう。
+* text=auto eol=lf
+*.sh text eol=lf
+
+# 画像・圧縮ファイル・フォントなどは改行を変えない
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.tgz binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.mp4 binary
+*.webm binary
+*.mov binary

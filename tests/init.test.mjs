@@ -6,6 +6,7 @@
 // 置いた雛形の検査スクリプト（templates/scripts）も実際に回し、「導入 → 検査 → コミット」が通ることを固定する。
 // 通信は使わない。「空の Node プロジェクト」は npm init -y の出力と同じ package.json を直接書く（npm の起動と通信を避けるため）。
 // v0.1.4 の雛形を使うテストは、このリポジトリの履歴（f08d4e5）が無い浅い clone では飛ばす。
+// 雛形を CRLF で checkout した環境（Windows の core.autocrlf=true）でも通るよう、雛形から期待値を作るときは改行を LF に揃える。
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -150,7 +151,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `;
 
 function tablesBlock() {
-  const t = fs.readFileSync(path.join(TEMPLATES, "CLAUDE.md"), "utf8");
+  // append は既存の CLAUDE.md の改行（ここでは LF）に揃えて足すので、雛形が CRLF で checkout されていても LF で比べる
+  const t = fs.readFileSync(path.join(TEMPLATES, "CLAUDE.md"), "utf8").replace(/\r\n/g, "\n");
   return t.slice(t.indexOf("<!-- docdd:tables:begin -->"), t.indexOf("<!-- docdd:tables:end -->") + "<!-- docdd:tables:end -->".length);
 }
 
@@ -179,12 +181,15 @@ function v014Files() {
 /** templates/.gitignore の塊（「# docdd: 」で始まる見出しと、その下の行）。 */
 function gitignoreTemplateBlocks() {
   const blocks = [];
-  for (const l of fs.readFileSync(path.join(TEMPLATES, ".gitignore"), "utf8").split("\n").map((s) => s.trim())) {
+  for (const l of fs.readFileSync(path.join(TEMPLATES, ".gitignore"), "utf8").split(/\r?\n/).map((s) => s.trim())) {
     if (l.startsWith("# docdd:")) blocks.push({ header: l, lines: [] });
     else if (l && !l.startsWith("#")) blocks[blocks.length - 1].lines.push(l);
   }
   return blocks;
 }
+
+/** .gitignore が無いときに置く中身（塊を空行 1 行で区切る）。 */
+const gitignoreText = (blocks) => `${blocks.map((b) => [b.header, ...b.lines].join("\n")).join("\n\n")}\n`;
 
 /** 既存の .gitignore に足すときの並び（塊の中で、肯定の行のあとに否定の行）。 */
 const appendOrder = (lines) => [...lines.filter((l) => !l.startsWith("!")), ...lines.filter((l) => l.startsWith("!"))];
@@ -398,8 +403,8 @@ test("既存の .claude/settings.json と .mcp.json は上書きもマージも�
   assert.equal(st.json.settings.exists, true);
   assert.ok(st.json.settings.missingDeny.includes("Bash(sudo:*)"));
   assert.ok(st.json.settings.missingDeny.includes("Read(./.env)"));
-  assert.equal(st.json.settings.missingMarketplace, true);
-  assert.equal(st.json.settings.missingEnabledPlugin, true);
+  assert.equal(st.json.settings.currentDefaultMode, null, "既存に始まりのモードの指定が無い");
+  for (const key of ["defaultMode", "missingMarketplace", "missingEnabledPlugin"]) assert.ok(!(key in st.json.settings), `settings.${key} は返さない`);
   assert.deepEqual(st.json.mcp.missingServers, ["shadcn", "next-devtools"]);
 
   const a = init(dir, "apply", "--settings", "yes");
@@ -411,6 +416,34 @@ test("既存の .claude/settings.json と .mcp.json は上書きもマージも�
   assert.equal(a.json.mcp.action, "skipped");
   assert.deepEqual(a.json.mcp.missingServers, ["shadcn", "next-devtools"]);
   assert.ok(!a.json.created.includes(".claude/settings.json"));
+});
+
+test("雛形の .claude/settings.json は始まりのモード・入手先・有効化を決めない。既存の defaultMode は currentDefaultMode で報告するだけで消さない", () => {
+  const templateText = fs.readFileSync(path.join(TEMPLATES, ".claude/settings.json"), "utf8");
+  const t = JSON.parse(templateText);
+  assert.equal(t.permissions.defaultMode, undefined, "Pro・Max・Team の auto モードを上書きしない");
+  assert.equal(t.extraKnownMarketplaces, undefined, "入手先の名前を決め打ちしない");
+  assert.equal(t.enabledPlugins, undefined);
+  for (const key of ["allow", "ask", "deny"]) assert.ok(Array.isArray(t.permissions[key]) && t.permissions[key].length > 0, `permissions.${key} は残す`);
+
+  const fresh = project({ files: { "package.json": '{\n  "name": "x"\n}\n' } });
+  const a = init(fresh, "apply", "--settings", "yes");
+  assert.equal(a.status, 0, a.stdout);
+  assert.equal(a.json.settings.action, "created");
+  assert.equal(read(fresh, ".claude/settings.json"), templateText);
+  const same = init(fresh, "status").json.settings;
+  assert.deepEqual([same.sameAsTemplate, same.currentDefaultMode, same.missingAllow, same.missingAsk, same.missingDeny], [true, null, [], [], []]);
+
+  const settings = `${JSON.stringify({ permissions: { defaultMode: "acceptEdits", allow: t.permissions.allow, ask: t.permissions.ask, deny: t.permissions.deny } }, null, 2)}\n`;
+  const dir = project({ files: { ".claude/settings.json": settings, "package.json": '{\n  "name": "x"\n}\n' } });
+  const st = init(dir, "status").json.settings;
+  assert.deepEqual([st.currentDefaultMode, st.missingAllow, st.missingAsk, st.missingDeny], ["acceptEdits", [], [], []]);
+  const b = init(dir, "apply", "--settings", "yes");
+  assert.equal(b.status, 0, b.stdout);
+  assert.equal(b.json.settings.action, "skipped");
+  assert.equal(b.json.settings.diff.currentDefaultMode, "acceptEdits");
+  assert.equal(read(dir, ".claude/settings.json"), settings, "既存の defaultMode は消さない");
+  assert.equal(init(dir, "update").json.files.find((f) => f.path === ".claude/settings.json").settings.currentDefaultMode, "acceptEdits");
 });
 
 test("apply を add せずにもう一度実行しても、toStage に .gitignore と package.json が残る（.gitignore の例外の行を足す流れ）。コミット後は、キットと関係ない package.json の変更を stage しない", () => {
@@ -451,7 +484,7 @@ test("既存の .gitignore: 足りない行だけを塊ごとに「# docdd: 共�
   const original = "node_modules/\n.env\n/custom-output\n";
   const dir = project({ files: { ".gitignore": original } });
   const blocks = gitignoreTemplateBlocks();
-  assert.deepEqual(blocks.map((b) => b.header), ["# docdd: 共通", "# docdd: Web（Node.js・ビルド出力・Playwright）"]);
+  assert.deepEqual(blocks.map((b) => b.header), ["# docdd: 共通", "# docdd: Web（Node.js・ビルド出力・Playwright）", "# docdd: Python"], "見出しは完全一致で、この順");
   // 否定の行（!.env.example）は、同じ塊で足した行より後ろに置く（.gitignore は後ろの行が勝つ）
   const [common, web] = blocks.map((b) => appendOrder(b.lines.filter((l) => l !== "node_modules/" && l !== ".env")));
   const expected = `${original}\n${blocks[0].header}\n${common.join("\n")}\n\n${blocks[1].header}\n${web.join("\n")}\n`;
@@ -459,7 +492,7 @@ test("既存の .gitignore: 足りない行だけを塊ごとに「# docdd: 共�
   const a = init(dir, "apply");
   assert.equal(a.status, 0, a.stdout);
   assert.equal(a.json.gitignore.action, "appended");
-  assert.equal(read(dir, ".gitignore"), expected, "package.json も Web 以外の目印も無い（web=null）ので、両方の塊");
+  assert.equal(read(dir, ".gitignore"), expected, "package.json も Web 以外の目印も無い（web=null）ので共通と Web の塊。Python は検出していないので足さない");
   assert.deepEqual(a.json.gitignore.addedLines, [...common, ...web]);
   assert.ok(a.json.toStage.includes(".gitignore"));
 
@@ -514,7 +547,7 @@ test("サブディレクトリ（モノレポ）: status が atGitRoot=false を
   assert.equal(st.json.lockfile, "../../package-lock.json");
   const row = (name) => st.json.inferred.find((r) => r.row === name);
   assert.equal(row("依存の脆弱性").value, "node scripts/audit-check.mjs");
-  assert.equal(row("開発サーバー起動").cell, "`npm run dev`（http://127.0.0.1:5173 で開く）");
+  assert.equal(row("開発サーバー起動").cell, "`npm run dev`（http://localhost:5173 で開く）");
   assert.equal(row("単体・DBテスト").value, "npm test");
 });
 
@@ -719,7 +752,7 @@ test("未記入の欄を埋め、従量課金が無いので PRD §4 を消す�
   const dir = project({ files: { "package.json": NPM_INIT_PACKAGE } });
   const a = init(dir, "apply", "--settings", "no", "--fill-inferred");
   assert.equal(a.status, 0, a.stdout);
-  write(dir, { "docs/PRD.md": read(dir, "docs/PRD.md").replace(/^## 4\. 料金・上限（従量課金があるとき）\n[\s\S]*?(?=^## )/m, "") });
+  write(dir, { "docs/PRD.md": read(dir, "docs/PRD.md").replace(/^## 4\. 料金・上限（従量課金があるとき）\r?\n[\s\S]*?(?=^## )/m, "") });
   const ph = init(dir, "status").json.placeholders;
   assert.ok(!ph.some((p) => p.file === "docs/PRD.md" && /上限|数値|原価/.test(p.token)), JSON.stringify(ph));
   for (const p of ph.filter((x) => x.token !== "{{YYYY-MM-DD}}")) {
@@ -791,7 +824,7 @@ test("CRLF の文書: apply --claude-md append と update --apply の追記で C
   assert.equal(a.status, 0, a.stdout);
   assert.equal(bareLf(read(dir, "CLAUDE.md")), 0, "LF だけの行が混ざらない");
 
-  const dev = read(dir, "docs/operations/development-and-testing.md");
+  const dev = read(dir, "docs/operations/development-and-testing.md").replace(/\r\n/g, "\n");
   write(dir, { "docs/operations/development-and-testing.md": dev.replace(/^## 5\. 落とし穴\n[\s\S]*?(?=^## 6\.)/m, "").replace(/\n/g, "\r\n") });
   const up = init(dir, "update");
   assert.equal(up.json.files.find((f) => f.path === "docs/operations/development-and-testing.md").action, "append");
@@ -825,7 +858,7 @@ test("apply: 置き場所がふさがっていれば何も書かず終了コー�
   assert.ok(!read(dir2, "docs/PRD.md").includes("{{YYYY-MM-DD}}"));
 });
 
-test("apply: サンドボックスなどで .claude/settings.json を書けなくても、残りの雛形は置き切り notWritten で返す", { skip: process.getuid?.() === 0 ? "root では書き込み拒否を再現できない" : false }, () => {
+test("apply: サンドボックスなどで .claude/settings.json を書けなくても、残りの雛形は置き切り notWritten で返す", { skip: process.platform === "win32" ? "Windows では chmod でフォルダへの書き込みを禁止できない" : process.getuid?.() === 0 ? "root では書き込み拒否を再現できない" : false }, () => {
   const dir = project({ files: { "package.json": '{\n  "name": "sandboxed"\n}\n' } });
   fs.mkdirSync(path.join(dir, ".claude/rules"), { recursive: true });
   fs.chmodSync(path.join(dir, ".claude"), 0o555);
@@ -937,6 +970,10 @@ test("Unity のプロジェクト: status は kind=unity・web=false で、Proje
   assert.match(st.json.next, /Web 以外のプロジェクトです。検証コマンドは一部しか推定できません。README『Web 以外のプロジェクトで使う』を見て埋め、必要なら『スキルへの追加指示』を書いてください/);
   const row = (name) => st.json.inferred.find((r) => r.row === name);
   for (const name of ["開発サーバー起動", "本番モード起動", "依存の脆弱性"]) assert.equal(row(name).value, "無い", name);
+  for (const name of ["型検査", "lint"]) {
+    assert.equal(row(name).value, "無い", name);
+    assert.equal(row(name).source, "Unity には型検査・lint の標準のコマンドが無い（C# のコンパイルエラーは EditMode テストで出る）", name);
+  }
   for (const name of ["単体・DBテスト", "E2E（実際に動かす）", "ビルド"]) {
     assert.equal(row(name).value, null, name);
     assert.match(row(name).source, /README『Web 以外のプロジェクトで使う』/, name);
@@ -945,9 +982,11 @@ test("Unity のプロジェクト: status は kind=unity・web=false で、Proje
 
   const a = init(dir, "apply", "--fill-inferred", "--settings", "no", "--tasks", "test-infra");
   assert.equal(a.status, 0, a.stdout);
-  assert.deepEqual(a.json.filled.map((f) => [f.row, f.cell]), [["開発サーバー起動", "無い"], ["本番モード起動", "無い"], ["依存の脆弱性", "無い"]]);
+  assert.deepEqual(a.json.filled.map((f) => [f.row, f.cell]), [["開発サーバー起動", "無い"], ["型検査", "無い"], ["lint", "無い"], ["本番モード起動", "無い"], ["依存の脆弱性", "無い"]]);
   const claude = read(dir, "CLAUDE.md");
   assert.match(claude, /^\| 開発サーバー起動 \| 無い \|$/m);
+  assert.match(claude, /^\| 型検査 \| 無い \|$/m);
+  assert.match(claude, /^\| lint \| 無い \|$/m);
   assert.match(claude, /^\| 本番モード起動 \| 無い \|$/m);
   assert.match(claude, /^\| 依存の脆弱性 \| 無い \|$/m);
   assert.match(claude, /^\| 単体・DBテスト \| \{\{単体・DBテスト\}\} \|$/m);
@@ -996,8 +1035,9 @@ test("Web のプロジェクト: status は kind=web・web=true。.gitignore は
 
   const a = init(dir, "apply", "--settings", "no");
   assert.equal(a.status, 0, a.stdout);
-  assert.equal(read(dir, ".gitignore"), fs.readFileSync(path.join(TEMPLATES, ".gitignore"), "utf8"));
-  assert.deepEqual(a.json.gitignore.addedLines, gitignoreTemplateBlocks().flatMap((b) => b.lines));
+  const [common0, web0] = gitignoreTemplateBlocks();
+  assert.equal(read(dir, ".gitignore"), gitignoreText([common0, web0]), "Python を検出していないので Python の塊は置かない");
+  assert.deepEqual(a.json.gitignore.addedLines, [...common0.lines, ...web0.lines]);
 
   const dir2 = project({ files: { "package.json": pkg, ".gitignore": "node_modules\n" } });
   const b = init(dir2, "apply", "--settings", "no");
@@ -1052,6 +1092,8 @@ test("Web 以外の種類: Godot・Flutter・Android・Apple・.NET は web=fals
     assert.equal(row("開発サーバー起動").value, "無い", c.kind);
     assert.equal(row("本番モード起動").value, "無い", c.kind);
     assert.equal(row("依存の脆弱性").value, c.audit, c.kind);
+    assert.equal(row("型検査").value, null, `${c.kind}: 型検査・lint を「無い」と決めるのは Unity だけ`);
+    assert.equal(row("lint").value, null, c.kind);
   }
 
   const godot = project({ files: cases[0].files });
@@ -1117,4 +1159,308 @@ test("既存コードの判定: Godot の .gd・Flutter の .dart・C/C++ も数
   // addons/ を数えないのは Godot のときだけ
   const other = init(project({ files: { "addons/sale/models.py": "x = 1\n", "web/app.cpp": "int main() {}\n" } }), "status").json;
   assert.deepEqual([other.stack.kind, other.scaffold.sourceFileCount], ["unknown", 2]);
+});
+
+test("依存の脆弱性の推定: npm 以外も本番の依存だけを high 以上で調べる（yarn v2 以上は依存の依存まで）", () => {
+  const pkg = (extra = "") => `{\n  "name": "a"${extra}\n}\n`;
+  const berry = "yarn npm audit --recursive --severity high --environment production";
+  const cases = [
+    { name: "npm", files: { "package.json": pkg(), "package-lock.json": '{\n  "lockfileVersion": 3\n}\n' }, cmd: "node scripts/audit-check.mjs" },
+    { name: "pnpm", files: { "package.json": pkg(), "pnpm-lock.yaml": "lockfileVersion: '9.0'\n" }, cmd: "pnpm audit --audit-level=high --prod" },
+    { name: "yarn v1", files: { "package.json": pkg(), "yarn.lock": "# yarn lockfile v1\n" }, cmd: "yarn audit --level high --groups dependencies" },
+    { name: "yarn v4（.yarnrc.yml）", files: { "package.json": pkg(), "yarn.lock": "__metadata:\n  version: 8\n", ".yarnrc.yml": "nodeLinker: node-modules\n" }, cmd: berry },
+    { name: "yarn v4（packageManager）", files: { "package.json": pkg(',\n  "packageManager": "yarn@4.18.0"'), "yarn.lock": "__metadata:\n  version: 8\n" }, cmd: berry },
+    // .yarnrc.yml も packageManager も無いときは、yarn.lock の形（v2 以上は __metadata: の塊）で見分ける
+    {
+      name: "yarn v4（yarn.lock だけ）",
+      files: { "package.json": pkg(), "yarn.lock": '# This file is generated by running "yarn install" inside your project.\n# Manual changes might be lost - proceed with caution!\n\n__metadata:\n  version: 10\n  cacheKey: 10c0\n' },
+      cmd: berry,
+    },
+    { name: "yarn v1（lockfile v1 の見出し）", files: { "package.json": pkg(), "yarn.lock": "# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.\n# yarn lockfile v1\n\n\nms@2.1.3:\n  version \"2.1.3\"\n" }, cmd: "yarn audit --level high --groups dependencies" },
+    { name: "bun", files: { "package.json": pkg(), "bun.lock": "{}\n" }, cmd: "bun audit --audit-level=high --prod" },
+  ];
+  for (const c of cases) {
+    const st = init(project({ files: c.files }), "status");
+    assert.equal(st.status, 0, st.stderr);
+    assert.equal(st.json.inferred.find((r) => r.row === "依存の脆弱性").value, c.cmd, c.name);
+  }
+  const dir = project({ files: cases[3].files });
+  const a = init(dir, "apply", "--fill-inferred", "--settings", "no");
+  assert.equal(a.status, 0, a.stdout);
+  assert.match(read(dir, "CLAUDE.md"), /^\| 依存の脆弱性 \| `yarn npm audit --recursive --severity high --environment production` \|$/m);
+});
+
+// create-vite（2026-09 の latest）の react-ts・vue-ts が置く中身。tsconfig.json は中身を references の先に任せる形
+const VITE_REACT_PACKAGE = `{
+  "name": "vite-react",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "oxlint": "^1.81.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0"
+  }
+}
+`;
+const VITE_VUE_PACKAGE = `{
+  "name": "vite-vue",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.5.42"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "@vue/tsconfig": "^0.9.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0",
+    "vue-tsc": "^3.3.11"
+  }
+}
+`;
+const VITE_TSCONFIG = `{
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}
+`;
+const VITE_REACT_TSCONFIG_APP = `{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "target": "es2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "esnext",
+    "types": ["vite/client"],
+    "allowArbitraryExtensions": true,
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Linting */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"]
+}
+`;
+const VITE_VUE_TSCONFIG_APP = `{
+  "extends": "@vue/tsconfig/tsconfig.dom.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "types": ["vite/client"],
+    "allowArbitraryExtensions": true,
+
+    /* Linting */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"]
+}
+`;
+const VITE_TSCONFIG_NODE = `{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "target": "es2023",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "module": "nodenext",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Linting */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["vite.config.ts"]
+}
+`;
+// @vue/tsconfig 0.9.1 の 2 本を縮めたもの（// のコメント・文字列の中の //・末尾のカンマを含む）
+const VUE_TSCONFIG_PACKAGE = {
+  "node_modules/@vue/tsconfig/tsconfig.dom.json": `{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": [
+      // Target ES2022 to align with Vite.
+      // <https://vite.dev/config/build-options.html#build-target>
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": []
+  }
+}
+`,
+  "node_modules/@vue/tsconfig/tsconfig.json": `{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    // Most non-library projects don't need to emit declarations.
+    "noEmit": true,
+    "module": "ESNext",
+    "skipLibCheck": true,
+  }
+}
+`,
+};
+
+test("Vite の TypeScript（create-vite の react-ts・vue-ts）: tsconfig.json が references の形なら、型検査は build と同じ tsc -b（JS を書き出さないときだけ）、本番モード起動は build と preview", () => {
+  const rowOf = (dir, name) => init(dir, "status").json.inferred.find((r) => r.row === name);
+  const reactFiles = { "package.json": VITE_REACT_PACKAGE, "tsconfig.json": VITE_TSCONFIG, "tsconfig.app.json": VITE_REACT_TSCONFIG_APP, "tsconfig.node.json": VITE_TSCONFIG_NODE };
+
+  const react = project({ files: reactFiles });
+  const st = init(react, "status");
+  assert.equal(st.status, 0, st.stderr);
+  const row = (name) => st.json.inferred.find((r) => r.row === name);
+  assert.equal(row("型検査").value, "npx tsc -b", row("型検査").source);
+  assert.match(row("型検査").source, /references の形で、scripts\.build が tsc -b を使う/);
+  assert.equal(row("本番モード起動").value, "npm run build && npm run preview", row("本番モード起動").source);
+  assert.equal(row("本番モード起動").cell, "`npm run build && npm run preview`（http://localhost:4173 で開く）");
+  assert.equal(row("全検査（push 前に1回）").value, "npx tsc -b && npm run lint && npm run build");
+  const a = init(react, "apply", "--fill-inferred", "--settings", "no");
+  assert.equal(a.status, 0, a.stdout);
+  const claude = read(react, "CLAUDE.md");
+  assert.match(claude, /^\| 型検査 \| `npx tsc -b` \|$/m);
+  assert.match(claude, /^\| 本番モード起動 \| `npm run build && npm run preview`（http:\/\/localhost:4173 で開く） \|$/m);
+
+  // パッケージマネージャに合わせる
+  const pnpm = init(project({ files: { ...reactFiles, "pnpm-lock.yaml": "lockfileVersion: '9.0'\n" } }), "status").json.inferred;
+  assert.deepEqual(
+    ["型検査", "本番モード起動"].map((n) => pnpm.find((r) => r.row === n).value),
+    ["pnpm exec tsc -b", "pnpm build && pnpm preview"],
+  );
+
+  // 参照先が JS を書き出す（noEmit も emitDeclarationOnly も無い）なら推定しない。emitDeclarationOnly なら書き出さない
+  const emitting = rowOf(project({ files: { ...reactFiles, "tsconfig.app.json": VITE_REACT_TSCONFIG_APP.replace('"noEmit": true,', "") } }), "型検査");
+  assert.equal(emitting.value, null);
+  assert.match(emitting.source, /JS を書き出す/);
+  const declOnly = { ...reactFiles, "tsconfig.app.json": VITE_REACT_TSCONFIG_APP.replace('"noEmit": true,', '"declaration": true,\n    "emitDeclarationOnly": true,') };
+  assert.equal(rowOf(project({ files: declOnly }), "型検査").value, "npx tsc -b");
+  // references がフォルダを指す形（その下の tsconfig.json）も同じ
+  const dirRef = {
+    "package.json": VITE_REACT_PACKAGE,
+    "tsconfig.json": '{\n  "files": [],\n  "references": [{ "path": "./app" }]\n}\n',
+    "app/tsconfig.json": '{\n  "compilerOptions": { "noEmit": true },\n  "include": ["src"]\n}\n',
+  };
+  assert.equal(rowOf(project({ files: dirRef }), "型検査").value, "npx tsc -b");
+
+  // build に tsc -b が無い references の形は、tsc --noEmit にしない（1 ファイルも調べずに成功するため）
+  const viteOnly = rowOf(project({ files: { ...reactFiles, "package.json": VITE_REACT_PACKAGE.replace('"tsc -b && vite build"', '"vite build"') } }), "型検査");
+  assert.equal(viteOnly.value, null);
+  assert.match(viteOnly.source, /tsc --noEmit では何も調べない/);
+
+  // include の形（Next.js など）は今までどおり
+  const include = { "package.json": '{\n  "name": "n",\n  "devDependencies": { "typescript": "5.9.3" }\n}\n', "tsconfig.json": '{\n  "compilerOptions": { "noEmit": true },\n  "include": ["**/*.ts"]\n}\n' };
+  assert.equal(rowOf(project({ files: include }), "型検査").value, "npx tsc --noEmit");
+
+  // vue-ts: noEmit は extends の先（@vue/tsconfig）にある。node_modules が無いと確かめられないので推定しない
+  const vueFiles = { "package.json": VITE_VUE_PACKAGE, "tsconfig.json": VITE_TSCONFIG, "tsconfig.app.json": VITE_VUE_TSCONFIG_APP, "tsconfig.node.json": VITE_TSCONFIG_NODE };
+  const bare = rowOf(project({ files: vueFiles }), "型検査");
+  assert.equal(bare.value, null);
+  assert.match(bare.source, /extends の先/);
+  const vue = init(project({ files: { ...vueFiles, ...VUE_TSCONFIG_PACKAGE } }), "status").json.inferred;
+  assert.deepEqual(
+    ["型検査", "本番モード起動", "全検査（push 前に1回）"].map((n) => vue.find((r) => r.row === n).value),
+    ["npx vue-tsc -b", "npm run build && npm run preview", "npx vue-tsc -b && npm run build"],
+  );
+
+  // start があれば start。依存に vite が無ければ preview を本番モード起動とみなさない
+  const withStart = { "package.json": '{\n  "name": "s",\n  "scripts": { "build": "vite build", "start": "node server.js", "preview": "vite preview" },\n  "devDependencies": { "vite": "8.3.0" }\n}\n' };
+  assert.equal(rowOf(project({ files: withStart }), "本番モード起動").value, "npm run build && npm start");
+  const noVite = { "package.json": '{\n  "name": "p",\n  "scripts": { "build": "node build.js", "preview": "node preview.js" }\n}\n' };
+  assert.equal(rowOf(project({ files: noVite }), "本番モード起動").value, "無い");
+});
+
+test("開くアドレス: Vite・SvelteKit・Astro・Nuxt は localhost（既定で localhost だけで待つ）、Next.js は 127.0.0.1。ポートは scripts の --port を優先", () => {
+  const cells = (pkgJson) => {
+    const inferred = init(project({ files: { "package.json": pkgJson } }), "status").json.inferred;
+    return ["開発サーバー起動", "本番モード起動"].map((n) => inferred.find((r) => r.row === n).cell);
+  };
+  assert.deepEqual(cells('{\n  "name": "q",\n  "scripts": { "dev": "vite --port 3001", "build": "vite build", "preview": "vite preview --port 8080" },\n  "devDependencies": { "vite": "8.3.0" }\n}\n'), [
+    "`npm run dev`（http://localhost:3001 で開く）",
+    "`npm run build && npm run preview`（http://localhost:8080 で開く）",
+  ]);
+  assert.deepEqual(cells('{\n  "name": "k",\n  "scripts": { "dev": "vite dev", "build": "vite build", "preview": "vite preview" },\n  "devDependencies": { "@sveltejs/kit": "2.0.0", "vite": "8.3.0" }\n}\n'), [
+    "`npm run dev`（http://localhost:5173 で開く）",
+    "`npm run build && npm run preview`（http://localhost:4173 で開く）",
+  ]);
+  assert.equal(cells('{\n  "name": "a",\n  "scripts": { "dev": "astro dev", "build": "astro build" },\n  "dependencies": { "astro": "7.3.2" }\n}\n')[0], "`npm run dev`（http://localhost:4321 で開く）");
+  assert.equal(cells('{\n  "name": "x",\n  "scripts": { "dev": "nuxt dev", "build": "nuxt build" },\n  "dependencies": { "nuxt": "4.5.2" }\n}\n')[0], "`npm run dev`（http://localhost:3000 で開く）");
+  // Next.js は vite を併せて持っていても 127.0.0.1。start にはアドレスを添えない（今までどおり）
+  assert.deepEqual(cells('{\n  "name": "n",\n  "scripts": { "dev": "next dev", "build": "next build", "start": "next start" },\n  "dependencies": { "next": "15.0.0" },\n  "devDependencies": { "vite": "8.3.0" }\n}\n'), [
+    "`npm run dev`（http://127.0.0.1:3000 で開く）",
+    "`npm run build && npm start`",
+  ]);
+});
+
+test("Python のプロジェクト: .gitignore に「# docdd: Python」の塊も使う（Web の Python は Web の塊も）。Python でなければ使わない", () => {
+  const blocks = gitignoreTemplateBlocks();
+  const [common, web] = blocks;
+  const python = blocks.find((b) => b.header === "# docdd: Python");
+  assert.deepEqual(python.lines, ["__pycache__/", "*.py[cod]", ".venv/", ".pytest_cache/", ".mypy_cache/", ".ruff_cache/"]);
+
+  // FastAPI: 共通・Web・Python の順に置き、__pycache__ が git status に出ない
+  const fastapi = project({ files: { "pyproject.toml": '[project]\nname = "api"\ndependencies = ["fastapi>=0.115"]\n', "app/main.py": "from fastapi import FastAPI\n\napp = FastAPI()\n" } });
+  const st = init(fastapi, "status");
+  assert.equal(st.status, 0, st.stderr);
+  assert.deepEqual([st.json.stack.web, st.json.stack.languages.includes("Python")], [true, true]);
+  assert.deepEqual(st.json.gitignore.missingLines, [...common.lines, ...web.lines, ...python.lines]);
+  const a = init(fastapi, "apply", "--settings", "no");
+  assert.equal(a.status, 0, a.stdout);
+  assert.equal(read(fastapi, ".gitignore"), gitignoreText([common, web, python]));
+  write(fastapi, { "app/__pycache__/main.cpython-314.pyc": "x" });
+  assert.equal(spawnSync("git", ["check-ignore", "-q", "--", "app/__pycache__/main.cpython-314.pyc"], { cwd: fastapi, env: ENV }).status, 0);
+  assert.equal(init(fastapi, "update").json.files.find((f) => f.path === ".gitignore").status, "current");
+
+  // 既存の .gitignore に Python の行が一部あれば、足りない行だけを「# docdd: Python」の見出しごと末尾に足す
+  const py = project({ files: { ".gitignore": "__pycache__/\n.venv\n", "requirements.txt": "flask==3.1.0\n" } });
+  const b = init(py, "apply", "--settings", "no");
+  assert.equal(b.status, 0, b.stdout);
+  const added = b.json.gitignore.addedLines;
+  assert.ok(added.includes("*.py[cod]") && !added.includes("__pycache__/") && !added.includes(".venv/"), added.join(" "));
+  assert.ok(read(py, ".gitignore").endsWith("\n\n# docdd: Python\n*.py[cod]\n.pytest_cache/\n.mypy_cache/\n.ruff_cache/\n"), read(py, ".gitignore"));
+  assert.equal(init(py, "apply", "--settings", "no").json.gitignore.action, "unchanged");
+
+  // Python でなければ使わない
+  const node = init(project({ files: { "package.json": NPM_INIT_PACKAGE } }), "status").json;
+  assert.ok(!node.gitignore.missingLines.some((l) => python.lines.includes(l)), node.gitignore.missingLines.join(" "));
 });

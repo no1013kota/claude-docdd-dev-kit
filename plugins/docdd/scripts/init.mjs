@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // docdd init.mjs — /docdd:init と /docdd:update-kit が使う「決まった処理」をまとめたスクリプト（依存なし・Node 18 以上）。
-// 雛形はこのファイルの位置から ../templates を読む。版はプラグインの .claude-plugin/plugin.json の version（無ければ 0.3.0）。
+// 雛形はこのファイルの位置から ../templates を読む。版はプラグインの .claude-plugin/plugin.json の version（無ければ 0.4.0）。
 // プロジェクトのフォルダ（cwd）で実行する:
 //
 //   node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" status    [--json]
@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const TEMPLATES = path.join(PLUGIN_ROOT, "templates");
-const FALLBACK_VERSION = "0.3.0";
+const FALLBACK_VERSION = "0.4.0";
 const KIT_VERSION = readKitVersion();
 const CWD = realpath(process.cwd());
 
@@ -237,6 +237,20 @@ function readText(rel) {
     return fs.readFileSync(abs(rel), "utf8");
   } catch {
     return null;
+  }
+}
+
+/** ファイルの先頭 bytes バイトを文字列で。読めなければ空文字。 */
+function readHead(rel, bytes) {
+  let fd;
+  try {
+    fd = fs.openSync(abs(rel), "r");
+    const buf = Buffer.alloc(bytes);
+    return buf.toString("utf8", 0, fs.readSync(fd, buf, 0, bytes, 0));
+  } catch {
+    return "";
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
   }
 }
 
@@ -560,7 +574,13 @@ function detectPackageManager(pkg, gi) {
   const name = found?.[1] ?? field?.[1] ?? "npm";
   const yarnBerry =
     name === "yarn" &&
-    Boolean((field && field[1] === "yarn" && Number(field[2]) >= 2) || isFile(".yarnrc.yml") || (gi.root && fs.existsSync(path.join(gi.root, ".yarnrc.yml"))));
+    Boolean(
+      (field && field[1] === "yarn" && Number(field[2]) >= 2) ||
+        isFile(".yarnrc.yml") ||
+        (gi.root && fs.existsSync(path.join(gi.root, ".yarnrc.yml"))) ||
+        // v2 以上の yarn.lock は __metadata: の塊を持つ（v1 は「# yarn lockfile v1」）。.yarnrc.yml も packageManager も無いときの手がかり
+        (lockfile && path.posix.basename(lockfile) === "yarn.lock" && /^__metadata:/m.test(readHead(lockfile, 4096)))
+    );
   return { name, lockfile, yarnBerry };
 }
 
@@ -692,6 +712,146 @@ function execCmd(pm, bin, args) {
 
 const NPM_DEFAULT_TEST = /no test specified/;
 
+/** JSON にコメントと末尾のカンマを許した形（tsconfig.json など）を読む。読めなければ null。 */
+function readJsonc(file) {
+  let text;
+  try {
+    text = fs.readFileSync(file, "utf8").replace(/^\uFEFF/, "");
+  } catch {
+    return null;
+  }
+  // 文字列の外のコメントを消す
+  let noComments = "";
+  for (let i = 0; i < text.length; ) {
+    const c = text[i];
+    if (c === '"') {
+      let j = i + 1;
+      while (j < text.length && text[j] !== '"') j += text[j] === "\\" ? 2 : 1;
+      noComments += text.slice(i, j + 1);
+      i = j + 1;
+    } else if (c === "/" && text[i + 1] === "/") {
+      while (i < text.length && text[i] !== "\n") i += 1;
+    } else if (c === "/" && text[i + 1] === "*") {
+      const end = text.indexOf("*/", i + 2);
+      i = end === -1 ? text.length : end + 2;
+    } else {
+      noComments += c;
+      i += 1;
+    }
+  }
+  // 文字列の外の、閉じかっこの直前のカンマを消す
+  let out = "";
+  for (let i = 0; i < noComments.length; ) {
+    const c = noComments[i];
+    if (c === '"') {
+      let j = i + 1;
+      while (j < noComments.length && noComments[j] !== '"') j += noComments[j] === "\\" ? 2 : 1;
+      out += noComments.slice(i, j + 1);
+      i = j + 1;
+      continue;
+    }
+    if (c === ",") {
+      let j = i + 1;
+      while (j < noComments.length && /\s/.test(noComments[j])) j += 1;
+      if (noComments[j] === "}" || noComments[j] === "]") {
+        i += 1;
+        continue;
+      }
+    }
+    out += c;
+    i += 1;
+  }
+  try {
+    const data = JSON.parse(out);
+    return isPlainObject(data) ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+const isFileAbs = (file) => {
+  try {
+    return fs.statSync(file).isFile();
+  } catch {
+    return false;
+  }
+};
+
+/** tsconfig の extends が指すファイル（相対パスか、上のフォルダの node_modules にあるパッケージ）。見つからなければ null。 */
+function resolveTsconfigExtends(fromFile, spec) {
+  if (typeof spec !== "string" || spec === "") return null;
+  const candidates = (base) => [base, `${base}.json`, path.join(base, "tsconfig.json")];
+  if (spec.startsWith(".") || path.isAbsolute(spec)) return candidates(path.resolve(path.dirname(fromFile), spec)).find(isFileAbs) ?? null;
+  for (let dir = path.dirname(fromFile); ; dir = path.dirname(dir)) {
+    const hit = candidates(path.join(dir, "node_modules", ...spec.split("/"))).find(isFileAbs);
+    if (hit) return hit;
+    if (path.dirname(dir) === dir) return null;
+  }
+}
+
+/** tsconfig の noEmit・emitDeclarationOnly（extends をたどる）。値は true・false・undefined（指定なし）・"?"（読めない extends があって決まらない）。 */
+function tsconfigEmitOptions(file, seen = new Set()) {
+  const unknown = { noEmit: "?", emitDeclarationOnly: "?" };
+  if (seen.has(file) || seen.size > 16) return unknown;
+  const data = readJsonc(file);
+  if (!data) return unknown;
+  const chain = new Set([...seen, file]);
+  const out = { noEmit: undefined, emitDeclarationOnly: undefined };
+  const specs = data.extends === undefined ? [] : [data.extends].flat();
+  for (const spec of specs) {
+    const target = resolveTsconfigExtends(file, spec);
+    const base = target ? tsconfigEmitOptions(target, chain) : unknown;
+    for (const k of Object.keys(out)) if (base[k] !== undefined) out[k] = base[k];
+  }
+  const co = isPlainObject(data.compilerOptions) ? data.compilerOptions : {};
+  for (const k of Object.keys(out)) if (typeof co[k] === "boolean") out[k] = co[k];
+  return out;
+}
+
+/** 自分ではファイルを持たず、中身を references の先に任せる tsconfig か（files: [] で include が無い）。 */
+const delegatesOnly = (data) => Array.isArray(data.files) && data.files.length === 0 && data.include === undefined;
+
+/**
+ * tsc -b（vue-tsc -b）が file から references をたどって JS を書き出すか。
+ * true = 書き出す参照先がある／false = どれも書き出さない（noEmit か emitDeclarationOnly）／null = 読めない tsconfig があって決まらない。
+ */
+function buildEmitsJs(file, depth = 0) {
+  if (depth > 8) return null;
+  const data = readJsonc(file);
+  if (!data) return null;
+  let result = false;
+  if (!delegatesOnly(data)) {
+    const o = tsconfigEmitOptions(file);
+    if (o.noEmit !== true && o.emitDeclarationOnly !== true) {
+      if (o.noEmit !== "?" && o.emitDeclarationOnly !== "?") return true;
+      result = null;
+    }
+  }
+  for (const ref of Array.isArray(data.references) ? data.references : []) {
+    if (!isPlainObject(ref) || typeof ref.path !== "string") continue;
+    let target = path.resolve(path.dirname(file), ref.path);
+    try {
+      if (fs.statSync(target).isDirectory()) target = path.join(target, "tsconfig.json");
+    } catch {
+      result = null;
+      continue;
+    }
+    const r = buildEmitsJs(target, depth + 1);
+    if (r === true) return true;
+    if (r === null) result = null;
+  }
+  return result;
+}
+
+/** scripts.build の中で、型検査をしながらビルドする形（vue-tsc -b・tsc -b。--build も同じ）。無ければ null。 */
+function buildTypecheckBin(build) {
+  if (typeof build !== "string") return null;
+  for (const bin of ["vue-tsc", "tsc"]) {
+    if (new RegExp(`(?:^|[\\s;&|(])${bin}\\s+(?:-b|--build)(?=$|[\\s;&|)])`).test(build)) return bin;
+  }
+  return null;
+}
+
 /** 検証コマンド表の各行を推定する。value は生のコマンド／「無い」／null（推定できない）。cell は表に書く形。 */
 function inferVerification(pkg, pm, stack) {
   const rows = new Map(VERIFY_ROWS.map((r) => [r.token, { row: r.row, token: r.token, value: null, cell: null, source: "推定できない（ヒアリングで聞く）" }]));
@@ -715,12 +875,17 @@ function inferVerification(pkg, pm, stack) {
       return n;
     };
 
+    // Vite・SvelteKit・Astro・Nuxt の開発サーバーと preview は、既定で localhost だけで待つ。macOS などでは localhost が ::1 に解決され、
+    // http://127.0.0.1 では繋がらない。Next.js は既定で 0.0.0.0 で待つので 127.0.0.1 のまま
+    const viteLike = hasDep("vite") || hasDep("@sveltejs/kit");
+    const localhostOnly = !hasDep("next") && (hasDep("nuxt") || hasDep("astro") || viteLike);
+    const localUrl = (p) => `http://${localhostOnly ? "localhost" : "127.0.0.1"}:${p}`;
     const dev = pick(["dev"]);
     if (dev) {
       const s = scripts[dev];
       const port = (/(?:-p|--port)[\s=]+(\d{2,5})/.exec(s) || /\bPORT=(\d{2,5})/.exec(s) || [])[1];
-      const guess = port ?? (hasDep("next") || hasDep("nuxt") ? "3000" : hasDep("astro") ? "4321" : hasDep("vite") || hasDep("@sveltejs/kit") ? "5173" : null);
-      set("開発サーバー起動", scriptCmd(name, dev), `package.json の scripts.${dev}`, guess ? `（http://127.0.0.1:${guess} で開く）` : "");
+      const guess = port ?? (hasDep("next") || hasDep("nuxt") ? "3000" : hasDep("astro") ? "4321" : viteLike ? "5173" : null);
+      set("開発サーバー起動", scriptCmd(name, dev), `package.json の scripts.${dev}`, guess ? `（${localUrl(guess)} で開く）` : "");
     } else {
       // dev が無い Web のプロジェクト（create-react-app・Express・Vue CLI など）は、serve や start が開発サーバーを兼ねることが多い。
       // ここを「無い」にすると、ui-polish などの Web の門が Web 以外と取り違えて止まるので、推定できなければ未記入のまま聞く。
@@ -731,8 +896,19 @@ function inferVerification(pkg, pm, stack) {
     }
 
     const tc = pick(["typecheck", "type-check", "tsc", "types", "check-types", "check:types"]);
+    const tsconfig = isFile("tsconfig.json") ? readJsonc(abs("tsconfig.json")) : null;
+    // Vite の雛形（react-ts・vue-ts）の形。tsc --noEmit は 1 ファイルも調べずに成功するので使わない
+    const solution = tsconfig != null && delegatesOnly(tsconfig) && Array.isArray(tsconfig.references) && tsconfig.references.length > 0;
     if (tc) set("型検査", scriptCmd(name, tc), `package.json の scripts.${tc}`);
-    else if (hasDep("typescript") && isFile("tsconfig.json")) set("型検査", execCmd(name, "tsc", "--noEmit"), "tsconfig.json と typescript の依存");
+    else if (solution && (hasDep("typescript") || hasDep("vue-tsc"))) {
+      const bin = buildTypecheckBin(scripts.build);
+      const emits = bin ? buildEmitsJs(abs("tsconfig.json")) : undefined;
+      const row = rows.get("型検査");
+      if (bin && emits === false) set("型検査", execCmd(name, bin, "-b"), `tsconfig.json が references の形で、scripts.build が ${bin} -b を使う（参照先の tsconfig は JS を書き出さない）`);
+      else if (!bin) row.source = "tsconfig.json が references の形（files: [] と references）なので tsc --noEmit では何も調べない。scripts.build にも tsc -b・vue-tsc -b が無い（ヒアリングで聞く）";
+      else if (emits === true) row.source = `tsconfig.json が references の形だが、参照先の tsconfig に noEmit も emitDeclarationOnly も無く、${bin} -b が JS を書き出す（ヒアリングで聞く）`;
+      else row.source = `tsconfig.json が references の形だが、参照先の tsconfig（extends の先）を読めず、${bin} -b が JS を書き出すか確かめられない（npm install のあとに /docdd:init をもう一度打つか、ヒアリングで聞く）`;
+    } else if (hasDep("typescript") && isFile("tsconfig.json")) set("型検査", execCmd(name, "tsc", "--noEmit"), "tsconfig.json と typescript の依存");
     else set("型検査", "無い", "型検査の script も tsconfig.json も無い");
 
     fromScript("lint", ["lint"], "lint");
@@ -741,10 +917,16 @@ function inferVerification(pkg, pm, stack) {
     }
     const build = fromScript("ビルド", ["build"], "build");
     const start = pick(["start"]);
-    if (start) {
-      const cmd = build ? `${scriptCmd(name, build)} && ${scriptCmd(name, start)}` : scriptCmd(name, start);
-      set("本番モード起動", cmd, `package.json の scripts.${build ? `${build} と scripts.` : ""}${start}`);
-    } else set("本番モード起動", "無い", "package.json の scripts に start が無い");
+    // Vite は start を持たず、本番ビルドを手元で動かす preview を持つ
+    const preview = !start && hasDep("vite") ? pick(["preview"]) : null;
+    const prodRun = start ?? preview;
+    if (prodRun) {
+      const cmd = build ? `${scriptCmd(name, build)} && ${scriptCmd(name, prodRun)}` : scriptCmd(name, prodRun);
+      const why = preview ? "（start が無く、依存に vite があるので、preview を本番モード起動とみなした）" : "";
+      // vite preview の既定のポートは 4173
+      const previewPort = preview ? ((/(?:^|\s)--port[\s=]+(\d{2,5})/.exec(scripts[preview]) || [])[1] ?? "4173") : null;
+      set("本番モード起動", cmd, `package.json の scripts.${build ? `${build} と scripts.` : ""}${prodRun}${why}`, previewPort ? `（${localUrl(previewPort)} で開く）` : "");
+    } else set("本番モード起動", "無い", hasDep("vite") ? "package.json の scripts に start も preview も無い" : "package.json の scripts に start が無い");
 
     const e2e = pick(["test:e2e", "e2e", "playwright", "test:playwright"]);
     const pwConfig = ["playwright.config.ts", "playwright.config.js", "playwright.config.mjs", "playwright.config.cjs"].find(isFile);
@@ -763,9 +945,11 @@ function inferVerification(pkg, pm, stack) {
     const lock = pm.lockfile ? path.posix.basename(pm.lockfile) : null;
     if (name === "npm" && lock === "package-lock.json") set("依存の脆弱性", "node scripts/audit-check.mjs", "npm と package-lock.json");
     else if (name === "npm" && lock) set("依存の脆弱性", "npm audit --audit-level=high", `npm と ${lock}`);
-    else if (name === "pnpm") set("依存の脆弱性", "pnpm audit --audit-level=high", "pnpm");
-    else if (name === "yarn") set("依存の脆弱性", pm.yarnBerry ? "yarn npm audit --severity high" : "yarn audit --level high", pm.yarnBerry ? "yarn（v2 以上）" : "yarn（v1）");
-    else if (name === "bun") set("依存の脆弱性", "bun audit --audit-level=high", "bun");
+    // npm 以外も、audit-check と同じく本番の依存だけを high 以上で調べる。据え置きの一覧（scripts/audit-allowlist.json）は audit-check だけが読む
+    else if (name === "pnpm") set("依存の脆弱性", "pnpm audit --audit-level=high --prod", "pnpm（本番の依存だけ）");
+    else if (name === "yarn" && pm.yarnBerry) set("依存の脆弱性", "yarn npm audit --recursive --severity high --environment production", "yarn（v2 以上。依存の依存まで・本番の依存だけ）");
+    else if (name === "yarn") set("依存の脆弱性", "yarn audit --level high --groups dependencies", "yarn（v1。本番の依存だけ）");
+    else if (name === "bun") set("依存の脆弱性", "bun audit --audit-level=high --prod", "bun（本番の依存だけ）");
     // lock がまだ無い npm のプロジェクトも audit-check を使う。lock が無ければスクリプトが「npm install を 1 回実行して」と案内して止まるので、非エンジニアにコマンドを聞かずに済む。
     else if (name === "npm") set("依存の脆弱性", "node scripts/audit-check.mjs", "npm（package-lock.json はまだ無い。npm install で作られる）");
     else rows.get("依存の脆弱性").source = "パッケージマネージャを判定できない";
@@ -787,6 +971,11 @@ function inferVerification(pkg, pm, stack) {
     set("開発サーバー起動", "無い", `Web 以外のプロジェクト（${name}）なので、Web の開発サーバーは無い`);
     set("本番モード起動", "無い", `Web 以外のプロジェクト（${name}）なので、Web の本番モード起動は無い`);
     if (stack.kind === "unity" || stack.kind === "godot") set("依存の脆弱性", "無い", `${name} には依存の脆弱性を調べる標準の検査が無い`);
+    if (stack.kind === "unity") {
+      const why = "Unity には型検査・lint の標準のコマンドが無い（C# のコンパイルエラーは EditMode テストで出る）";
+      set("型検査", "無い", why);
+      set("lint", "無い", why);
+    }
     for (const token of ["単体・DBテスト", "E2E", "ビルド"]) {
       set(token, null, "推定しない（Web 以外のプロジェクト。README『Web 以外のプロジェクトで使う』の例を見て書く）");
     }
@@ -908,9 +1097,8 @@ function settingsDiff() {
     missingAllow: missing("allow"),
     missingAsk: missing("ask"),
     missingDeny: missing("deny"),
-    defaultMode: { current: cur?.permissions?.defaultMode ?? null, template: t.permissions.defaultMode },
-    missingMarketplace: !cur?.extraKnownMarketplaces?.["claude-docdd-dev-kit"],
-    missingEnabledPlugin: cur?.enabledPlugins?.["docdd@claude-docdd-dev-kit"] !== true,
+    // 雛形は始まりのモードを決めない（Pro・Max・Team の auto モードを上書きしない）。既存の指定は報告だけする
+    currentDefaultMode: typeof cur?.permissions?.defaultMode === "string" ? cur.permissions.defaultMode : null,
   };
 }
 
@@ -929,32 +1117,46 @@ function mcpInfo(stack, mode = "auto") {
   return { exists: true, recommended: variant, missingServers: want.filter((s) => !have.includes(s)) };
 }
 
-/** templates/.gitignore の Web 向けの塊の見出し（Web 以外のプロジェクトには足さない）。 */
+/** templates/.gitignore の塊の見出し（完全一致で使う）。「# docdd: 共通」とこの 2 つ以外の見出しの塊は、どのプロジェクトにも使う。 */
 const GITIGNORE_WEB_HEADER = "# docdd: Web（Node.js・ビルド出力・Playwright）";
+const GITIGNORE_PYTHON_HEADER = "# docdd: Python";
 
 /**
- * templates/.gitignore を「# docdd: 」で始まる見出しごとの塊に分ける（見出しは完全一致で使う）。
- * web が false（Web 以外のプロジェクト）なら「# docdd: 共通」だけ、それ以外（true・null）なら全部の塊を返す。
+ * templates/.gitignore を「# docdd: 」で始まる見出しごとの塊に分け、stack に合う塊だけを返す。
+ * 「# docdd: 共通」は常に。Web の塊は stack.web が false でないとき（Web 以外のプロジェクトには足さない）。Python の塊は Python を検出したとき。
+ * lines は比べる行（コメントと空行を除く）、raw は見出しから塊の終わりまでの行（新しく置くときに使う）。
  */
-function gitignoreBlocks(web) {
+function gitignoreBlocks(stack) {
   const blocks = [];
-  for (const raw of tplText(".gitignore").split(/\r?\n/)) {
-    const l = raw.trim();
-    if (l.startsWith("# docdd:")) blocks.push({ header: l, lines: [] });
-    else if (l && !l.startsWith("#") && blocks.length) blocks[blocks.length - 1].lines.push(l);
+  for (const line of tplText(".gitignore").split(/\r?\n/)) {
+    const l = line.trim();
+    if (l.startsWith("# docdd:")) blocks.push({ header: l, lines: [], raw: [l] });
+    else if (blocks.length) {
+      const b = blocks[blocks.length - 1];
+      b.raw.push(line.replace(/\s+$/, ""));
+      if (l && !l.startsWith("#")) b.lines.push(l);
+    }
   }
-  return web === false ? blocks.filter((b) => b.header !== GITIGNORE_WEB_HEADER) : blocks;
+  const want = (b) => {
+    if (b.header === GITIGNORE_WEB_HEADER) return stack.web !== false;
+    if (b.header === GITIGNORE_PYTHON_HEADER) return stack.languages.includes("Python");
+    return true;
+  };
+  return blocks.filter(want).map((b) => {
+    const raw = [...b.raw];
+    while (raw.length && raw[raw.length - 1] === "") raw.pop();
+    return { ...b, raw };
+  });
 }
 
-function gitignoreTemplateLines(web) {
-  return gitignoreBlocks(web).flatMap((b) => b.lines);
+function gitignoreTemplateLines(stack) {
+  return gitignoreBlocks(stack).flatMap((b) => b.lines);
 }
 
-/** .gitignore が無いときに置く中身。Web 以外なら共通の塊だけ。 */
-function gitignoreTemplateText(web) {
-  if (web !== false) return tpl(".gitignore");
-  return `${gitignoreBlocks(web)
-    .map((b) => [b.header, ...b.lines].join("\n"))
+/** .gitignore が無いときに置く中身（stack に合う塊を、雛形の順に空行 1 行で区切る）。 */
+function gitignoreTemplateText(stack) {
+  return `${gitignoreBlocks(stack)
+    .map((b) => b.raw.join("\n"))
     .join("\n\n")}\n`;
 }
 
@@ -965,7 +1167,7 @@ const gitignoreKey = (line) => line.trim().replace(/^\//, "").replace(/\/$/, "")
  * 既存の .gitignore に足す行（塊の順・塊の中の順）。塊ごとに、肯定の行（除外する行）を 1 行でも足すなら、その塊の否定行（! で始まる行。例: !.env.example）を
  * 既存にあるかどうかに関係なく、足した行の後ろにもう一度書く（.gitignore は後ろの行が勝つので、足した .env.* が .env.example を除外しないように）。
  */
-function gitignoreMissing(text, web) {
+function gitignoreMissing(text, stack) {
   const have = new Set(
     text
       .split(/\r?\n/)
@@ -974,7 +1176,7 @@ function gitignoreMissing(text, web) {
       .map(gitignoreKey),
   );
   const out = [];
-  for (const b of gitignoreBlocks(web)) {
+  for (const b of gitignoreBlocks(stack)) {
     const negatives = b.lines.filter((l) => l.startsWith("!"));
     const positives = b.lines.filter((l) => !l.startsWith("!") && !have.has(gitignoreKey(l)));
     out.push(...positives, ...(positives.length ? negatives : negatives.filter((l) => !have.has(gitignoreKey(l)))));
@@ -982,10 +1184,10 @@ function gitignoreMissing(text, web) {
   return out;
 }
 
-function gitignoreInfo(web) {
+function gitignoreInfo(stack) {
   const text = readText(".gitignore");
-  if (text == null) return { exists: false, missingLines: gitignoreTemplateLines(web) };
-  return { exists: true, missingLines: gitignoreMissing(text, web) };
+  if (text == null) return { exists: false, missingLines: gitignoreTemplateLines(stack) };
+  return { exists: true, missingLines: gitignoreMissing(text, stack) };
 }
 
 /**
@@ -1110,7 +1312,7 @@ function collectStatus({ tools = true } = {}) {
     claudeMd: claude,
     settings: settingsDiff(),
     mcp: mcpInfo(stack),
-    gitignore: gitignoreInfo(stack.web),
+    gitignore: gitignoreInfo(stack),
     env: envInfo(gi),
     backlog: backlogInfo(),
     packageJson: {
@@ -1269,11 +1471,11 @@ function addPackageScripts(raw, additions) {
  * .gitignore に足りない行を、雛形の塊ごとに見出し（「# docdd: 共通」など）の下へ足す。
  * 見出しが既にあればその塊の終わり（次の空行の手前）へ、無ければ末尾に見出しごと足す。
  */
-function appendGitignore(existing, missing, web) {
+function appendGitignore(existing, missing, stack) {
   const eol = eolOf(existing);
   const lines = existing.split(/\r?\n/);
   const tail = [];
-  for (const b of gitignoreBlocks(web)) {
+  for (const b of gitignoreBlocks(stack)) {
     const add = missing.filter((l) => b.lines.includes(l));
     if (!add.length) continue;
     const header = lines.findIndex((l) => l.trim() === b.header);
@@ -1671,14 +1873,14 @@ function cmdApply(opts) {
     const exists = isFile(rel);
     if (rel === ".gitignore") {
       if (!exists) {
-        out.set(rel, gitignoreTemplateText(stack.web));
+        out.set(rel, gitignoreTemplateText(stack));
         created.push(rel);
         placed.add(rel);
-        report.gitignore = { action: "created", addedLines: gitignoreTemplateLines(stack.web) };
+        report.gitignore = { action: "created", addedLines: gitignoreTemplateLines(stack) };
       } else {
-        const { missingLines } = gitignoreInfo(stack.web);
+        const { missingLines } = gitignoreInfo(stack);
         if (missingLines.length) {
-          out.set(rel, appendGitignore(readText(rel), missingLines, stack.web));
+          out.set(rel, appendGitignore(readText(rel), missingLines, stack));
           mod(rel, `足りない行を足した: ${missingLines.join(" ")}`);
           report.gitignore = { action: "appended", addedLines: missingLines };
         } else {
@@ -2370,7 +2572,7 @@ function planUpdate(opts) {
     } else if (rel === ".mcp.json") {
       Object.assign(e, { status: buf == null ? "missing" : "present", mcp: mcpInfo(stack), note: "上書きもマージもしない" });
     } else if (rel === ".gitignore") {
-      const gin = gitignoreInfo(stack.web);
+      const gin = gitignoreInfo(stack);
       if (!gin.exists) Object.assign(e, { status: "missing", action: "add", additions: gin.missingLines });
       else if (gin.missingLines.length) Object.assign(e, { status: "present", action: "append", additions: gin.missingLines });
       else e.status = "current";
@@ -2431,7 +2633,7 @@ function applyUpdateEntry(e, opts, pkg, stack) {
     return;
   }
   if (rel === ".gitignore") {
-    writeFile(rel, e.action === "add" ? gitignoreTemplateText(stack.web) : appendGitignore(readText(rel), e.additions, stack.web));
+    writeFile(rel, e.action === "add" ? gitignoreTemplateText(stack) : appendGitignore(readText(rel), e.additions, stack));
     return;
   }
   if (rel === "package.json") {

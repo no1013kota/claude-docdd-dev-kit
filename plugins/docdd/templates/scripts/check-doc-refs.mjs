@@ -1,4 +1,4 @@
-// docdd-kit v0.3.0 — scripts/check-doc-refs.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
+// docdd-kit v0.4.0 — scripts/check-doc-refs.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
 // CLAUDE.md・.claude/rules/・docs/ の文書が指しているファイルが、本当にあるかを検査する。
 // 存在しないファイルを指す仕様書は、読んだ人（と Claude）を行き止まりへ送る。
 //
@@ -6,7 +6,9 @@
 //
 // 見る書き方: バッククォートで囲んだパス（拡張子は下の EXTS）と、相対リンク [文字](./a.md)・[文字](../b.md)。
 //   リンクはその文書のフォルダを起点に探す。バッククォートのパスはプロジェクトの一番上・文書のフォルダ・末尾一致の順に探す。
-// 見ない所: 「例」の字を含む行、HTML コメントの中、コードブロックの中（書き方の見本を書けるように）。
+// 見ない所（書き方の見本を書けるように）: 「例」の字を含む行（「例外」の「例」は数えない）、
+//   行末が for example・e.g.・for instance・例えば・たとえば の行（末尾のコロンは除いて見る）に続く箇条、
+//   HTML コメントの中、コードブロックの中。
 // 大文字・小文字だけが違う参照も失敗にする（macOS では開けても、Linux の CI や clone した先では開けない）。
 // 対象の文書: git が追跡しているもの。docs/_imported/（取り込んだ原文）・docs/requirements/00_template.md・
 //   docs/decisions/0000-template.md（見本）は除く。
@@ -42,6 +44,61 @@ const PATH_REF = new RegExp(
 );
 /** `](./…)` と `](../…)` の相対リンク。 */
 const LINK = /\]\((\.{1,2}\/[^)\s]*)/g;
+
+/** 見本の箇条を導く行の終わり方（末尾の空白・コロン・全角コロンは除いてから見る。英語の大文字・小文字は問わない）。 */
+const EXAMPLE_INTRO = /(?:(?<![a-z])(?:for example|for instance|e\.g\.)|例えば|たとえば)$/i;
+/** 箇条の行（`-`・`*`・`+`・`1.` のあとに空白）。1 つ目の組は字下げ。 */
+const LIST_ITEM = /^([ \t]*)(?:[-*+]|[0-9]+\.)(?:[ \t]|$)/;
+
+/** 「例」の字を含む行か。「例外」の「例」は数えない（「例外の処理は `src/errors.ts`」は検査する）。 */
+function mentionsExample(line) {
+  return line.replaceAll("例外", "").includes("例");
+}
+
+/**
+ * 見本の導入の行（行末が for example など）に続く箇条の行番号（0 始まり）を集める。
+ * 箇条は、導入の行の直後（空行 1 行まで挟んでよい）から始まる `-`・`*`・`+`・`数字.` の行と、その字下げの続きの行。
+ * 空行のあとに箇条でない行が来たら、そこで終わる。コードブロックの中の行は導入の行と見ない。
+ */
+function exampleListLines(rawLines, scanned) {
+  const lines = new Set();
+  let gap = -1; // 導入の行のあと、箇条が始まる前に見た空行の数（-1 は導入の行のあとではない）
+  let base = -1; // 箇条の中なら、最初の箇条の字下げの幅（-1 は箇条の外）
+  let afterBlank = false;
+  rawLines.forEach((line, i) => {
+    const blank = line.trim() === "";
+    const item = LIST_ITEM.exec(line);
+    if (base >= 0) {
+      if (blank) {
+        afterBlank = true;
+        return;
+      }
+      const indent = line.length - line.trimStart().length;
+      if ((item && item[1].length >= base) || (!item && !afterBlank && indent > base)) {
+        lines.add(i);
+        afterBlank = false;
+        return;
+      }
+      base = -1;
+    } else if (gap >= 0) {
+      if (item) {
+        lines.add(i);
+        base = item[1].length;
+        afterBlank = false;
+        gap = -1;
+        return;
+      }
+      if (blank && gap === 0) {
+        gap = 1;
+        return;
+      }
+      gap = -1;
+    }
+    const inFence = scanned[i].length === 1 && scanned[i][0].kind === "fence";
+    if (!inFence && EXAMPLE_INTRO.test(line.replace(/[\s:：]+$/u, ""))) gap = 0;
+  });
+  return lines;
+}
 
 /** 実ファイルではなく命名の型を書いたもの（`NNNN-title.md`・`YYYY-MM-DD.md`）と絶対パスは見ない。 */
 function isPattern(ref) {
@@ -259,9 +316,11 @@ function record(at, ref, result) {
 for (const doc of docs) {
   const source = readFileSync(doc, "utf8");
   const rawLines = source.split(/\r?\n/);
-  scanMarkdown(source).forEach((segs, i) => {
-    // 「例」の字を含む行は書き方の見本。実在しないファイル名を書いてよい。
-    if (rawLines[i].includes("例")) return;
+  const scanned = scanMarkdown(source);
+  const exampleLists = exampleListLines(rawLines, scanned);
+  scanned.forEach((segs, i) => {
+    // 書き方の見本は、実在しないファイル名を書いてよい（「例」の字を含む行と、for example などに続く箇条）。
+    if (mentionsExample(rawLines[i]) || exampleLists.has(i)) return;
     const at = `${doc}:${i + 1}`;
     for (const seg of segs) {
       if (seg.kind === "code") {
@@ -289,7 +348,8 @@ if (missing.length > 0) {
   console.error(`❌ 無いファイルを指す記述が ${missing.length} 件あります（${checked} 件を検査）\n`);
   for (const m of missing) console.error(`   ${m}`);
   console.error("\n   → 移動・改名したなら正しいパスへ、消したなら記述ごと見直してください");
-  console.error("   → 書き方の見本として書いた行なら、その行に「例」の字を入れると検査しません");
+  console.error("   → 書き方の見本として書いた行なら、その行に「例」の字を入れると検査しません（「例外」の「例」は数えません）");
+  console.error("   → 見本を箇条で並べるなら、前の行を「例えば:」や「for example:」で終えると、続く箇条を検査しません");
   process.exit(1);
 }
 
