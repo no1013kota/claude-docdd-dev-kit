@@ -39,7 +39,7 @@ allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs update*) Bash(no
 | `migrate` | v0.1 系の `CLAUDE.md` | 下の「v0.1 系からの移行」 |
 | `none` | することが無い | 聞かない |
 
-`.claude/settings.json` と `.mcp.json` は変えない（上書きもマージもしない）。`settings` の `missingDeny`・`missingAsk` などに項目があれば、報告に差分として載せ、「足したいときは Claude に『.claude/settings.json の deny に … を足して』と頼む」と伝える。
+`.claude/settings.json` と `.mcp.json` は変えない（上書きもマージもしない）。`settings` の `missingDeny`・`missingAsk`・`missingAllow` に項目があれば、報告に差分として載せ、「足したいときは Claude に『.claude/settings.json の deny に … を足して』と頼む」と伝える。`settings.currentDefaultMode` が null でなければ、その値（始まりのモード）も載せる。いまの雛形は始まりのモードを決めない（Pro・Max・Team の既定の auto モードを上書きしない）。消すかどうかは運営者が決め、消したいときは Claude に『.claude/settings.json の permissions から defaultMode を消して』と頼む、と伝える。
 
 #### v0.1 系からの移行（`state: legacy`）
 

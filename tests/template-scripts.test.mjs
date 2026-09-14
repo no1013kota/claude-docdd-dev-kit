@@ -6,11 +6,12 @@
 // テンプレートの docs・CLAUDE.md はコピーしない（中身が変わってもこのテストが壊れないように、
 // 各テストが最小の文書を自分で書く）。audit-check.mjs だけは「scripts/ の隣に allowlist、1 つ上に lock」
 // という置き方そのものを検査するため、スクリプト 1 本を使い捨てのリポジトリへ置いて実行する。
-// 通信が要るケース（npm audit の結果で決まるもの）は書かない。
+// audit-check.mjs の判定は通信せずに確かめる。PATH の先頭に偽の npm（記録した npm audit の JSON を出す）を置き、
+// fetch は --require で読み込む偽物（記録した bulk advisory endpoint の応答を返す）に差し替える。
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { devNull, tmpdir } from "node:os";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -18,7 +19,10 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SCRIPTS = path.join(ROOT, "plugins/docdd/templates/scripts");
 
-const ENV = { ...process.env, GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_NOSYSTEM: "1" };
+// GIT_CONFIG_GLOBAL に os.devNull を渡すと、Git for Windows は「\\.\nul」を設定ファイルとして読めずに止まる。空のファイルを渡す
+const EMPTY_GITCONFIG = path.join(mkdtempSync(path.join(tmpdir(), "docdd-gitconfig-")), "config");
+writeFileSync(EMPTY_GITCONFIG, "");
+const ENV = { ...process.env, GIT_CONFIG_GLOBAL: EMPTY_GITCONFIG, GIT_CONFIG_NOSYSTEM: "1" };
 for (const key of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE"]) {
   delete ENV[key];
 }
@@ -301,6 +305,112 @@ test("refs: 「例」を含む行とコードブロックの中の .cs・.unity 
   assert.match(r.out, /1 件すべて実在しました/);
 });
 
+test("refs: 行末が for example・e.g.・for instance・例えば・たとえば の行に続く箇条は検査しない（空行 1 行を挟んでもよい）", () => {
+  const dir = repo({
+    "docs/UNITY_WORKFLOW.md": [
+      // RTSProject の docs/UNITY_WORKFLOW.md 69-73 行と同じ形
+      "All new production scenes must be created under `Assets/_Project/Scenes/`, for example:",
+      "",
+      "- `Assets/_Project/Scenes/MainMenu.unity`",
+      "- `Assets/_Project/Scenes/Battle.unity`",
+      "- `Assets/_Project/Scenes/Test_UnitCombat.unity`",
+      "",
+      "Do not create new production scenes under `Assets/Scenes/`.",
+      "",
+      "Scripts e.g.",
+      "* `Assets/Scripts/Units/UnitMover.cs`",
+      "  (the mover, `Assets/Scripts/Units/UnitMoverTests.cs` too)",
+      "  - `Assets/Scripts/Units/Nested.cs`",
+      "1. `Assets/Scripts/Units/Numbered.cs`",
+      "",
+      "+ `Assets/Scripts/Units/AfterBlank.cs`",
+      "",
+      "For Instance：",
+      "- `src/instance.ts`",
+      "",
+      "画面は、例えば:",
+      "- `src/app/page.tsx`",
+      "",
+      "たとえば",
+      "",
+      "- `src/app/layout.tsx`",
+      "",
+      "本物は `Assets/Scripts/Player.cs`",
+      "",
+    ].join("\n"),
+    "Assets/Scripts/Player.cs": "\n",
+  });
+  const r = run(REFS, dir);
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /1 件すべて実在しました/);
+});
+
+test("refs: 見本の箇条は、箇条でない行・空行のあとの箇条でない行で終わり、そのあとは検査する", () => {
+  const dir = repo({
+    "CLAUDE.md": [
+      "Scenes, for example:", // 1
+      "- `Assets/Scenes/Menu.unity`", // 2
+      "After the list `app/after_list.py`", // 3: 字下げの無い箇条でない行で終わる
+      "",
+      "for example:", // 5
+      "",
+      "",
+      "- `app/two_blank_lines.py`", // 8: 導入の行との間に空行が 2 行
+      "",
+      "e.g.:", // 10
+      "- `app/listed.py`",
+      "",
+      "  `app/indented_after_blank.py`", // 13: 空行のあとの箇条でない行で終わる
+      "- `app/after_end.py`", // 14: 終わったあとの箇条は検査する
+      "",
+      "```text",
+      "for example:", // 17: コードブロックの中は導入の行と見ない
+      "```",
+      "- `app/after_fence.py`", // 19
+      "",
+      "- Scenes, for example:", // 21
+      "  - `Assets/Scenes/Nested.unity`",
+      "- `app/sibling.py`", // 23: 導入の行の箇条より浅い箇条で終わる
+      "",
+      "Use one, for example: `app/same_line.py`", // 25: 導入の行そのものは検査する
+      "",
+    ].join("\n"),
+  });
+  const r = run(REFS, dir);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /無いファイルを指す記述が 7 件あります（7 件を検査）/);
+  for (const [line, ref] of [
+    [3, "app/after_list.py"],
+    [8, "app/two_blank_lines.py"],
+    [13, "app/indented_after_blank.py"],
+    [14, "app/after_end.py"],
+    [19, "app/after_fence.py"],
+    [23, "app/sibling.py"],
+    [25, "app/same_line.py"],
+  ]) {
+    assert.match(r.out, new RegExp(`CLAUDE\\.md:${line} {2}→ {2}${ref.replace(/[.]/g, "\\.")}\\n`), ref);
+  }
+  assert.doesNotMatch(r.out, /Menu\.unity|Nested\.unity|listed\.py/);
+  assert.match(r.out, /for example:」で終えると、続く箇条を検査しません/);
+});
+
+test("refs: 「例外」の「例」は数えずに検査する（「事例」「比例」のような語は今までどおり見本として飛ばす）", () => {
+  const dir = repo({
+    "CLAUDE.md": [
+      "- 例外の処理は `src/errors.ts` と `src/missing_errors.ts` にある",
+      "- 事例として `src/case_study.ts` を挙げる",
+      "- 例外の例: `src/example_of_exception.ts`",
+      "",
+    ].join("\n"),
+    "src/errors.ts": "\n",
+  });
+  const r = run(REFS, dir);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /無いファイルを指す記述が 1 件あります（2 件を検査）/);
+  assert.match(r.out, /CLAUDE\.md:1 {2}→ {2}src\/missing_errors\.ts/);
+  assert.doesNotMatch(r.out, /case_study|example_of_exception/);
+});
+
 // ---------------------------------------------------------------------------
 // check-doc-dates.mjs
 // ---------------------------------------------------------------------------
@@ -473,11 +583,12 @@ test("placeholders: 文書を git に追加していなければ、git add の�
 });
 
 // ---------------------------------------------------------------------------
-// audit-check.mjs（npm audit を呼ぶ前に決まるケースだけ）
+// audit-check.mjs
 // ---------------------------------------------------------------------------
 
 const LOCK_V3 = `${JSON.stringify({ name: "fixture", lockfileVersion: 3, requires: true, packages: { "": { name: "fixture" } } }, null, 2)}\n`;
-const EXPIRED = `${JSON.stringify({ lodash: { why: "テスト用の据え置き", until: "2000-01-01" } }, null, 2)}\n`;
+const EXPIRED = `${JSON.stringify({ lodash: { ids: ["GHSA-35jh-r3h4-6jhm"], why: "テスト用の据え置き", until: "2000-01-01" } }, null, 2)}\n`;
+const PATH_KEY = Object.keys(ENV).find((key) => key.toUpperCase() === "PATH") ?? "PATH";
 
 /** scripts/audit-check.mjs を置いたプロジェクト（`at` はスクリプトを置くフォルダ）。 */
 function auditProject(files, at = "scripts") {
@@ -485,6 +596,247 @@ function auditProject(files, at = "scripts") {
   mkdirSync(path.join(dir, at), { recursive: true });
   copyFileSync(path.join(SCRIPTS, "audit-check.mjs"), path.join(dir, at, "audit-check.mjs"));
   return { dir, script: path.join(dir, at, "audit-check.mjs") };
+}
+
+/*
+  記録した監査結果。2026-09-14 に npm 10.9.8 の `npm audit --json --omit=dev` と、
+  registry の bulk advisory endpoint（本番依存の名前と版を POST）から取ったものを、判定に使う項目だけに削った。
+  どちらの経路でも、high・critical の脆弱性の集合は同じだった（express は 5 件、lodash と minimist は 3 件）。
+*/
+/** express@4.17.1 だけを入れたプロジェクト。express 自身は low・moderate だけだが、npm audit では qs などが伝わって high になる。 */
+const EXPRESS = {
+  versions: {"body-parser": "1.19.0", "cookie": "0.4.0", "express": "4.17.1", "path-to-regexp": "0.1.7", "qs": "6.7.0", "send": "0.17.1", "serve-static": "1.14.1"},
+  npm: {
+    auditReportVersion: 2,
+    vulnerabilities: {
+      "body-parser": {
+        name: "body-parser", severity: "high", isDirect: false, effects: ["express"],
+        via: [
+          { source: 1099520, name: "body-parser", dependency: "body-parser", title: "body-parser vulnerable to denial of service when url encoding is enabled", url: "https://github.com/advisories/GHSA-qwcr-r2fm-qrc7", severity: "high", range: "<1.20.3" },
+          { source: 1123977, name: "body-parser", dependency: "body-parser", title: "body-parser vulnerable to denial of service when invalid limit value silently disables size enforcement", url: "https://github.com/advisories/GHSA-v422-hmwv-36x6", severity: "low", range: "<1.20.6" },
+          "qs",
+        ],
+      },
+      "cookie": {
+        name: "cookie", severity: "low", isDirect: false, effects: ["express"],
+        via: [
+          { source: 1103907, name: "cookie", dependency: "cookie", title: "cookie accepts cookie name, path, and domain with out of bounds characters", url: "https://github.com/advisories/GHSA-pxg6-pf52-xh8x", severity: "low", range: "<0.7.0" },
+        ],
+      },
+      "express": {
+        name: "express", severity: "high", isDirect: true, effects: [],
+        via: [
+          { source: 1100530, name: "express", dependency: "express", title: "express vulnerable to XSS via response.redirect()", url: "https://github.com/advisories/GHSA-qw6h-vgh9-j6wx", severity: "low", range: "<4.20.0" },
+          { source: 1111636, name: "express", dependency: "express", title: "Express.js Open Redirect in malformed URLs", url: "https://github.com/advisories/GHSA-rv95-896h-c2vc", severity: "moderate", range: "<4.19.2" },
+          "body-parser",
+          "cookie",
+          "path-to-regexp",
+          "qs",
+          "send",
+          "serve-static",
+        ],
+      },
+      "path-to-regexp": {
+        name: "path-to-regexp", severity: "high", isDirect: false, effects: ["express"],
+        via: [
+          { source: 1101850, name: "path-to-regexp", dependency: "path-to-regexp", title: "path-to-regexp outputs backtracking regular expressions", url: "https://github.com/advisories/GHSA-9wv6-86v2-598j", severity: "high", range: "<0.1.10" },
+          { source: 1105199, name: "path-to-regexp", dependency: "path-to-regexp", title: "path-to-regexp contains a ReDoS", url: "https://github.com/advisories/GHSA-rhx6-c78j-4q9w", severity: "high", range: "<0.1.12" },
+          { source: 1115527, name: "path-to-regexp", dependency: "path-to-regexp", title: "path-to-regexp vulnerable to Regular Expression Denial of Service via multiple route parameters", url: "https://github.com/advisories/GHSA-37ch-88jc-xwx2", severity: "high", range: "<0.1.13" },
+        ],
+      },
+      "qs": {
+        name: "qs", severity: "high", isDirect: false, effects: ["body-parser", "express"],
+        via: [
+          { source: 1104120, name: "qs", dependency: "qs", title: "qs vulnerable to Prototype Pollution", url: "https://github.com/advisories/GHSA-hrpp-h998-j3pp", severity: "high", range: ">=6.7.0 <6.7.3" },
+          { source: 1113161, name: "qs", dependency: "qs", title: "qs's arrayLimit bypass in comma parsing allows denial of service", url: "https://github.com/advisories/GHSA-w7fw-mjwx-w883", severity: "low", range: ">=6.7.0 <=6.14.1" },
+          { source: 1113719, name: "qs", dependency: "qs", title: "qs's arrayLimit bypass in its bracket notation allows DoS via memory exhaustion", url: "https://github.com/advisories/GHSA-6rw7-vpxm-498p", severity: "moderate", range: "<6.14.1" },
+          { source: 1158507, name: "qs", dependency: "qs", title: "qs: Denial of Service via Attacker Controlled isBuffer", url: "https://github.com/advisories/GHSA-4mjr-xmp4-gh2g", severity: "moderate", range: ">=2.2.5 <6.16.0" },
+        ],
+      },
+      "send": {
+        name: "send", severity: "low", isDirect: false, effects: ["express", "serve-static"],
+        via: [
+          { source: 1109556, name: "send", dependency: "send", title: "send vulnerable to template injection that can lead to XSS", url: "https://github.com/advisories/GHSA-m6fv-jmcg-4jfg", severity: "low", range: "<0.19.0" },
+        ],
+      },
+      "serve-static": {
+        name: "serve-static", severity: "low", isDirect: false, effects: [],
+        via: [
+          { source: 1100528, name: "serve-static", dependency: "serve-static", title: "serve-static vulnerable to template injection that can lead to XSS", url: "https://github.com/advisories/GHSA-cm22-4g7w-348p", severity: "low", range: "<1.16.0" },
+          "send",
+        ],
+      },
+    },
+    metadata: { vulnerabilities: {"info": 0, "low": 3, "moderate": 0, "high": 4, "critical": 0, "total": 7} },
+  },
+  bulk: {
+    "body-parser": [
+      { id: 1123977, url: "https://github.com/advisories/GHSA-v422-hmwv-36x6", title: "body-parser vulnerable to denial of service when invalid limit value silently disables size enforcement", severity: "low", vulnerable_versions: "<1.20.6" },
+      { id: 1099520, url: "https://github.com/advisories/GHSA-qwcr-r2fm-qrc7", title: "body-parser vulnerable to denial of service when url encoding is enabled", severity: "high", vulnerable_versions: "<1.20.3" },
+    ],
+    "cookie": [
+      { id: 1103907, url: "https://github.com/advisories/GHSA-pxg6-pf52-xh8x", title: "cookie accepts cookie name, path, and domain with out of bounds characters", severity: "low", vulnerable_versions: "<0.7.0" },
+    ],
+    "express": [
+      { id: 1100530, url: "https://github.com/advisories/GHSA-qw6h-vgh9-j6wx", title: "express vulnerable to XSS via response.redirect()", severity: "low", vulnerable_versions: "<4.20.0" },
+      { id: 1111636, url: "https://github.com/advisories/GHSA-rv95-896h-c2vc", title: "Express.js Open Redirect in malformed URLs", severity: "moderate", vulnerable_versions: "<4.19.2" },
+    ],
+    "path-to-regexp": [
+      { id: 1101850, url: "https://github.com/advisories/GHSA-9wv6-86v2-598j", title: "path-to-regexp outputs backtracking regular expressions", severity: "high", vulnerable_versions: "<0.1.10" },
+      { id: 1105199, url: "https://github.com/advisories/GHSA-rhx6-c78j-4q9w", title: "path-to-regexp contains a ReDoS", severity: "high", vulnerable_versions: "<0.1.12" },
+      { id: 1115527, url: "https://github.com/advisories/GHSA-37ch-88jc-xwx2", title: "path-to-regexp vulnerable to Regular Expression Denial of Service via multiple route parameters", severity: "high", vulnerable_versions: "<0.1.13" },
+    ],
+    "qs": [
+      { id: 1104120, url: "https://github.com/advisories/GHSA-hrpp-h998-j3pp", title: "qs vulnerable to Prototype Pollution", severity: "high", vulnerable_versions: ">=6.7.0 <6.7.3" },
+      { id: 1158507, url: "https://github.com/advisories/GHSA-4mjr-xmp4-gh2g", title: "qs: Denial of Service via Attacker Controlled isBuffer", severity: "moderate", vulnerable_versions: ">=2.2.5 <6.16.0" },
+      { id: 1113161, url: "https://github.com/advisories/GHSA-w7fw-mjwx-w883", title: "qs's arrayLimit bypass in comma parsing allows denial of service", severity: "low", vulnerable_versions: ">=6.7.0 <=6.14.1" },
+      { id: 1113719, url: "https://github.com/advisories/GHSA-6rw7-vpxm-498p", title: "qs's arrayLimit bypass in its bracket notation allows DoS via memory exhaustion", severity: "moderate", vulnerable_versions: "<6.14.1" },
+    ],
+    "send": [
+      { id: 1109556, url: "https://github.com/advisories/GHSA-m6fv-jmcg-4jfg", title: "send vulnerable to template injection that can lead to XSS", severity: "low", vulnerable_versions: "<0.19.0" },
+    ],
+    "serve-static": [
+      { id: 1100528, url: "https://github.com/advisories/GHSA-cm22-4g7w-348p", title: "serve-static vulnerable to template injection that can lead to XSS", severity: "low", vulnerable_versions: "<1.16.0" },
+    ],
+  },
+};
+
+/** lodash@4.17.20 と minimist@1.2.5 のプロジェクト。lodash に high が 2 件（GHSA-35jh-r3h4-6jhm・GHSA-r5fr-rjxr-66jc）、minimist に critical が 1 件。 */
+const LODASH_MINIMIST = {
+  versions: {"lodash": "4.17.20", "minimist": "1.2.5"},
+  npm: {
+    auditReportVersion: 2,
+    vulnerabilities: {
+      "lodash": {
+        name: "lodash", severity: "high", isDirect: true, effects: [],
+        via: [
+          { source: 1106913, name: "lodash", dependency: "lodash", title: "Command Injection in lodash", url: "https://github.com/advisories/GHSA-35jh-r3h4-6jhm", severity: "high", range: "<4.17.21" },
+          { source: 1108258, name: "lodash", dependency: "lodash", title: "Regular Expression Denial of Service (ReDoS) in lodash", url: "https://github.com/advisories/GHSA-29mw-wpgm-hmr9", severity: "moderate", range: ">=4.0.0 <4.17.21" },
+          { source: 1115806, name: "lodash", dependency: "lodash", title: "lodash vulnerable to Code Injection via `_.template` imports key names", url: "https://github.com/advisories/GHSA-r5fr-rjxr-66jc", severity: "high", range: ">=4.0.0 <=4.17.23" },
+          { source: 1115810, name: "lodash", dependency: "lodash", title: "lodash vulnerable to Prototype Pollution via array path bypass in `_.unset` and `_.omit`", url: "https://github.com/advisories/GHSA-f23m-r3pf-42rh", severity: "moderate", range: "<=4.17.23" },
+          { source: 1120370, name: "lodash", dependency: "lodash", title: "Lodash has Prototype Pollution Vulnerability in `_.unset` and `_.omit` functions", url: "https://github.com/advisories/GHSA-xxjr-mmjv-4gpg", severity: "moderate", range: ">=4.0.0 <=4.17.22" },
+        ],
+      },
+      "minimist": {
+        name: "minimist", severity: "critical", isDirect: true, effects: [],
+        via: [
+          { source: 1097678, name: "minimist", dependency: "minimist", title: "Prototype Pollution in minimist", url: "https://github.com/advisories/GHSA-xvch-5gv4-984h", severity: "critical", range: ">=1.0.0 <1.2.6" },
+        ],
+      },
+    },
+    metadata: { vulnerabilities: {"info": 0, "low": 0, "moderate": 0, "high": 1, "critical": 1, "total": 2} },
+  },
+  bulk: {
+    "lodash": [
+      { id: 1106913, url: "https://github.com/advisories/GHSA-35jh-r3h4-6jhm", title: "Command Injection in lodash", severity: "high", vulnerable_versions: "<4.17.21" },
+      { id: 1108258, url: "https://github.com/advisories/GHSA-29mw-wpgm-hmr9", title: "Regular Expression Denial of Service (ReDoS) in lodash", severity: "moderate", vulnerable_versions: ">=4.0.0 <4.17.21" },
+      { id: 1120370, url: "https://github.com/advisories/GHSA-xxjr-mmjv-4gpg", title: "Lodash has Prototype Pollution Vulnerability in `_.unset` and `_.omit` functions", severity: "moderate", vulnerable_versions: ">=4.0.0 <=4.17.22" },
+      { id: 1115806, url: "https://github.com/advisories/GHSA-r5fr-rjxr-66jc", title: "lodash vulnerable to Code Injection via `_.template` imports key names", severity: "high", vulnerable_versions: ">=4.0.0 <=4.17.23" },
+      { id: 1115810, url: "https://github.com/advisories/GHSA-f23m-r3pf-42rh", title: "lodash vulnerable to Prototype Pollution via array path bypass in `_.unset` and `_.omit`", severity: "moderate", vulnerable_versions: "<=4.17.23" },
+    ],
+    "minimist": [
+      { id: 1097678, url: "https://github.com/advisories/GHSA-xvch-5gv4-984h", title: "Prototype Pollution in minimist", severity: "critical", vulnerable_versions: ">=1.0.0 <1.2.6" },
+    ],
+  },
+};
+
+/** 記録から、指定したパッケージの分を除いた結果（npm audit の伝播の印も除く）。 */
+function without(fixture, name) {
+  const vulnerabilities = {};
+  for (const [pkg, info] of Object.entries(fixture.npm.vulnerabilities)) {
+    if (pkg !== name) vulnerabilities[pkg] = { ...info, via: info.via.filter((v) => v !== name) };
+  }
+  const versions = { ...fixture.versions };
+  delete versions[name];
+  const bulk = { ...fixture.bulk };
+  delete bulk[name];
+  return { versions, npm: { ...fixture.npm, vulnerabilities }, bulk };
+}
+
+/**
+ * 記録のうち、指定した番号の脆弱性の URL から GHSA の ID を外した結果（2 つの経路の両方）。
+ * GHSA の無い実例は見つけていないので、ここだけは作った形。
+ */
+function withoutGhsa(fixture, numbers) {
+  const strip = (entry, number) =>
+    numbers.includes(number) ? { ...entry, url: `https://www.npmjs.com/advisories/${number}` } : entry;
+  const vulnerabilities = {};
+  for (const [pkg, info] of Object.entries(fixture.npm.vulnerabilities)) {
+    vulnerabilities[pkg] = { ...info, via: info.via.map((v) => (typeof v === "object" ? strip(v, v.source) : v)) };
+  }
+  const bulk = {};
+  for (const [pkg, list] of Object.entries(fixture.bulk)) bulk[pkg] = list.map((a) => strip(a, a.id));
+  return { versions: fixture.versions, npm: { ...fixture.npm, vulnerabilities }, bulk };
+}
+
+const FAKE_NPM = `const fs = require("fs");
+const path = require("path");
+process.stdout.write(fs.readFileSync(path.join(__dirname, "npm-output.json"), "utf8"));
+process.exit(1);
+`;
+
+const FAKE_FETCH = `const fs = require("fs");
+const path = require("path");
+const zlib = require("zlib");
+async function fakeFetch(url, init) {
+  const asked = JSON.parse(init.body);
+  fs.appendFileSync(path.join(__dirname, "bulk-requests.jsonl"), JSON.stringify({ url: String(url), asked }) + "\\n");
+  const recorded = JSON.parse(fs.readFileSync(path.join(__dirname, "bulk.json"), "utf8"));
+  const answer = Object.fromEntries(Object.entries(recorded).filter(([name]) => name in asked));
+  let body = Buffer.from(JSON.stringify(answer));
+  if (process.env.DOCDD_TEST_GZIP === "1") body = zlib.gzipSync(body);
+  return { ok: true, status: 200, arrayBuffer: async () => body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) };
+}
+Object.defineProperty(globalThis, "fetch", { value: fakeFetch, writable: true, configurable: true });
+`;
+
+/**
+ * 通信せずに audit-check.mjs を回す。
+ * route: "npm" は npm audit の経路。"bulk" は npm がエラーの JSON を返し、直接問い合わせる経路。
+ * dev は開発用だけの依存（lock に dev: true で書き、直接の問い合わせに含まれないことを確かめる）。
+ */
+function auditWithRecord(fixture, allowlist, { route, gzip = false, dev = {} }) {
+  const packages = { "": { name: "fixture" } };
+  for (const [name, version] of Object.entries(fixture.versions)) packages[`node_modules/${name}`] = { version };
+  for (const [name, version] of Object.entries(dev)) packages[`node_modules/${name}`] = { version, dev: true };
+  const { dir, script } = auditProject({
+    "package-lock.json": `${JSON.stringify({ name: "fixture", lockfileVersion: 3, requires: true, packages }, null, 2)}\n`,
+    "scripts/audit-allowlist.json": `${JSON.stringify(allowlist, null, 2)}\n`,
+  });
+  const bin = path.join(dir, "fake-bin");
+  const npmOutput =
+    route === "npm"
+      ? fixture.npm
+      : { message: "request to https://registry.npmjs.org/-/npm/v1/security/advisories/bulk failed", error: { code: "E500" } };
+  write(bin, {
+    "npm-output.json": JSON.stringify(npmOutput),
+    "bulk.json": JSON.stringify(fixture.bulk),
+    "fake-npm.cjs": FAKE_NPM,
+    "fake-fetch.cjs": FAKE_FETCH,
+  });
+  writeFileSync(path.join(bin, "npm"), `#!/bin/sh\nexec "${process.execPath}" "${path.join(bin, "fake-npm.cjs")}" "$@"\n`, { mode: 0o755 });
+  writeFileSync(path.join(bin, "npm.cmd"), `@"${process.execPath}" "${path.join(bin, "fake-npm.cjs")}" %*\r\n`);
+  const r = run("", dir, {
+    scriptPath: script,
+    nodeArgs: ["--require", path.join(bin, "fake-fetch.cjs")],
+    env: { [PATH_KEY]: `${bin}${path.delimiter}${ENV[PATH_KEY] ?? ""}`, DOCDD_TEST_GZIP: gzip ? "1" : "0" },
+  });
+  const log = path.join(bin, "bulk-requests.jsonl");
+  const requests = existsSync(log)
+    ? readFileSync(log, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line))
+    : [];
+  return { ...r, requests };
+}
+
+/** 合否の部分（「audit-check OK」か「audit-check FAILED」から後ろ）。経路の違いで変わる行は除く。 */
+function verdict(out) {
+  const lines = out.split("\n");
+  const at = lines.findIndex((line) => /^audit-check (OK|FAILED)/.test(line));
+  assert.notEqual(at, -1, out);
+  return lines
+    .slice(at)
+    .filter((line) => !line.startsWith("audit-check: npm audit が監査レポートを返しませんでした"))
+    .join("\n");
 }
 
 test("audit: package-lock.json がどこにも無ければ exit 2（workspaces の案内つき）", () => {
@@ -503,12 +855,12 @@ test("audit: lockfileVersion 1 の古い lock は作り直しを案内して exi
   assert.match(r.out, /npm install/);
 });
 
-test("audit: allowlist の until を過ぎた据え置きは「据え置き期限切れ」で exit 1", () => {
+test("audit: 据え置きの一覧の until を過ぎたら「据え置き期限切れ」で exit 1", () => {
   const { dir, script } = auditProject({ "package-lock.json": LOCK_V3, "scripts/audit-allowlist.json": EXPIRED });
   const r = run("", dir, { scriptPath: script });
   assert.equal(r.code, 1, r.out);
   assert.match(r.out, /据え置き期限切れ/);
-  assert.match(r.out, /lodash（期限 2000-01-01。理由: テスト用の据え置き）/);
+  assert.match(r.out, /lodash GHSA-35jh-r3h4-6jhm（期限 2000-01-01。理由: テスト用の据え置き）/);
 });
 
 test("audit: scripts/ の隣に lock が無ければ git の一番上の package-lock.json を使う", () => {
@@ -522,22 +874,147 @@ test("audit: scripts/ の隣に lock が無ければ git の一番上の package
   assert.match(r.out, /据え置き期限切れ/);
 });
 
-test("audit: allowlist の書き方が違えば exit 2（until が日付でない・why が無い）", () => {
-  const badUntil = auditProject({
-    "package-lock.json": LOCK_V3,
-    "scripts/audit-allowlist.json": '{ "lodash": { "why": "理由", "until": "来月" } }\n',
-  });
-  const r1 = run("", badUntil.dir, { scriptPath: badUntil.script });
-  assert.equal(r1.code, 2, r1.out);
-  assert.match(r1.out, /until は YYYY-MM-DD の日付で/);
+test("audit: 据え置きの一覧の書き方が違えば、書き方を示して exit 2（古い文字列の形・ids・why・until の欠け）", () => {
+  const ok = { ids: ["GHSA-35jh-r3h4-6jhm"], why: "理由", until: "2999-01-01" };
+  const cases = [
+    ["古い書き方（値が文字列）", "理由だけの古い書き方", /"lodash" は古い書き方です（値が文字列）/],
+    ["ids が無い", { why: ok.why, until: ok.until }, /"lodash" に据え置く脆弱性の ID（ids）を 1 件以上/],
+    ["ids が空", { ...ok, ids: [] }, /"lodash" に据え置く脆弱性の ID（ids）を 1 件以上/],
+    ["ids が GHSA の形でない", { ...ok, ids: ["CVE-2021-23337"] }, /"lodash" の ids は GHSA-xxxx-xxxx-xxxx の形で書いてください（いまの値: "CVE-2021-23337"）/],
+    ["why が無い", { ids: ok.ids, until: ok.until }, /"lodash" に「なぜ今直さないか」（why）を書いてください/],
+    ["until が無い", { ids: ok.ids, why: ok.why }, /"lodash" に期限（until）を YYYY-MM-DD で書いてください/],
+    ["until が日付でない", { ...ok, until: "来月" }, /"lodash" の until は YYYY-MM-DD の日付で書いてください（いまの値: "来月"）/],
+  ];
+  for (const [label, entry, message] of cases) {
+    const { dir, script } = auditProject({
+      "package-lock.json": LOCK_V3,
+      "scripts/audit-allowlist.json": `${JSON.stringify({ lodash: entry })}\n`,
+    });
+    const r = run("", dir, { scriptPath: script });
+    assert.equal(r.code, 2, `${label}\n${r.out}`);
+    assert.match(r.out, message, label);
+    assert.match(r.out, /形: \{ "<パッケージ名>": \{ "ids": \["GHSA-xxxx-xxxx-xxxx"\], "why": "<なぜ今直さないか>", "until": "YYYY-MM-DD" \} \}/, label);
+  }
+});
 
-  const noWhy = auditProject({
-    "package-lock.json": LOCK_V3,
-    "scripts/audit-allowlist.json": '{ "lodash": { "until": "2999-01-01" } }\n',
-  });
-  const r2 = run("", noWhy.dir, { scriptPath: noWhy.script });
-  assert.equal(r2.code, 2, r2.out);
-  assert.match(r2.out, /なぜ今直さないか/);
+test("audit: 伝わっただけの親（express）は数えず、脆弱性を持つパッケージの GHSA ごとに落とす（npm audit の経路）", () => {
+  const r = auditWithRecord(EXPRESS, {}, { route: "npm" });
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /audit 本番依存の脆弱性: critical=0 high=5 moderate=3 low=6/);
+  for (const [pkg, id] of [
+    ["body-parser", "GHSA-qwcr-r2fm-qrc7"],
+    ["path-to-regexp", "GHSA-37ch-88jc-xwx2"],
+    ["path-to-regexp", "GHSA-9wv6-86v2-598j"],
+    ["path-to-regexp", "GHSA-rhx6-c78j-4q9w"],
+    ["qs", "GHSA-hrpp-h998-j3pp"],
+  ]) {
+    assert.match(r.out, new RegExp(`\\n {2}- ${pkg} ${id}（high）`), id);
+  }
+  assert.doesNotMatch(r.out, /\n {2}- express /);
+  assert.match(r.out, /"qs": \{ "ids": \["GHSA-hrpp-h998-j3pp"\], "why": "<なぜ今直さないか>", "until": "YYYY-MM-DD" \}/);
+  assert.doesNotMatch(r.out, /"express": \{ "ids"/);
+  assert.deepEqual(r.requests, [], "npm audit の経路では直接問い合わせない");
+});
+
+test("audit: 直接問い合わせる経路でも、npm audit の経路と同じ脆弱性で落ちる（開発用だけの依存は問い合わせない）", () => {
+  const viaNpm = auditWithRecord(EXPRESS, {}, { route: "npm" });
+  const viaBulk = auditWithRecord(EXPRESS, {}, { route: "bulk", dev: { minimist: "1.2.5" } });
+  assert.equal(viaBulk.code, 1, viaBulk.out);
+  assert.match(viaBulk.out, /bulk advisory endpoint へ直接問い合わせます/);
+  assert.match(viaBulk.out, /audit（bulk endpoint 直接問い合わせ） 本番依存の脆弱性: critical=0 high=5 moderate=3 low=6/);
+  assert.equal(verdict(viaBulk.out), verdict(viaNpm.out));
+  assert.equal(viaBulk.requests.length, 1, viaBulk.out);
+  assert.deepEqual(Object.keys(viaBulk.requests[0].asked).sort(), Object.keys(EXPRESS.versions).sort());
+  assert.equal(viaBulk.requests[0].url, "https://registry.npmjs.org/-/npm/v1/security/advisories/bulk");
+});
+
+test("audit: 脆弱性を持つパッケージの ID を据え置けば、親を書かなくても合格し、据え置き中の ID を出す（2 つの経路で同じ）", () => {
+  const allowlist = {
+    qs: { ids: ["GHSA-HRPP-H998-J3PP", "GHSA-6rw7-vpxm-498p"], why: "qs の配列の形を受けない", until: "2999-01-01" },
+    "path-to-regexp": {
+      ids: ["GHSA-9wv6-86v2-598j", "GHSA-rhx6-c78j-4q9w", "GHSA-37ch-88jc-xwx2"],
+      why: "ルートは固定",
+      until: "2999-01-01",
+    },
+    "body-parser": { ids: ["GHSA-qwcr-r2fm-qrc7"], why: "urlencoded を使わない", until: "2999-01-01" },
+  };
+  const viaNpm = auditWithRecord(EXPRESS, allowlist, { route: "npm" });
+  assert.equal(viaNpm.code, 0, viaNpm.out);
+  assert.match(viaNpm.out, /audit-check OK/);
+  assert.match(viaNpm.out, /据え置き中: qs GHSA-hrpp-h998-j3pp（high。期限 2999-01-01。理由: qs の配列の形を受けない）/);
+  assert.match(viaNpm.out, /据え置き中: path-to-regexp GHSA-37ch-88jc-xwx2（high。/);
+  assert.match(viaNpm.out, /据え置き中: body-parser GHSA-qwcr-r2fm-qrc7（high。/);
+  assert.equal(viaNpm.out.match(/据え置き中: /g).length, 5);
+  assert.match(viaNpm.out, /いまは本番依存の high として出ていない: qs GHSA-6rw7-vpxm-498p/);
+
+  const viaBulk = auditWithRecord(EXPRESS, allowlist, { route: "bulk", gzip: true });
+  assert.equal(viaBulk.code, 0, viaBulk.out);
+  assert.equal(verdict(viaBulk.out), verdict(viaNpm.out));
+});
+
+test("audit: 一覧にあるパッケージでも、ids に無い脆弱性が出たらパッケージ名と ID を出して exit 1（2 つの経路で同じ）", () => {
+  const fixture = without(LODASH_MINIMIST, "minimist");
+  const allowlist = { lodash: { ids: ["GHSA-35jh-r3h4-6jhm"], why: "_.template を使っていない", until: "2999-01-01" } };
+  const viaNpm = auditWithRecord(fixture, allowlist, { route: "npm" });
+  assert.equal(viaNpm.code, 1, viaNpm.out);
+  assert.match(viaNpm.out, /\n {2}- lodash GHSA-r5fr-rjxr-66jc（high。据え置きの一覧に無い脆弱性）/);
+  assert.match(viaNpm.out, /https:\/\/github\.com\/advisories\/GHSA-r5fr-rjxr-66jc/);
+  assert.doesNotMatch(viaNpm.out, /\n {2}- lodash GHSA-35jh-r3h4-6jhm/);
+  assert.match(viaNpm.out, /"lodash": \{ "ids": \["GHSA-35jh-r3h4-6jhm", "GHSA-r5fr-rjxr-66jc"\]/);
+  assert.match(viaNpm.out, /ids に新しい ID を足し、why をその脆弱性の分まで書き直して/);
+  assert.doesNotMatch(viaNpm.out, /critical は据え置けません/);
+  assert.doesNotMatch(viaNpm.out, /GHSA の ID が無い high/);
+
+  const viaBulk = auditWithRecord(fixture, allowlist, { route: "bulk" });
+  assert.equal(viaBulk.code, 1, viaBulk.out);
+  assert.equal(verdict(viaBulk.out), verdict(viaNpm.out));
+});
+
+test("audit: critical は一覧に ID を書いても据え置けず exit 1（2 つの経路で同じ）", () => {
+  const allowlist = {
+    lodash: { ids: ["GHSA-35jh-r3h4-6jhm", "GHSA-r5fr-rjxr-66jc"], why: "_.template を使っていない", until: "2999-01-01" },
+    minimist: { ids: ["GHSA-xvch-5gv4-984h"], why: "引数を外から受けない", until: "2999-01-01" },
+  };
+  const viaNpm = auditWithRecord(LODASH_MINIMIST, allowlist, { route: "npm" });
+  assert.equal(viaNpm.code, 1, viaNpm.out);
+  assert.match(viaNpm.out, /\n {2}- minimist GHSA-xvch-5gv4-984h（critical。critical は据え置けません）Prototype Pollution in minimist/);
+  assert.doesNotMatch(viaNpm.out, /\n {2}- lodash /);
+  assert.doesNotMatch(viaNpm.out, /次の形で足せます/);
+  assert.match(viaNpm.out, /\ncritical は据え置けません。\n/);
+  assert.doesNotMatch(viaNpm.out, /GHSA の ID が無い high/);
+
+  const viaBulk = auditWithRecord(LODASH_MINIMIST, allowlist, { route: "bulk" });
+  assert.equal(viaBulk.code, 1, viaBulk.out);
+  assert.equal(verdict(viaBulk.out), verdict(viaNpm.out));
+});
+
+test("audit: GHSA の ID が無い high は据え置けず、上げるしかないと出して exit 1（critical が無ければ critical の文は出さない。2 つの経路で同じ）", () => {
+  const lodashOnly = without(LODASH_MINIMIST, "minimist");
+
+  // high がすべて GHSA 無し: 貼れる JSON は出さない
+  const allMissing = withoutGhsa(lodashOnly, [1106913, 1115806]);
+  const viaNpm = auditWithRecord(allMissing, {}, { route: "npm" });
+  assert.equal(viaNpm.code, 1, viaNpm.out);
+  assert.match(viaNpm.out, /\n {2}- lodash npm の番号 1106913（high。GHSA の ID が無いため据え置けません）Command Injection in lodash/);
+  assert.match(viaNpm.out, /\n {2}- lodash npm の番号 1115806（high。GHSA の ID が無いため据え置けません）/);
+  assert.match(viaNpm.out, /\nGHSA の ID が無い high は一覧に書けないため、依存を上げて直すしかありません。\n/);
+  assert.doesNotMatch(viaNpm.out, /critical は据え置けません/);
+  assert.doesNotMatch(viaNpm.out, /次の形で足せます/);
+  const viaBulk = auditWithRecord(allMissing, {}, { route: "bulk" });
+  assert.equal(viaBulk.code, 1, viaBulk.out);
+  assert.equal(verdict(viaBulk.out), verdict(viaNpm.out));
+
+  // GHSA のある high と混ざるとき: JSON には GHSA のある分だけ出し、GHSA 無しの分は上げるしかないと出す
+  const oneMissing = withoutGhsa(lodashOnly, [1115806]);
+  const mixedNpm = auditWithRecord(oneMissing, {}, { route: "npm" });
+  assert.equal(mixedNpm.code, 1, mixedNpm.out);
+  assert.match(mixedNpm.out, /に次の形で足せます:\n/);
+  assert.match(mixedNpm.out, /"lodash": \{ "ids": \["GHSA-35jh-r3h4-6jhm"\], "why"/);
+  assert.match(mixedNpm.out, /\nGHSA の ID が無い high は一覧に書けないため、依存を上げて直すしかありません。\n/);
+  assert.doesNotMatch(mixedNpm.out, /critical は据え置けません/);
+  const mixedBulk = auditWithRecord(oneMissing, {}, { route: "bulk" });
+  assert.equal(mixedBulk.code, 1, mixedBulk.out);
+  assert.equal(verdict(mixedBulk.out), verdict(mixedNpm.out));
 });
 
 const fetchCanBeHidden =
@@ -546,18 +1023,17 @@ const fetchCanBeHidden =
     .status === 0;
 
 test(
-  "audit: npm が使えず fetch も無い Node では「Node.js 18 以上が必要」で exit 2（期限なしの据え置きは警告）",
+  "audit: npm が使えず fetch も無い Node では「Node.js 18 以上が必要」で exit 2",
   { skip: fetchCanBeHidden ? false : "この Node では fetch を隠せない" },
   () => {
     const { dir, script } = auditProject({
       "package-lock.json": LOCK_V3,
-      "scripts/audit-allowlist.json": '{ "lodash": "理由だけの古い書き方" }\n',
+      "scripts/audit-allowlist.json": `${JSON.stringify({ lodash: { ids: ["GHSA-35jh-r3h4-6jhm"], why: "理由", until: "2999-01-01" } })}\n`,
     });
     const emptyBin = path.join(dir, "empty-bin");
     mkdirSync(emptyBin);
     const r = run("", dir, { scriptPath: script, nodeArgs: ["--no-experimental-fetch"], env: { PATH: emptyBin } });
     assert.equal(r.code, 2, r.out);
-    assert.match(r.out, /期限（until）がありません/);
     assert.match(r.out, /Node\.js 18 以上が必要です（いまの版: v/);
   },
 );

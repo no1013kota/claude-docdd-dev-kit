@@ -1,0 +1,6 @@
+# Issue を作るときの選択画面の設定。空の Issue（テンプレートなし）は出さず、不具合・質問・要望のどれかから選んでもらう。
+blank_issues_enabled: false
+contact_links:
+  - name: 使い方の説明（README）
+    url: https://github.com/no1013kota/claude-docdd-dev-kit/blob/main/plugins/docdd/README.md
+    about: 入れ方・始め方・困ったときの対処は、まずこちらに書いてあります。

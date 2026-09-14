@@ -45,12 +45,13 @@
 
 `CLAUDE.md`「検証コマンド」表の『単体・DBテスト』（または『E2E（実際に動かす）』）が「無い」か未記入なら、テスト基盤（テストを動かす道具と設定）が無い。テストを書く前に、土台を1つのタスクで入れる（`/docdd:init` が起票する「テスト基盤の導入」。無ければ `/docdd:add-task` で起票する）。
 
-- 選び方の目安: TypeScript／JavaScript は vitest（単体）と @playwright/test（E2E）。Python は pytest。依存を増やしたくなければ Node.js 標準の node:test。Unity は Unity Test Framework（EditMode／PlayMode）。Godot などほかのエンジン・言語は、その標準のテスト道具（例: go test、dotnet test）。どれにするかは運営者の承知を得てから入れる。
+- 選び方の目安: TypeScript／JavaScript は vitest（単体）と @playwright/test（E2E）。Python は pytest。依存を増やしたくなければ Node.js 標準の node:test。Unity は Unity Test Framework（EditMode／PlayMode）。Godot には、ゲームのプロジェクト向けの標準のテスト道具が無い。アドオン（addons/ に入れる追加の部品）の GUT か gdUnit4 を入れる。GDScript だけなら GUT、C# でも書くなら gdUnit4（どちらもコマンドで回せるが、docdd では確かめていない）。ほかの言語は、その言語の標準のテスト道具（例: go test、dotnet test）。どれにするかは運営者の承知を得てから入れる。
 - 最小構成: 設定ファイル1つ ＋ 見本テスト1件 ＋ 実行コマンド（Node.js なら package.json の scripts に test と test:e2e。Unity なら設定はテスト用の asmdef）。見本テスト1件が緑になったら完了。
 - 選んだコマンドは `CLAUDE.md`「検証コマンド」表の『単体・DBテスト』『E2E（実際に動かす）』『全検査（push 前に1回）』行に書く。ほかの文書には書かない。
 - DB を使うテストは本番と別の DB に向ける。接続先は『テスト用 DB』行に書く（ホスト型なら「② ホスト型の開発専用: 接続先は .env の `<キー名>`（本番と別・開発専用・破棄可能）」の形）。
 - Web の E2E は初回にブラウザ本体のダウンロード（数百 MB）が要る。依存を足す確認（npm install など）が出たら内容を読んで許可し、「常に許可」は選ばない。
 - Unity の注意: Editor で同じプロジェクトを開いていると、コマンドでのテスト実行（batchmode）は動かない（閉じてから回すか、運営者に Editor の Test Runner で回してもらう）。テストが 0 件でも成功扱い（終了コード 0）なので、終了コードに加えて結果ファイル（XML）のテストの件数も見る。
+- Unity のビルドと PlayMode テスト: docdd では確かめていない（書き方は Unity 公式ドキュメントのとおり）。ビルドは、ビルド用のスクリプトが無くても `-build`（出力先）と `-buildTarget`（または `-activeBuildProfile`）で作れる。テストと違い、ビルドには `-quit` を付ける。macOS の出力先は .app、Windows は .exe で終える。書き方の見本は `CLAUDE.md`「検証コマンド」表の下にある。
 
 ## 5. 落とし穴
 

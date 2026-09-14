@@ -3,6 +3,119 @@
 版ごとの変更と、プロジェクトに置いた雛形への影響をまとめます。
 「雛形への影響: あり」の版へ上げたら、プロジェクトのフォルダで `/docdd:update-kit` を打ちます（プラグインを更新しただけでは、置いた雛形は変わりません）。
 
+## 0.4.0（2026-09-15）
+
+コミュニティのマーケットプレイスへの申請の前に、許可設定・配布の手順・安全の柵を見直した。あわせて、検査が黙って合格する所（Vite の型検査、yarn v2 以上の監査）と、Web 以外で聞かなくてよい問いを直した。これまでの「やらなかったこと」のうち、秘密の値の検査（hook の第 2 段）、Windows の CI、URL の検査、脆弱性の ID での照合、`check-doc-refs` の for example の箇条、playwright-cli の `references/` の置き換えを、今回行った。
+
+### 追加
+
+- **hook: 秘密の値の検査**: docdd のプロジェクトで、`git commit` を含むコマンドの直前に、コミットに入る中身を調べる。見るのは、stage 済みの追加した行と、同じコマンドの中で `git commit` より前に `git add` したファイル（`cd`・`git -C` も追う。バイナリは飛ばす）。`git commit --dry-run` では調べない。
+  - 止める: `.env`・`.env.*` のファイル（末尾が `.example`・`.sample`・`.template` のものは除く）、`git add -f`／`--force` での `.env` の形のファイル、秘密鍵（見出しと本体）、AWS のアクセスキー ID、Anthropic・OpenAI・Stripe（本番）・GitHub・Slack・Google の API キーやトークン、Slack の Webhook の URL、Supabase の秘密キー（`sb_secret_`）、role が service_role の JWT。
+  - 確認を出す: 秘密らしい名前（`api_key`・`secret`・`token`・`password` など）に 16 文字以上の文字列を入れた行、調べた中身が 2MB を超えたとき。
+  - 見本の値（`example`・`dummy`・`your-`・`xxxx` など）と、環境変数から読む行は通す。`docdd-allow-secret` を書いた行は飛ばす（`.env` のファイルには効かない）。止めるときも、キーそのものは表示しない。
+  - `hooks.json` の git の handler の timeout を 30 秒にした（時間切れだと通してしまうため。macOS での実測は 1 回 0.5 秒未満）。
+- **hook: PowerShell**: matcher を `Bash|PowerShell` にし、`PowerShell(git *)`・`PowerShell(Remove-Item *)` の handler を足した。git の判定と秘密の値の検査は Bash と同じ。`Remove-Item` の `-Recurse`・`-Force` で確認を出す（`guard-bash.mjs` は別名の `rm`・`del`・`erase`・`rd`・`rmdir`・`ri` も同じに扱う）。根拠は公式の hooks・tools-reference・permissions の頁で、Windows の実機では確かめていない。別名で hook が呼ばれるかも確かめていない（公式で別名を同じに扱うと書かれているのは許可の規則で、hook の `if` ではない）。macOS・Linux の pwsh の `rm` は OS の `rm` なので、`PowerShell(Remove-Item *)` に合わない見込み。
+- **init**: Python を見つけたときだけ、`.gitignore` に「# docdd: Python」の塊（`__pycache__/`・`*.py[cod]`・`.venv/`・`.pytest_cache/`・`.mypy_cache/`・`.ruff_cache/`）を使う。update-kit も同じ選び方。
+- **init**: Unity では『型検査』『lint』を「無い」と推定する。
+- **init**: Vite のプロジェクトで `start` が無く `preview` があれば、『本番モード起動』を `<build> && <preview>`（`npm run build && npm run preview` など）と推定する。
+- **雛形 `CLAUDE.md`**: 検証コマンドの例に「Unity のビルドの例」（ビルド用のスクリプト無しの `-build` と `-buildTarget`／`-activeBuildProfile`。docdd では確かめていない）。
+- **雛形 `docs/operations/development-and-testing.md`** §4: 「Unity のビルドと PlayMode テスト」の箇条。
+- **配布リポジトリ**:
+  - `scripts/check-version-bump.mjs`（`npm run check` に追加）: 最新のタグ `docdd--vX.Y.Z` から `plugins/docdd/` の中身が変わったのに、版が同じなら落とす（`README.md`・`CHANGELOG.md`・`evals/` だけは数えない）。版を下げても落とす。
+  - `scripts/check-urls.mjs`（`npm run check:urls`。CI には入れない）: README 2 本・CHANGELOG・RELEASING・skills・templates・examples の外部リンクを開けるか。
+  - `scripts/run-tests.mjs`: `npm test` から `tests/*.test.mjs` を並べて `node --test` に渡す（macOS の Node 18・20・22・24 で同じ結果を確かめた。シェルの `*` の展開に頼らないので Windows の npm でも動く形だが、Windows の実機では確かめていない）。
+  - `.gitattributes`: 改行を LF に固定した（Windows で取り出しても、テストと evals の scaffold が動く）。
+  - Issue テンプレート: 「質問・分かりにくい所」（必須は「困っていること」だけ）と「要望」、`config.yml`（空の Issue は出さない）。どれも日本語でも英語でも書ける。
+  - CI: `test-node18`（Node 18 で `npm test`）と `test-windows`（Windows で `npm test`。落ちても CI は止めない）。
+- **evals**: grader 2 本（`init-unity-project` で『型検査』『lint』が「無い」、`init-new-node-project` で `.gitignore` に Python の塊が無い）。
+- **テスト**: guard-bash に 16 本（秘密の値・PowerShell）。init に settings の差分・`.gitignore` の塊・Unity・監査のコマンド・Vite・CRLF。template-scripts に据え置きの ID と見本の箇条。新しく `tests/repo-scripts.test.mjs`（版の上げ忘れ・URL の検査）。
+- **RELEASING.md**: 「main と配布」と「コミュニティのマーケットプレイスへの申請」（フォームに入れる値、説明と使い方の例 3 つを日本語のあとに英語で）。
+
+### 変更
+
+- **雛形 `.claude/settings.json`**: 始まりのモード `defaultMode`（`acceptEdits`）を外した。Pro・Max・Team の既定の auto モードを上書きしない。`allow`・`ask`・`deny` は変えていない。
+- **init**: 問 8（settings を置くか）は、`.claude/settings.json` が無いときだけ聞く。既存の settings の差分から `defaultMode`・`missingMarketplace`・`missingEnabledPlugin` の欄を外し、始まりのモード（`currentDefaultMode`）を報告する。update-kit の報告も同じ。
+- **init: 依存の脆弱性の推定**: npm 以外も本番の依存だけを見る。pnpm は `pnpm audit --audit-level=high --prod`、yarn v1 は `yarn audit --level high --groups dependencies`、yarn v2 以上は `yarn npm audit --recursive --severity high --environment production`（前は直接の依存しか調べず、依存の依存にある high を見落としていた）、bun は `bun audit --audit-level=high --prod`。npm は変えていない。yarn v2 以上は、`.yarnrc.yml` や `packageManager` の指定が無くても、`yarn.lock` の `__metadata:` で見分ける。
+- **init: Vite の型検査の推定**: `tsconfig.json` が references の形で、`build` が `tsc -b`／`vue-tsc -b` を使い、参照先がどれも JS を書き出さなければ、`npx tsc -b`（Vue は `npx vue-tsc -b`。パッケージマネージャに合わせた形）にした。前の `npx tsc --noEmit` は、この形では 1 ファイルも調べずに合格していた。include の形（Next.js など）は今までどおり `npx tsc --noEmit`。
+- **init: 開発サーバーのアドレス**: Vite・SvelteKit・Astro・Nuxt の『開発サーバー起動』に書くアドレスを `http://localhost:<ポート>` にした。これらは既定で localhost だけで待ち受け、macOS では 127.0.0.1 だと接続を断られるため。Next.js は今までどおり `127.0.0.1`。preview の『本番モード起動』にもアドレスを添える（`http://localhost:4173`、または `scripts.preview` の `--port`）。
+- **init: Windows での git の一番上の判定**: 今いるフォルダと git の一番上のパスを、OS が返す正式な名前にそろえてから比べる。短い名前（`RUNNER~1` など）や大文字小文字の違いで「一番上ではない」と誤り、モノレポの位置もずれていた（CI の `test-windows` で見つかった）。
+- **init・update-kit: `.gitignore`**: 新しく置くときも、プロジェクトに合う塊だけを並べる（雛形の丸写しをやめた）。
+- **audit-check**: 据え置きを、パッケージの単位から脆弱性の ID（GHSA）の単位にした。
+  - 一覧の形は `{ "<パッケージ名>": { "ids": ["GHSA-xxxx-xxxx-xxxx"], "why": "<なぜ今直さないか>", "until": "YYYY-MM-DD" } }`。3 つとも必須で、欠けや古い書き方（値が文字列）は exit 2 で書き方を示す。「期限なし」の警告は無くした。
+  - 一覧にあるパッケージでも、`ids` に無い high は落ちる。critical は据え置けない。期限切れは落ちる（どちらも今までどおり）。
+  - 依存の脆弱性が伝わって high になっただけの親（例: express）は数えない。npm audit の経路と、bulk endpoint に直接問い合わせる経路で、合否と出力が同じ。
+  - 落ちたときに、一覧に貼れる JSON を出す。合格したときに、据え置き中の ID と、一覧から消せる ID を出す。
+  - 件数の行は、脆弱性を持つパッケージの数から、脆弱性の数になった（前の報告と比べるときは、数え方が違う）。
+- **check-doc-refs**: 行末が `for example`・`for instance`・`e.g.`・`例えば`・`たとえば` の行（末尾のコロンは無視）に続く箇条を、見本として検査しない。「例外」の「例」は数えない（「例外」のほかに「例」が無い行は検査する）。落ちたときの案内を 2 行にした。
+- **検査スクリプト**: 4 本の刻印を v0.4.0 にした。
+- **playwright-cli・ui-polish・verify-e2e**: プロジェクトの Playwright で代用できるかを、`npx --no-install playwright cli --help` の出力に `playwright-cli` を含む行があるかで決める（古い Playwright は、別のヘルプを出して終了コード 0 で終わるため、終了コードでは決めない）。playwright-cli の `allowed-tools` に `Bash(npx --no-install playwright cli *)` を足した。
+- **playwright-cli**: 詳しい使い方は、`playwright-cli --help` の `Agent skill:` 行が指す公式の手順書を読む。行が無い・読めないときは `--help` で進める。公式の手順書と違う所（`@latest` での入れ方・保存先・`playwright-cli install`）は docdd の決まりに従う。固定の版は 0.1.17 のまま。
+- **playwright-cli・ui-polish**: 開発サーバーのアドレスの例を、『開発サーバー起動』行のアドレス（例: `http://localhost:5173`）に合わせた。127.0.0.1 で開くときは、Vite などの開発サーバーを `--host 127.0.0.1` で起動する、を足した。
+- **maintenance・security-audit**: 据え置きの説明を、ID の単位と「一覧が効くのは npm の audit-check だけ」に合わせた。npm 以外は `tasks/BACKLOG.md` の要決定に、ID・理由・期限を書く。
+- **雛形 `CLAUDE.md`**: ディレクトリ構成の `.claude/settings.json` の行から「プラグインの取得元」を消した。Unity の例の PlayMode テストに「docdd では確かめていない」を足した。pnpm の『依存の脆弱性』の例に `--prod` を足した。据え置きの一覧の説明を、npm の audit-check だけに効き、ID・理由・期限を書く形にした（npm 以外は `tasks/BACKLOG.md` の要決定に書く）。
+- **雛形 `docs/README.md`**: 参照の検査で見本として見ない所を、3 つの箇条にした（「例」の字がある行、コメントとコードブロックの中、前置きの行に続く箇条）。据え置きの一覧の説明を、雛形 `CLAUDE.md` と同じにした。
+- **雛形 `docs/operations/development-and-testing.md`**: Godot には標準のテスト道具が無いので、アドオンの GUT か gdUnit4 を入れる、にした。
+- **雛形 `.claude/rules/docdd-kit.md`**: 刻印を v0.4.0 にした。
+- **hook の説明**（`hooks.json` の description）に、秘密の値と PowerShell を足した。`rm` の確認の文面に `Remove-Item` を足した。
+- **CI**: `ci.yml` の冒頭を「main はいつ配布されてもよい状態に保つ。PR の CI で緑にしてから入れる」にした。
+- **Issue テンプレート `bug.yml`**: 必須を「起きたこと」と「docdd の版」の 2 つにし、冒頭の文と揃えた。
+- **evals**: `init-unity-project` の期待する結果に、『型検査』『lint』が「無い」を足した。
+- **テスト**: `tests/init.test.mjs` を、Windows の改行（CRLF）で取り出しても通るようにした（chmod のテストは Windows では飛ばす）。
+- **マニフェスト**: `plugin.json` を 0.4.0 にした。`plugin.json`・`marketplace.json` の説明の日本語のあとに、英語を 1 文足した。プラグインの説明の hook に、秘密の値を足した。
+- **README 2 本**: 冒頭に使える環境（Claude Code 向け。Cowork では確かめていない）と英語の要約。確認の出方（auto モード、allow・ask・deny、hook、`defaultMode` の足し方と、消したときに始まるモード）。入れ方・更新・やめ方で、`@` の右の名前を `/plugin list` で確かめる書き方。hook の表（秘密の値・PowerShell）と Windows の注意。Unity のビルドのコマンド。依存の脆弱性のコマンドの表と、据え置きの書き方。Issues のリンクを、種類を選ぶ画面（`issues/new/choose`）にした。「手順書を直したいとき」に写すときの注意 4 点。
+- **NOTICE**（2 本）: `references/` の同梱をやめた書き方にした。
+- **RELEASING.md**: main へのマージを配布として扱う手順にした（PR の CI で緑にしてからマージ、版の上げ忘れの検査、`npm run check:urls`）。
+
+### 削除
+
+- 雛形 `.claude/settings.json` の `permissions.defaultMode`・`extraKnownMarketplaces`・`enabledPlugins`。別の PC でフォルダを開いたときに入れ方を案内する働きは、無くなった（ほかの配布元から入れた人のプロジェクトに、違う配布元の docdd を有効にする指定を置かないため）。
+- init の問い「既存の settings.json に 2 つのキーを足すか」と、そのための Edit の手順。
+- `skills/playwright-cli/references/` の 9 本（上流の `@playwright/cli` 0.1.17 の写し）。
+- `scripts/audit-allowlist.json` の古い書き方（値が理由の文字列、ID の無い形）と、「期限なし」の警告。
+
+### 雛形への影響: あり
+
+- `/docdd:update-kit` で置き換わる（手付かずのとき。手を入れていれば、差分を見せて聞く）: `.claude/rules/docdd-kit.md`（刻印だけ）、`scripts/audit-check.mjs`・`scripts/check-doc-refs.mjs`（中身）、`scripts/check-doc-dates.mjs`・`scripts/check-doc-placeholders.mjs`（刻印だけ）。
+- update-kit が、足してよいかを聞く: `.gitignore` の足りない行（Python のプロジェクトなら「# docdd: Python」の塊）。
+- 変わらない（利用者のファイル）。要るなら、雛形（リポジトリの `plugins/docdd/templates/`）と見比べて、手で直す。
+  - `scripts/audit-allowlist.json`: 中身を書いていたら、`ids`・`why`・`until` の形に書き直す。古い書き方のままだと、置き換わった `audit-check.mjs` が exit 2 で止まる（`{}` のままなら直さなくてよい）。
+  - `.claude/settings.json`: auto モードで始めたいなら、`defaultMode` の行を消す。消したあとに auto モードで始まるのは、Pro・Max・Team で、`~/.claude/settings.json` にも別の `defaultMode` が無いとき。Enterprise・Console の API キーでは Manual で始まるので、`~/.claude/settings.json` の permissions に `"defaultMode": "auto"` を書く（README「英語で出る確認と答え方」）。ほかの配布元から入れたなら、`extraKnownMarketplaces`・`enabledPlugins` の docdd の行を消す。update-kit は、始まりのモードを報告する。
+  - `CLAUDE.md`「検証コマンド」表: Vite で『型検査』が `npx tsc --noEmit` なら `npx tsc -b`（Vue は `npx vue-tsc -b`）に。pnpm・yarn・bun の『依存の脆弱性』行を、上の新しいコマンドに。Unity で『型検査』『lint』が未記入なら「無い」に。Vite・SvelteKit・Astro・Nuxt で『開発サーバー起動』のアドレスが `http://127.0.0.1:<ポート>` なら `http://localhost:<ポート>` に。表の下の例（Unity のビルドの例、PlayMode の注記、pnpm の例の `--prod`、据え置きの一覧の説明）と、ディレクトリ構成の設定の行の文言。
+  - `docs/README.md`: 参照の検査で見本として見ない所の説明と、据え置きの一覧の説明。
+  - `docs/operations/development-and-testing.md` §4: Godot の書き方と、「Unity のビルドと PlayMode テスト」。
+- hook とスキルの変更は、プラグインを更新すれば効く（update-kit は要らない）。
+
+### 仮説（決まっていない点を、こう置いた）
+
+- H1: `plugins/docdd/` の中でも、`README.md`・`CHANGELOG.md`・`evals/` だけを変えたときは版を上げない（入れている人の動きが変わらないため）。版の上げ忘れの検査も、この 3 つは数えない。
+- H2: Cowork では動作を確かめていない。README と申請の文面には「Claude Code（ターミナル・Desktop・IDE）向け。git・Node.js・ターミナルが要るので、Cowork では確かめていない」と書く。
+- H3: 秘密の値は、確実な形（秘密鍵・既知の形のキー・`.env` の追加）なら止め、怪しい形なら確認を出す。誤検知のときの逃げ道は、その行に `docdd-allow-secret` と書くこと（止めるときの文面で、運営者に確かめてから書くよう求める）。
+- H4: 据え置きの一覧は `ids`・`why`・`until` を必須にし、古い書き方は exit 2 で書き方を示す（利用者がまだいないので、移行の仕組みは作らない）。
+- H5: `.gitignore` の Python の塊は、Python を見つけたときだけ足す。Web の塊の選び方は変えない。
+- H6: Godot では『型検査』『lint』を推定しない（「無い」と決める根拠が無い）。
+- H7: 必要な Node.js は 18 以上のまま（今の中身で正しい）。CI で 18 を回して確かめる。
+- H8: Vite のプロジェクトで `preview` があれば、それを『本番モード起動』とみなす。
+- H9: playwright-cli の固定の版は 0.1.17 のまま（新しい版を、実際のブラウザで確かめていないため）。
+- H10: 「事例」「比例」なども「例」を含むので、今までどおり見本として飛ばす。「例外」だけは語として除いて判定する。
+- 実装で置いた決定: Vite の references の形で、`build` に `tsc -b` が無いとき、`extends` の先を読めないとき、参照先が JS を書き出すときは、『型検査』を推定しない（ヒアリングで聞く）。1 ファイルも調べずに合格するコマンドを、表に書かないため。
+
+### 今回やらなかったこと（理由）
+
+- 脆弱性を非公開で知らせてもらう窓口（`SECURITY.md`・GitHub の非公開の報告）: 置かない。審査では求められておらず、利用者の多くは非エンジニアで、使う場面がほぼ無い。置くと、通知を見て返事を続ける負担が出るため。知らせは Issues で受ける。
+- Unity の PlayMode テストとコマンドでのビルドの実測: 今回も Unity を起動していない。README と雛形は「docdd では確かめていない」と揃え、書き方は Unity 6000.3 の公式ドキュメントに合わせた。Unity CLI は experimental のままなので、紹介しない。
+- どの配布元から入れたかを init が調べ、設定を書き分けること: キャッシュの置き場所の形が、公式に保証されていないため。README は「`@` の右の名前は `/plugin list` で確かめる」書き方にした。
+- main のブランチ保護（CI の合格を必須にする）: 1 人の運用で手間が増えるため。代わりに、版の上げ忘れを CI で落とし、手順で PR の CI を緑にしてからマージする。
+- 雛形の許可設定に、PowerShell 用の規則を足すこと: `allow`・`ask`・`deny` は変えない決定のため。PowerShell では hook だけが柵になる。
+- 秘密の値の検査を push の直前にも行うこと: コミットの直前で止めれば、push には入らないため。npm のトークンと Stripe のテスト用のキーの形も、今回は対象外。
+- 動作の評価（evals）を GitHub 上で回すこと: 1 回約 4 ドルの API の請求と、キーの管理が要るため。今のまま、手元で手動で回す。
+- playwright-cli が手元以外のサイトを開くときに、hook で確認を出すこと: クリックやリダイレクトでの移動は hook から見えず、「確認が出るから安全」と誤解させるおそれがあるため。本番での入力や送信は、スキルの文章で禁じている。使った人の声を待つ。
+- 手順書を写す専用のスキル（eject）: 作らず、README「手順書を直したいとき」に注意 4 点を足した。丸ごと写すと update-kit で新しい版に追随できず、キットの利点を失うため。
+- `CONTRIBUTING.md`・行動規範: 外部からの貢献者がまだいないため。最初の PR や声が来てから考える。
+- ゲームエンジン向けの変更影響表・専用スキル: 今のまま（汎用の行と「スキルへの追加指示」で合わせる）。PlayMode もビルドも実測していないため。
+- 導入済みかを判定するスクリプト（`docdd-status.sh`、0.2.0 の宿題）: 宿題から外した。`init.mjs` の `status` で置き換え済み（スキルの前置きも、init の前なら止まって `/docdd:init` を案内する）。
+- 英語の要約の一致を見る検査: 足していない。README 2 本の英語の要約は同じ文にし、RELEASING.md の申請の節に、変えるときは揃えると書いた。
+- Windows の実機での確認（PowerShell の hook・CI の `test-windows`）と、evals の本実行（新しい grader 2 本を含む）: 実機が無く、evals は費用が出るため。`test-windows` は、落ちても CI を止めない。
+
 ## 0.3.0（2026-09-14）
 
 Web 以外のプロジェクト（Unity などのゲーム・ネイティブアプリ）で害が出ないように直した。細部は `CLAUDE.md`「スキルへの追加指示」と README「Web 以外のプロジェクトで使う（例: Unity）」で合わせる。

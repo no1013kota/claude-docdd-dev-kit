@@ -1,6 +1,5 @@
 {
   "permissions": {
-    "defaultMode": "acceptEdits",
     "allow": [
       "Bash(git status:*)",
       "Bash(git diff:*)",
@@ -55,16 +54,5 @@
       "Read(./.env)",
       "Read(./.env.*)"
     ]
-  },
-  "extraKnownMarketplaces": {
-    "claude-docdd-dev-kit": {
-      "source": {
-        "source": "github",
-        "repo": "no1013kota/claude-docdd-dev-kit"
-      }
-    }
-  },
-  "enabledPlugins": {
-    "docdd@claude-docdd-dev-kit": true
   }
 }

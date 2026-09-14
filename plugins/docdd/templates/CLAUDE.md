@@ -14,9 +14,9 @@
 | `docs/operations/development-and-testing.md` | 開発とテストの進め方（テストの層・いつ回すか・テスト基盤が無いとき・落とし穴）。実装前に読む |
 | `tasks/BACKLOG.md` | 作業キュー（タスク）と要決定（運営者に決めてほしいこと） |
 | `tasks/REFACTOR_PLAN.md` | リファクタ計画（`/docdd:refactor` が読み書きする） |
-| `scripts/` | docs の検査・未記入欄の検査・依存の脆弱性の検査。下の「検証コマンド」表から使う。据え置く脆弱性は `scripts/audit-allowlist.json` に理由を添えて書く |
+| `scripts/` | docs の検査・未記入欄の検査・依存の脆弱性の検査。下の「検証コマンド」表から使う。据え置く脆弱性は、npm（`scripts/audit-check.mjs`）なら `scripts/audit-allowlist.json` に脆弱性の ID（`ids`。GHSA- で始まる）・理由（`why`）・期限（`until`）を書く。npm 以外はこの一覧が読まれないので、`tasks/BACKLOG.md` の「要決定・外部準備」に書く |
 | `.claude/rules/docdd-kit.md` | キット共通の約束。キットが管理するので直接は直さない（このプロジェクトだけの指示は下の「スキルへの追加指示」へ） |
-| `.claude/settings.json` | Claude Code の許可設定（例: 検査コマンドは確認なしで進め、削除や push は必ず確認する）と、プラグインの取得元 |
+| `.claude/settings.json` | Claude Code の許可設定（例: 検査コマンドは確認なしで進め、削除や push は必ず確認する） |
 | `.mcp.json` | Claude Code から使う MCP サーバー（外部の道具とつなぐ設定）。使う道具に合わせて足す（例: Next.js なら shadcn/ui・Next.js DevTools を初期設定し、それ以外は空で置く） |
 | `.docdd/manifest.json` | キットの版と、キットが置いたファイルの記録（`/docdd:update-kit` が使う。手で直さない） |
 | アプリ本体 | {{フレームワーク名}} |
@@ -48,9 +48,10 @@
 - npm の例: 開発サーバー起動 `npm run dev`（http://127.0.0.1:3000 で開く）／型検査 `npx tsc --noEmit`／単体・DBテスト `npm test`／E2E `npx playwright test`／全検査 `npx tsc --noEmit && npm run lint && npm test && npm run build && npx playwright test`
 - pnpm の例: lint `pnpm lint`／ビルド `pnpm build`／本番モード起動 `pnpm build && PORT=3100 pnpm start`（http://127.0.0.1:3100 で開く）
 - Python の例: 型検査 `mypy .`／lint `ruff check .`／単体・DBテスト `pytest`／依存の脆弱性 `pip-audit`
-- Unity の例（Unity の場所は macOS の Unity Hub の既定で、環境で違う。`<版>` は ProjectSettings/ProjectVersion.txt の m_EditorVersion）: 開発サーバー起動・本番モード起動・依存の脆弱性は「無い」／テスト用 DB は ③／型検査・lint は「無い」（コンパイルエラーは EditMode テストで出る）／単体・DBテスト `mkdir -p Logs && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/MacOS/Unity -batchmode -nographics -projectPath "$(pwd)" -runTests -testPlatform EditMode -testResults "$(pwd)/Logs/editmode.xml" -logFile "$(pwd)/Logs/editmode.log"`（EditMode テスト）／E2E は同じコマンドの EditMode を PlayMode に、editmode を playmode に変え、`-nographics` を外す（PlayMode テスト）。Editor で同じプロジェクトを開いていると動かない。`-runTests` に `-quit` を付けない
+- Unity の例（Unity の場所は macOS の Unity Hub の既定で、環境で違う。`<版>` は ProjectSettings/ProjectVersion.txt の m_EditorVersion）: 開発サーバー起動・本番モード起動・依存の脆弱性は「無い」／テスト用 DB は ③／型検査・lint は「無い」（コンパイルエラーは EditMode テストで出る）／単体・DBテスト `mkdir -p Logs && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/MacOS/Unity -batchmode -nographics -projectPath "$(pwd)" -runTests -testPlatform EditMode -testResults "$(pwd)/Logs/editmode.xml" -logFile "$(pwd)/Logs/editmode.log"`（EditMode テスト）／E2E は同じコマンドの EditMode を PlayMode に、editmode を playmode に変え、`-nographics` を外す（PlayMode テスト。docdd では確かめていない）。Editor で同じプロジェクトを開いていると動かない。`-runTests` に `-quit` を付けない
+- Unity のビルドの例（docdd では確かめていない。書き方は Unity 6000.3 の公式ドキュメントのとおり）: ビルド用のスクリプトが無くても `-build` で作れる。macOS なら `mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/MacOS/Unity -batchmode -quit -projectPath "$(pwd)" -buildTarget osxuniversal -build "$(pwd)/Builds/<名前>.app" -logFile "$(pwd)/Logs/build.log"`。テストと違い、ビルドには `-quit` を付ける。Windows は `-buildTarget win64` にし、出力先を .exe で終える。ビルドプロファイルを使うなら、`-buildTarget osxuniversal` の代わりに `-activeBuildProfile "Assets/Settings/Build Profiles/<名前>.asset"`（プロジェクトからの相対パス）。ビルド用のスクリプトを作ったなら、`-build` とその出力先の代わりに `-executeMethod <クラス名.メソッド名>`。出力先（Builds/ など）は git に入れない（.gitignore に無ければ足す）
 - テスト用 DB の例（3 種から選ぶ）: ① ローカル: `supabase start`／② ホスト型の開発専用: 接続先は .env の `DATABASE_URL`（本番と別・開発専用・破棄可能）／③ DB 無し
-- 依存の脆弱性の例: npm で package-lock.json があるなら `node scripts/audit-check.mjs`、pnpm なら `pnpm audit --audit-level=high`
+- 依存の脆弱性の例: npm で package-lock.json があるなら `node scripts/audit-check.mjs`、pnpm なら `pnpm audit --audit-level=high --prod`（本番の依存だけを見る）
 - 実物1周の費用上限の例: 1 周 $0.50 まで（金額はバッククォートで囲まない。外部 AI や有料 API を使わないなら「無い」）
 
 ## 反映コマンド

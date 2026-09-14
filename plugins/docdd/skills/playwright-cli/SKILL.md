@@ -1,14 +1,12 @@
 ---
 name: playwright-cli
 description: ブラウザ操作の道具箱。画面を開く・操作する・スクショを撮る・コンソールや通信を確かめるときに使う。ui-polish・verify-e2e・release から使う。接続先はローカル（公開先の確認は release のときだけ）。Web 以外のプロジェクト（ゲーム・ネイティブアプリなど）では使わない。
-allowed-tools: Bash(playwright-cli *) Bash(npx playwright-cli *) Bash(npx @playwright/cli *) Bash(npx playwright cli *)
+allowed-tools: Bash(playwright-cli *) Bash(npx playwright-cli *) Bash(npx @playwright/cli *) Bash(npx playwright cli *) Bash(npx --no-install playwright cli *)
 ---
 
 # playwright-cli：ブラウザ操作の道具箱
 
-`/docdd:ui-polish`・`/docdd:verify-e2e`・`/docdd:release`（公開先の確認）から使う。**ここは入口だけ**。詳しい使い方は `references/` に分けてある（必要になったものだけ読む）。全コマンドは `playwright-cli --help`。
-
-`references/` は英語で、上流（Playwright の CLI `@playwright/cli` 0.1.17）に同梱のスキルと同じ内容。上流のスキルそのものは `playwright-cli install --skills` で入れられる。
+`/docdd:ui-polish`・`/docdd:verify-e2e`・`/docdd:release`（公開先の確認）から使う。**ここは入口と docdd の決まりだけ**。詳しい使い方は、道具に入っている公式の手順書（英語）を読む（下の「詳しい使い方」）。全コマンドは `playwright-cli --help`。
 
 **最初に（Web の門）**: `CLAUDE.md`「検証コマンド」表の『開発サーバー起動』行が「無い」なら（Web の画面が無いプロジェクト。例: Unity・Godot のゲーム、ネイティブアプリ）、このスキルは使わない。「該当なし」と報告して止まる（画面の確認は変更影響表の「画面・操作（Web 以外）」行）。
 
@@ -17,8 +15,10 @@ allowed-tools: Bash(playwright-cli *) Bash(npx playwright-cli *) Bash(npx @playw
 使う前に、次の順で確かめる。
 
 1. `playwright-cli --version` が通れば、そのまま使う。
-2. 通らなければ `npx --no-install playwright --version`（プロジェクトに Playwright が入っているかの確認。何もダウンロードしない）。通れば、以下の `playwright-cli` を `npx playwright cli` に読み替える。
-3. どちらも無ければ、入れてよいかを利用者に聞く（勝手に入れない）。承知を得たら `npm install -g @playwright/cli@0.1.17`（このキットで動作を確かめた版）。初回はインストールの確認（許可を求める表示）が出るので、内容を読んで許可してもらう。入れたら `playwright-cli --version` で `0.1.17` と出ることを確かめる。
+2. 通らなければ `npx --no-install playwright cli --help` を打つ（プロジェクトに入っている Playwright で代用できるかの確認。何もダウンロードしない）。
+   - 出力に `playwright-cli` を含む行があれば、代用できる。以下の `playwright-cli` を `npx playwright cli` に読み替える。
+   - 終了コードでは決めない。古い Playwright（例: 1.58）は、`playwright-cli` を含む行の無い全体のヘルプを出して、終了コード 0 で終わる。このときは代用せず、3 に進む。
+3. どちらも使えなければ、入れてよいかを利用者に聞く（勝手に入れない）。承知を得たら `npm install -g @playwright/cli@0.1.17`（このキットで動作を確かめた版）。初回はインストールの確認（許可を求める表示）が出るので、内容を読んで許可してもらう。入れたら `playwright-cli --version` で `0.1.17` と出ることを確かめる。
 4. 断られたら、呼び出し元のスキルの手順どおり探索的確認（手作業で目で見る確認）に切り替え、その旨を報告する。
 
 ## 接続先
@@ -31,8 +31,8 @@ allowed-tools: Bash(playwright-cli *) Bash(npx playwright-cli *) Bash(npx @playw
 ## 基本の使い方
 
 ```bash
-# <ポート> は CLAUDE.md「検証コマンド」表の『開発サーバー起動』行に合わせる（例: 3000）
-playwright-cli open http://127.0.0.1:<ポート>/login
+# <アドレス> は CLAUDE.md「検証コマンド」表の『開発サーバー起動』行に書いたアドレス（例: http://localhost:5173）
+playwright-cli open <アドレス>/login
 playwright-cli snapshot                            # 現在の画面（ref は e15 のような形で返る）
 playwright-cli find "ログイン"                      # 大きい画面は snapshot 全体より検索が安い
 playwright-cli fill e5 "user@example.com"
@@ -47,7 +47,7 @@ playwright-cli close
 ```
 
 - `--raw` を付けると値だけ返る（`playwright-cli --raw eval "document.title"`）。
-- **ログインが要る画面**は `state-save` / `state-load` でログイン状態を使い回す（置き場は下の「保存先」。詳しくは `references/storage-state.md`）。
+- **ログインが要る画面**は `state-save` / `state-load` でログイン状態を使い回す（置き場は下の「保存先」）。
 
 ## 保存先（ログイン状態・trace・スクショ）
 
@@ -58,7 +58,7 @@ playwright-cli close
 | スクショ | `/tmp/claude/` | `--filename=/tmp/claude/<名前>.png`（名前を省くと `.playwright-cli/` に置かれる） |
 
 - `.playwright-cli/` は `.gitignore` 済み（`/docdd:init` が足す）。ログイン状態も trace もコミットしない。コミット前の `git status` に `.playwright-cli/` やログイン状態の JSON が出ていたら stage せず、`.gitignore` に `.playwright-cli/` を足すよう利用者に伝える。
-- `references/` の英語の例は、ログイン状態を `auth.json`・`my-auth-state.json` などカレントディレクトリ直下に、trace を `traces/` に置く書き方をしている。**そのまま使わず、上の置き場に読み替える。**
+- 公式の手順書（下の「詳しい使い方」）の例は、ログイン状態を `auth.json`・`my-auth-state.json` などカレントディレクトリ直下に、trace を `traces/` に置く書き方をしている。**そのまま使わず、上の置き場に読み替える。**
 - ログイン状態のファイルの中身を、報告やログに貼らない。
 
 ## 落とし穴
@@ -68,16 +68,19 @@ playwright-cli close
 - **稼働中の開発サーバーを止めずに別ポートで確かめたいとき。** 同じディレクトリで開発サーバーを2つ起動できないフレームワークがある（例: Next.js）。`CLAUDE.md`「検証コマンド」表の『ビルド』行を通してから、『本番モード起動』行のコマンドを別ポートで起動する。行が「無い」か未記入なら、この確かめ方は使わず理由を報告する。
 - **`open` が `Chromium distribution 'chrome' is not found` で失敗する。** 既定では手元の Google Chrome を使う。Chrome が無ければ `playwright-cli open --browser=chromium <URL>` で Playwright 用のブラウザを使う。Playwright 用のブラウザも入っていなければ、取得（数百 MB のダウンロード）してよいかを利用者に聞き、承知を得てから `playwright-cli install-browser chromium`。
 
-## 詳しい話（必要になったら読む。英語）
+## 詳しい使い方（必要になったら読む。英語）
 
-| やりたいこと | 参照 |
-|---|---|
-| Playwright テストの実行・デバッグ | `references/playwright-tests.md` |
-| リクエストのモック | `references/request-mocking.md` |
-| ブラウザ内でコードを走らせる | `references/running-code.md` |
-| セッション管理（複数ブラウザ） | `references/session-management.md` |
-| cookie / localStorage | `references/storage-state.md`（保存先は上の「保存先」に読み替える） |
-| テスト生成（plan / generate / heal） | `references/test-generation.md` |
-| trace | `references/tracing.md`（保存先は上の「保存先」に読み替える） |
-| 動画 | `references/video-recording.md` |
-| 要素の属性を見る | `references/element-attributes.md` |
+上の「基本の使い方」で足りないとき（リクエストのモック・複数のブラウザ・テストの実行と生成・trace・動画・要素の属性など）は、道具に入っている公式の手順書を読む。手順書は道具と一緒に入っているので、道具と版がいつも合う。
+
+1. `playwright-cli --help` を打つ（代用しているときは `npx playwright cli --help`）。出力の `Agent skill:` で始まる行に、公式の手順書（`SKILL.md`）の場所が出る。
+2. 場所は、`--help` を打ったフォルダからの相対パスで出る。そのフォルダを起点にして開く。場所は版や入れ方で変わるので、前に見た場所を使い回さず、毎回 `--help` から読む。
+3. 手順書から案内される `references/` の手順書は、その `SKILL.md` と同じフォルダの中にある。やりたいことの分だけ読む。
+4. 場所が作業フォルダの外にあると（例: `npm install -g` で入れたとき）、読むときに確認（許可を求める表示）が出ることがある。内容を読んで許可してもらう。断られたら 5 に進む。
+5. `Agent skill:` の行が無いとき（上流が行を消したときなど）や、手順書を読めないときは、`playwright-cli --help` と、コマンドごとの `playwright-cli --help <コマンド>`（例: `playwright-cli --help state-save`）で進める。
+
+公式の手順書と、このスキルの決まりが違うときは、このスキルに従う。
+
+- 入れ方: 手順書の「Installation」（`@latest` を入れる書き方）は使わず、上の「インストール」に従う。
+- 開く先: 手順書の例は外部のサイト（`playwright.dev` など）を開く。開いてよいのは上の「接続先」だけ。
+- 置き場: ログイン状態・trace・スクショは、上の「保存先」に読み替える。
+- `playwright-cli install`（作業フォルダの初期化）と `playwright-cli install --skills`（`.claude/skills/` に手順書を写す）は打たない。利用者のプロジェクトにファイルを足さない。
