@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
-import { devNull, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -28,7 +28,10 @@ const PLUGIN_VERSION = (() => {
 })();
 const V014 = "f08d4e5";
 
-const ENV = { ...process.env, GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_NOSYSTEM: "1", NPM_CONFIG_UPDATE_NOTIFIER: "false" };
+// GIT_CONFIG_GLOBAL に os.devNull を渡すと、Git for Windows は「\\.\nul」を設定ファイルとして読めずに止まる。空のファイルを渡す
+const EMPTY_GITCONFIG = path.join(fs.mkdtempSync(path.join(tmpdir(), "docdd-gitconfig-")), "config");
+fs.writeFileSync(EMPTY_GITCONFIG, "");
+const ENV = { ...process.env, GIT_CONFIG_GLOBAL: EMPTY_GITCONFIG, GIT_CONFIG_NOSYSTEM: "1", NPM_CONFIG_UPDATE_NOTIFIER: "false" };
 for (const key of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE"]) delete ENV[key];
 
 const made = [];

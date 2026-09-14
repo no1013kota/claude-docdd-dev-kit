@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import { devNull, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -17,7 +17,10 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BUMP = path.join(ROOT, "scripts", "check-version-bump.mjs");
 const URLS = path.join(ROOT, "scripts", "check-urls.mjs");
 
-const ENV = { ...process.env, GIT_CONFIG_GLOBAL: devNull, GIT_CONFIG_NOSYSTEM: "1" };
+// GIT_CONFIG_GLOBAL に os.devNull を渡すと、Git for Windows は「\\.\nul」を設定ファイルとして読めずに止まる。空のファイルを渡す
+const EMPTY_GITCONFIG = path.join(fs.mkdtempSync(path.join(tmpdir(), "docdd-gitconfig-")), "config");
+fs.writeFileSync(EMPTY_GITCONFIG, "");
+const ENV = { ...process.env, GIT_CONFIG_GLOBAL: EMPTY_GITCONFIG, GIT_CONFIG_NOSYSTEM: "1" };
 for (const key of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE", "GIT_CEILING_DIRECTORIES"]) delete ENV[key];
 
 const made = [];
