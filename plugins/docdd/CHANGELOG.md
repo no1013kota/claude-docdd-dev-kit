@@ -38,6 +38,7 @@
 - **init: 依存の脆弱性の推定**: npm 以外も本番の依存だけを見る。pnpm は `pnpm audit --audit-level=high --prod`、yarn v1 は `yarn audit --level high --groups dependencies`、yarn v2 以上は `yarn npm audit --recursive --severity high --environment production`（前は直接の依存しか調べず、依存の依存にある high を見落としていた）、bun は `bun audit --audit-level=high --prod`。npm は変えていない。yarn v2 以上は、`.yarnrc.yml` や `packageManager` の指定が無くても、`yarn.lock` の `__metadata:` で見分ける。
 - **init: Vite の型検査の推定**: `tsconfig.json` が references の形で、`build` が `tsc -b`／`vue-tsc -b` を使い、参照先がどれも JS を書き出さなければ、`npx tsc -b`（Vue は `npx vue-tsc -b`。パッケージマネージャに合わせた形）にした。前の `npx tsc --noEmit` は、この形では 1 ファイルも調べずに合格していた。include の形（Next.js など）は今までどおり `npx tsc --noEmit`。
 - **init: 開発サーバーのアドレス**: Vite・SvelteKit・Astro・Nuxt の『開発サーバー起動』に書くアドレスを `http://localhost:<ポート>` にした。これらは既定で localhost だけで待ち受け、macOS では 127.0.0.1 だと接続を断られるため。Next.js は今までどおり `127.0.0.1`。preview の『本番モード起動』にもアドレスを添える（`http://localhost:4173`、または `scripts.preview` の `--port`）。
+- **init: Windows での git の一番上の判定**: 今いるフォルダと git の一番上のパスを、OS が返す正式な名前にそろえてから比べる。短い名前（`RUNNER~1` など）や大文字小文字の違いで「一番上ではない」と誤り、モノレポの位置もずれていた（CI の `test-windows` で見つかった）。
 - **init・update-kit: `.gitignore`**: 新しく置くときも、プロジェクトに合う塊だけを並べる（雛形の丸写しをやめた）。
 - **audit-check**: 据え置きを、パッケージの単位から脆弱性の ID（GHSA）の単位にした。
   - 一覧の形は `{ "<パッケージ名>": { "ids": ["GHSA-xxxx-xxxx-xxxx"], "why": "<なぜ今直さないか>", "until": "YYYY-MM-DD" } }`。3 つとも必須で、欠けや古い書き方（値が文字列）は exit 2 で書き方を示す。「期限なし」の警告は無くした。

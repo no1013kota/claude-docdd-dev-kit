@@ -201,11 +201,17 @@ const LEGACY_TOKENS = {
 
 // ---------------------------------------------------------------- 小さな道具
 
+// Windows では fs.realpathSync（JS 版）が短い名前（RUNNER~1 など）や大文字小文字を直さず、
+// git rev-parse --show-toplevel の正式な名前と食い違う。OS に正式な名前を聞く native 版を先に使う
 function realpath(p) {
   try {
-    return fs.realpathSync(p);
+    return fs.realpathSync.native(p);
   } catch {
-    return path.resolve(p);
+    try {
+      return fs.realpathSync(p);
+    } catch {
+      return path.resolve(p);
+    }
   }
 }
 
