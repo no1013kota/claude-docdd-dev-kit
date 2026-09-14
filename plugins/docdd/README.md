@@ -34,7 +34,7 @@ docdd は、次の 4 つをプロジェクトにそろえ、Claude Code がい�
 
 - 流れ: 要望 → `/docdd:add-task`（タスクにする）→ `/docdd:dev-loop`（1 タスクを実装・検証・仕様書の更新・コミット）→ 依頼が全部終わったら `/docdd:release`（本番へ反映）。
 - 考え方: 手順書は、`CLAUDE.md` の表に書いたコマンドだけを実行します。表で「無い」の行は飛ばし、未記入（`{{…}}` のまま）の行は実行せずに報告します。表を埋めるほど、検証が確実になります。
-- 背景（補足）: 記事『[コードを書けなくても Claude Code でアプリを壊さず作り続ける「4つのファイル」の仕組み](https://exosai.net/blog/claude-code-non-engineer-workflow)』。記事は v0.1 系の時点のもので、手順の細部はこの README が正です。
+- 背景（補足）: 記事『[コードを書けなくても Claude Code でアプリを壊さず作り続ける「4つのファイル」の仕組み](https://exosai.net/blog/claude-code-non-engineer-workflow)』。手順の細部はこの README が正です。
 
 ## 入れ方
 
