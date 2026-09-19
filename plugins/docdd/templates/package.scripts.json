@@ -2,5 +2,6 @@
   "check:doc-dates": "node scripts/check-doc-dates.mjs",
   "check:doc-refs": "node scripts/check-doc-refs.mjs",
   "check:doc-placeholders": "node scripts/check-doc-placeholders.mjs",
-  "audit:check": "node scripts/audit-check.mjs"
+  "audit:check": "node scripts/audit-check.mjs",
+  "backlog:archive": "node scripts/backlog-archive.mjs"
 }

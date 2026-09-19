@@ -20,10 +20,13 @@
       "Bash(node scripts/check-doc-refs.mjs)",
       "Bash(node scripts/check-doc-placeholders.mjs)",
       "Bash(node scripts/audit-check.mjs)",
+      "Bash(node scripts/backlog-archive.mjs)",
+      "Bash(node scripts/backlog-archive.mjs --check)",
       "Bash(npm run check:doc-dates)",
       "Bash(npm run check:doc-refs)",
       "Bash(npm run check:doc-placeholders)",
-      "Bash(npm run audit:check)"
+      "Bash(npm run audit:check)",
+      "Bash(npm run backlog:archive)"
     ],
     "ask": [
       "Bash(rm -r*)",
