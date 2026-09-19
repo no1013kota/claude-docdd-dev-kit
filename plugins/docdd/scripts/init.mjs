@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const TEMPLATES = path.join(PLUGIN_ROOT, "templates");
-const FALLBACK_VERSION = "0.4.0";
+const FALLBACK_VERSION = "0.5.0";
 const KIT_VERSION = readKitVersion();
 const CWD = realpath(process.cwd());
 
@@ -38,6 +38,7 @@ const KIT_OWNED = new Set([
   "scripts/check-doc-refs.mjs",
   "scripts/check-doc-placeholders.mjs",
   "scripts/audit-check.mjs",
+  "scripts/backlog-archive.mjs",
 ]);
 /** 見本（検査の対象外。日付も埋めない）。 */
 const SAMPLES = new Set(["docs/requirements/00_template.md", "docs/decisions/0000-template.md"]);
@@ -1642,32 +1643,42 @@ function tableRowsIn(lines, sec) {
 
 const isLegacyUnfilled = (cell) => /^`?<[^>]*>`?$/.test((cell ?? "").trim());
 
-/** 定型タスクを BACKLOG の「## タスク」節へ足す。同じタイトルが既にあれば足さない。 */
-function insertTasks(content, kinds) {
-  const eol = eolOf(content);
-  const lines = content.split(/\r?\n/);
-  const hs = headingsOf(lines);
-  const tasks = hs
+/** ### の見出しから T-番号・タイトル・状態を読む。 */
+function tasksOf(lines) {
+  return headingsOf(lines)
     .filter((h) => h.level === 3)
     .map((h) => {
       const m = /^T-(\d+)[:：]\s*(.*?)\s*(`[^`]*`)?\s*$/.exec(h.text);
       return m ? { id: Number(m[1]), title: m[2].trim(), state: m[3] ? m[3].replace(/`/g, "").trim() : null, index: h.index } : null;
     })
     .filter(Boolean);
-  let max = tasks.reduce((a, t) => Math.max(a, t.id), 0);
+}
+
+/**
+ * 定型タスクを BACKLOG の「## タスク」節へ足す。同じタイトルが既にあれば足さない。
+ * archived は tasks/archive/BACKLOG-done.md の中身（終わったタスクの置き場）。番号はそこも含めた最大の次にし、
+ * 「アプリの土台を作る」がそこにあれば（終わっていても）足さない。
+ */
+function insertTasks(content, kinds, archived = null) {
+  const eol = eolOf(content);
+  const lines = content.split(/\r?\n/);
+  const hs = headingsOf(lines);
+  const tasks = tasksOf(lines);
+  const archivedTasks = archived == null ? [] : tasksOf(archived.split(/\r?\n/));
+  let max = [...tasks, ...archivedTasks].reduce((a, t) => Math.max(a, t.id), 0);
   const pad = (n) => `T-${String(n).padStart(2, "0")}`;
   const results = [];
   const blocks = [];
   let scaffoldId = null;
   const order = ["scaffold", "test-infra"].filter((k) => kinds.includes(k));
-  const existingScaffold = tasks.find((t) => t.title === TASK_TITLES.scaffold);
+  const existingScaffold = tasks.find((t) => t.title === TASK_TITLES.scaffold) ?? archivedTasks.find((t) => t.title === TASK_TITLES.scaffold);
   if (existingScaffold) scaffoldId = pad(existingScaffold.id);
   for (const kind of order) {
     const title = TASK_TITLES[kind];
     const found =
       kind === "test-infra"
         ? tasks.find((t) => t.title.startsWith(title) && t.state !== "done" && t.state !== "dropped")
-        : tasks.find((t) => t.title === title);
+        : tasks.find((t) => t.title === title) ?? archivedTasks.find((t) => t.title === title);
     if (found) {
       results.push({ kind, id: pad(found.id), title: found.title, action: "exists" });
       continue;
@@ -1977,7 +1988,9 @@ function cmdApply(opts) {
     const cur = out.has(rel) ? String(out.get(rel)) : readText(rel);
     if (cur == null) warnings.push("tasks/BACKLOG.md が無いので、定型タスクを起票できませんでした。");
     else {
-      const r = insertTasks(cur, taskKinds);
+      const archivedRel = "tasks/archive/BACKLOG-done.md";
+      const archived = out.has(archivedRel) ? String(out.get(archivedRel)) : readText(archivedRel);
+      const r = insertTasks(cur, taskKinds, archived);
       tasks = r.results;
       if (r.content !== cur) {
         out.set(rel, r.content);

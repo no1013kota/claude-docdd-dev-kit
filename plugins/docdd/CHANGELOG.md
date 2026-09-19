@@ -3,6 +3,48 @@
 版ごとの変更と、プロジェクトに置いた雛形への影響をまとめます。
 「雛形への影響: あり」の版へ上げたら、プロジェクトのフォルダで `/docdd:update-kit` を打ちます（プラグインを更新しただけでは、置いた雛形は変わりません）。
 
+## 0.5.0（2026-09-19）
+
+BACKLOG を小さく保つ。終えたタスクまで `tasks/BACKLOG.md` に残すと、ファイルが育ち続け、「BACKLOG を読む」スキル（dev-loop・add-task・tasks-from-prd）が読むだけで作業の場所（コンテキスト）を使い、末尾の未着手のタスクを見落とす。1 人で長く開発を続けたプロジェクトで、BACKLOG が 1 万行・2MB 近くまで育った実例がある。終わったものは別のファイルへ移し、BACKLOG にはまだ動いているものだけを置く。
+
+### 追加
+
+- **雛形 `scripts/backlog-archive.mjs`**（キットが管理するファイル）: `tasks/BACKLOG.md` から、見出しの末尾の状態が `done`・`dropped` のタスクと、「要決定」の節で「- 状態: 決定…」の行がある判断を、`tasks/archive/BACKLOG-done.md` へ移す。
+  - 運用ルールの書式の見本（コードブロックの中）は移さない。未決（「状態: 未決」）の判断は、本文に「解決」などの語があっても移さない。
+  - 判断は「決定済み」の節の末尾へ、タスクはアーカイブの末尾へ足す。アーカイブが無ければ作り、見出しを消してあれば足す。移す文の相対リンクは、1 段深いアーカイブから同じ所を指すように直す。
+  - `--check` は移さずに、移すものがあれば一覧を出して exit 1。改行（CRLF）は元のファイルに合わせる。
+- **雛形 `tasks/archive/BACKLOG-done.md`**: 移した記録の置き場（見出し 2 つだけ）。丸ごと読まず、ID や言葉で検索して使う。
+- **`package.json` の scripts**: `backlog:archive`（`node scripts/backlog-archive.mjs`）。
+- **雛形 `.claude/settings.json`**: allow に `node scripts/backlog-archive.mjs`（と `--check`）・`npm run backlog:archive`。
+
+### 変更
+
+- **dev-loop**: 最初に `node scripts/backlog-archive.mjs` を回してから BACKLOG を読む。完了時にも回し、タスクのコミットに BACKLOG とアーカイブを含める。依存先が BACKLOG に無ければアーカイブを ID で検索して、`done`・「決定」かを確かめる。テスト基盤の門の「`done` がある」「`dropped` だけ」「どこにも無い」は、BACKLOG とアーカイブの両方で見る。スクリプトが無い（まだ update-kit していない）ときは移さずに進み、`/docdd:update-kit` を案内する。
+- **add-task**: 二重の起票の確認で、アーカイブを要望の言葉で検索する（丸ごとは読まない）。T-番号・D-番号はアーカイブも含めた最大の次にする。
+- **tasks-from-prd**: 既存のタスクと番号を、アーカイブも含めて見る。
+- **release**: 「テスト無しで本番反映する」の決定を、BACKLOG とアーカイブの両方で探す（決まった判断はアーカイブへ移るため）。
+- **init（スクリプト）**: 定型タスクの番号をアーカイブも含めた最大の次にし、アーカイブにある「アプリの土台を作る」（終えたもの）を足し直さない。
+- **init（スキル）**: 取り込んだ仕様を分けるタスクの番号も、アーカイブを含めて数える。
+- **雛形 `tasks/BACKLOG.md`** の運用ルール: 終えたら移す・番号はアーカイブも含めた最大の次・アーカイブは検索して使う、に書き換えた（「完了タスクは消さず `done` にする」をやめた）。
+- **雛形 `.claude/rules/docdd-kit.md`**: 開発の進め方と Definition of Done に、アーカイブへ移すことを足した。
+- **雛形 `CLAUDE.md`**: ディレクトリ構成に `tasks/archive/BACKLOG-done.md` の行を足し、`scripts/` の行に BACKLOG の整理を足した。
+- **検査スクリプト**: 4 本の刻印を v0.5.0 にした。
+
+### 雛形への影響: あり
+
+- `/docdd:update-kit` で置き換わる・足されるもの: `scripts/backlog-archive.mjs`（新規）・`tasks/archive/BACKLOG-done.md`（新規）・`.claude/rules/docdd-kit.md`・検査スクリプト 4 本（手付かずなら）・`package.json` の `backlog:archive`・`CLAUDE.md` のディレクトリ構成の行。
+- 手で直すもの: 既にある `tasks/BACKLOG.md` の「運用ルール」の文面（あなたのファイルなので、update-kit は節を足すだけで文面は変えない。直さなくてもスキルは新しい手順で動く）。`.claude/settings.json` の allow の追加（update-kit が差分を見せる）。
+
+### 置いた仮説
+
+- 移すのは「状態: 決定」の判断だけにした。書き戻し（PRD・ADR）が済んだかは見ない。書き戻しは、その判断に依存するタスクを dev-loop が選んだときに確かめる（アーカイブの「状態」行に書き戻し先がある）。
+- アーカイブは `tasks/` の下に置いた。`check-doc-placeholders` は `tasks/*.md` として見るが、`check-doc-refs`・`check-doc-dates` は見ない（終えたタスクが、もう無いファイルを指していても落とさない）。
+
+### 今回やらなかったこと（理由）
+
+- evals のケース追加: 費用が出る（1 回約 4 ドル）ため。挙動はテスト（`tests/template-scripts.test.mjs`・`tests/init.test.mjs`）で固定した。
+- アーカイブの分割（年ごとなど）: 1 人のプロジェクトでは検索で足りる。育って検索が遅くなったら考える。
+
 ## 0.4.0（2026-09-15）
 
 コミュニティのマーケットプレイスへの申請の前に、許可設定・配布の手順・安全の柵を見直した。あわせて、検査が黙って合格する所（Vite の型検査、yarn v2 以上の監査）と、Web 以外で聞かなくてよい問いを直した。これまでの「やらなかったこと」のうち、秘密の値の検査（hook の第 2 段）、Windows の CI、URL の検査、脆弱性の ID での照合、`check-doc-refs` の for example の箇条、playwright-cli の `references/` の置き換えを、今回行った。

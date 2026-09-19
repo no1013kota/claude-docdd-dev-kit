@@ -248,15 +248,17 @@ mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/
 | `docs/requirements/README.md`・`00_template.md` | どう作るか（画面・データ・処理）の分け方と、文書の雛形 | あなた・見本 |
 | `docs/decisions/README.md`・`0000-template.md` | 技術判断の記録（ADR）の置き場と雛形 | あなた・見本 |
 | `docs/operations/development-and-testing.md` | テストの層・いつ回すか・テスト基盤が無いとき・落とし穴 | あなた |
-| `tasks/BACKLOG.md` | 作業キューと要決定 | あなた |
+| `tasks/BACKLOG.md` | 作業キューと要決定。まだ動いているものだけを置く | あなた |
+| `tasks/archive/BACKLOG-done.md` | 終えたタスクと決まった要決定の置き場（`scripts/backlog-archive.mjs` が移す。丸ごと読まず検索する） | あなた |
 | `tasks/REFACTOR_PLAN.md` | リファクタ計画（`/docdd:refactor` が使う） | あなた |
 | `scripts/check-doc-refs.mjs` | 仕様書が指すファイルが実在するか | キット |
 | `scripts/check-doc-dates.mjs` | 仕様書の更新日がコミットより古くないか、版と変更履歴が合うか | キット |
 | `scripts/check-doc-placeholders.mjs` | 未記入の欄（`{{…}}`）が残っていないか | キット |
 | `scripts/audit-check.mjs` | 依存ライブラリの既知の脆弱性（npm と `package-lock.json` 用。本番の依存の high・critical で落ちる） | キット |
+| `scripts/backlog-archive.mjs` | 終えたタスク（`done`・`dropped`）と決まった要決定を BACKLOG からアーカイブへ移す（`--check` は移さずに見るだけ）。BACKLOG が育つと、読むだけで作業の場所を使い、末尾の未着手を見落とすため。`/docdd:dev-loop` が最初と完了時に回す | キット |
 | `scripts/audit-allowlist.json` | 直さずに据え置く脆弱性の一覧（脆弱性の ID の単位。読むのは npm の `audit-check.mjs` だけ。初期は空） | あなた |
 | `.docdd/manifest.json` | キットの版と、置いたファイルの記録（update-kit が使う。手で直さない） | init が作る |
-| `package.json` の `scripts` | `package.json` があれば 3 行（`check:doc-dates`・`check:doc-refs`・`check:doc-placeholders`）を足す。npm（`package-lock.json`、またはまだ lock が無い）なら `audit:check` も足して 4 行。無くても `node scripts/<名前>.mjs` で動く | あなた |
+| `package.json` の `scripts` | `package.json` があれば 4 行（`check:doc-dates`・`check:doc-refs`・`check:doc-placeholders`・`backlog:archive`）を足す。npm（`package-lock.json`、またはまだ lock が無い）なら `audit:check` も足して 5 行。無くても `node scripts/<名前>.mjs` で動く | あなた |
 
 ### プラグインが提供するスキル（15 本）
 

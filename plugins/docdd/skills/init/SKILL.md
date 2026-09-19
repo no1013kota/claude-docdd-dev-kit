@@ -129,7 +129,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
 4. 既存の仕様書があった場合:
    - PRD の §1〜§3 を、そこから下書きする（手順 1 で承知を得た内容）。
    - 原文を移すと答えたなら（Markdown の仕様書・メモだけ。問 2）、`mkdir -p docs/_imported` のあと `git mv <元のパス> docs/_imported/` で移し、原文の冒頭に「正本は docs/PRD.md（<今日の日付> 移行）」の 1 行を足す。git が追跡していないファイルなら、先に `git add <元のパス>` してから `git mv` する。
-   - 画面・データの細かい記述は、その場で `docs/requirements/` へ分けない。`tasks/BACKLOG.md` の「## タスク」節の末尾に、「取り込んだ仕様を requirements へ分ける」タスクを 1 件起票する（書式は同ファイルの「運用ルール」。番号はいちばん大きい T-番号の次。参照は `docs/_imported/<ファイル名>`、サイズは M）。
+   - 画面・データの細かい記述は、その場で `docs/requirements/` へ分けない。`tasks/BACKLOG.md` の「## タスク」節の末尾に、「取り込んだ仕様を requirements へ分ける」タスクを 1 件起票する（書式は同ファイルの「運用ルール」。番号はいちばん大きい T-番号の次（`tasks/archive/BACKLOG-done.md` に終えたタスクがあれば、それも含める）。参照は `docs/_imported/<ファイル名>`、サイズは M）。
 5. `settings.action` が `skipped`（既にあった）なら、init.mjs は中身に触れていない。Claude も直さない。`settings.diff` は手順 4 で差分として報告する。
 
 ### 3. 検査を通し、承知を得てコミットする

@@ -204,6 +204,36 @@ const bareLf = (s) => s.split("\n").length - 1 - (s.match(/\r\n/g) || []).length
 
 // ---------------------------------------------------------------------------------------------
 
+test("既存の BACKLOG とアーカイブ: 番号はアーカイブも含めた続きで、終えてアーカイブへ移した「アプリの土台を作る」は足し直さない", () => {
+  const backlog = "# 開発バックログ\n\n## タスク\n\n### T-05: ログインできる `doing`\n- 参照: PRD A-1\n\n## 要決定・外部準備（ユーザー作業）\n";
+  const archive = "# アーカイブ\n\n## 決定済みの要決定・外部準備\n\n## 完了したタスク\n\n### T-01: アプリの土台を作る `done`\n- メモ: 済み\n\n### T-09: 古い機能 `dropped`\n- 理由: 不要\n";
+  const dir = project({ files: { "tasks/BACKLOG.md": backlog, "tasks/archive/BACKLOG-done.md": archive, "package.json": '{\n  "name": "x"\n}\n' } });
+  const a = init(dir, "apply", "--tasks", "scaffold,test-infra");
+  assert.equal(a.status, 0, a.stdout);
+  assert.deepEqual(a.json.tasks, [
+    { kind: "scaffold", id: "T-01", title: "アプリの土台を作る", action: "exists" },
+    { kind: "test-infra", id: "T-10", title: "テスト基盤の導入", action: "added" },
+  ]);
+  const text = read(dir, "tasks/BACKLOG.md");
+  assert.doesNotMatch(text, /アプリの土台を作る/);
+  assert.match(text, /^### T-10: テスト基盤の導入 `todo`$/m);
+  assert.equal(read(dir, "tasks/archive/BACKLOG-done.md"), archive, "既にあるアーカイブは置き換えない");
+});
+
+test("置いた backlog-archive.mjs: 雛形のままの BACKLOG では移すものが無く、done にしたタスクを移せる", () => {
+  const dir = project({ files: { "package.json": NPM_INIT_PACKAGE } });
+  const a = init(dir, "apply", "--tasks", "scaffold");
+  assert.equal(a.status, 0, a.stdout + a.stderr);
+  assert.equal(JSON.parse(read(dir, "package.json")).scripts["backlog:archive"], "node scripts/backlog-archive.mjs");
+  const runArchive = (...args) => spawnSync(process.execPath, ["scripts/backlog-archive.mjs", ...args], { cwd: dir, env: ENV, encoding: "utf8" });
+  assert.equal(runArchive("--check").status, 0, "雛形の見本（コードブロックの中）は移さない");
+  write(dir, { "tasks/BACKLOG.md": read(dir, "tasks/BACKLOG.md").replace("### T-01: アプリの土台を作る `todo`", "### T-01: アプリの土台を作る `done`") });
+  const r = runArchive();
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.doesNotMatch(read(dir, "tasks/BACKLOG.md"), /### T-01: アプリの土台を作る/);
+  assert.match(read(dir, "tasks/archive/BACKLOG-done.md"), /### T-01: アプリの土台を作る `done`/);
+});
+
 test("空の Node プロジェクト: status → apply → git add → 検査 → dates → precommit → commit → 検査、2 回目の apply は何も変えない", () => {
   const dir = project({ files: { "package.json": NPM_INIT_PACKAGE } });
 
@@ -225,7 +255,7 @@ test("空の Node プロジェクト: status → apply → git add → 検査 �
   assert.equal(exists(dir, "package.scripts.json"), false);
   assert.deepEqual(a.json.modified.map((m) => m.path), ["package.json"]);
 
-  // package.json: 元のインデント（2 スペース）・キーの並び・末尾改行を保って scripts に 4 行を足す
+  // package.json: 元のインデント（2 スペース）・キーの並び・末尾改行を保って scripts に雛形の行（package.scripts.json）を足す
   const expected = NPM_INIT_PACKAGE.replace(
     '"test": "echo \\"Error: no test specified\\" && exit 1"',
     ['"test": "echo \\"Error: no test specified\\" && exit 1"', ...Object.entries(SCRIPTS_TO_ADD).map(([k, v]) => `    ${JSON.stringify(k)}: ${JSON.stringify(v)}`)].join(",\n"),
@@ -637,6 +667,8 @@ test("v0.1.4 の雛形で導入したプロジェクト: status は legacy、upd
     assert.equal(f(p).matchedVersion, "0.1.1〜0.1.4", p);
   }
   assert.equal(f("scripts/check-doc-placeholders.mjs").action, "add");
+  assert.equal(f("scripts/backlog-archive.mjs").action, "add");
+  assert.equal(f("tasks/archive/BACKLOG-done.md").action, "add");
   assert.equal(f(".claude/rules/docdd-kit.md").action, "add");
   assert.equal(f("CLAUDE.md").action, "migrate");
   assert.equal(up.json.legacy.removals.length, 8);
@@ -644,7 +676,7 @@ test("v0.1.4 の雛形で導入したプロジェクト: status は legacy、upd
   const devAdds = f("docs/operations/development-and-testing.md").additions.map((a) => a.heading);
   assert.ok(devAdds.some((h) => h.includes("テスト基盤が無いとき")), devAdds.join(" / "));
   assert.ok(devAdds.some((h) => h.includes("落とし穴")), devAdds.join(" / "));
-  assert.deepEqual(f("package.json").additions, ["check:doc-placeholders"]);
+  assert.deepEqual(f("package.json").additions, ["check:doc-placeholders", "backlog:archive"]);
   // v0.1 の雛形のまま手が入っていない利用者のファイルは、節を足すのではなく置き換える（重複を作らない）
   assert.equal(f("docs/requirements/README.md").status, "untouched");
   assert.equal(f("docs/requirements/README.md").action, "replace");

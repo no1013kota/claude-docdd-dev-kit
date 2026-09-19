@@ -105,8 +105,8 @@ function prd({
 // 共通
 // ---------------------------------------------------------------------------
 
-test("共通: 4 本とも先頭 3 行以内に docdd-kit の版の刻印がある", () => {
-  for (const name of ["check-doc-dates.mjs", "check-doc-refs.mjs", "check-doc-placeholders.mjs", "audit-check.mjs"]) {
+test("共通: 5 本とも先頭 3 行以内に docdd-kit の版の刻印がある", () => {
+  for (const name of ["check-doc-dates.mjs", "check-doc-refs.mjs", "check-doc-placeholders.mjs", "audit-check.mjs", "backlog-archive.mjs"]) {
     const head = readFileSync(path.join(SCRIPTS, name), "utf8").split("\n").slice(0, 3).join("\n");
     assert.match(head, /docdd-kit v[0-9]+\.[0-9]+\.[0-9]+/, name);
   }
@@ -580,6 +580,138 @@ test("placeholders: 文書を git に追加していなければ、git add の�
   const r = run(PLACEHOLDERS, dir);
   assert.equal(r.code, 1, r.out);
   assert.match(r.out, /git add CLAUDE\.md/);
+});
+
+// ---------------------------------------------------------------------------
+// backlog-archive.mjs
+// ---------------------------------------------------------------------------
+
+const ARCHIVE_SCRIPT = "backlog-archive.mjs";
+const ARCHIVE_TEMPLATE = readFileSync(path.join(ROOT, "plugins/docdd/templates/tasks/archive/BACKLOG-done.md"), "utf8").replace(/\r\n/g, "\n");
+
+/** 雛形と同じ節（運用ルールの見本はコードブロックの中）を持つ最小の BACKLOG。 */
+function backlog({ tasks = [], decisions = [] } = {}) {
+  return [
+    "# 開発バックログ",
+    "",
+    "## 運用ルール",
+    "",
+    "```markdown",
+    "### T-NN: <タスク名> `done`",
+    "**D-N: <論点>** — <背景>",
+    "- 状態: 決定（YYYY-MM-DD, 案A）",
+    "```",
+    "",
+    "## タスク",
+    "",
+    ...tasks.flatMap((t) => [...t, ""]),
+    "## 要決定・外部準備（ユーザー作業）",
+    "",
+    ...decisions.flatMap((d) => [...d, ""]),
+  ].join("\n");
+}
+
+const TASKS = [
+  ["### T-01: アプリの土台を作る `done`", "- 参照: [PRD](../docs/PRD.md)・[計画](./REFACTOR_PLAN.md)・[外](https://example.com)"],
+  ["### T-02: ログインできる `doing`", "- 参照: PRD A-1"],
+  ["### T-03: 通知 `dropped`", "- 理由: 要らなくなった"],
+  ["### T-04: 決済 `blocked`", "- 理由: 審査待ち"],
+  ["### T-05: 一覧 `todo`", "- 参照: PRD A-2"],
+];
+const DECISIONS = [
+  ["**D-1: 決済の方法** — 背景", "- 状態: 決定（2026-01-10, 案A）→ 書き戻し先: PRD §4", "- 案A（推奨）: 月額"],
+  ["**D-2: ログインの不具合を解決する方法** — 背景", "- 状態: 未決", "- 案A（推奨）: 直す"],
+];
+
+/** スクリプトを scripts/ へ置いたプロジェクト。 */
+function archiveProject(files) {
+  const dir = repo(files, { add: false, commitDate: null });
+  mkdirSync(path.join(dir, "scripts"), { recursive: true });
+  copyFileSync(path.join(SCRIPTS, ARCHIVE_SCRIPT), path.join(dir, "scripts", ARCHIVE_SCRIPT));
+  const runIn = (...args) => {
+    const r = spawnSync(process.execPath, [path.join("scripts", ARCHIVE_SCRIPT), ...args], { cwd: dir, env: ENV, encoding: "utf8" });
+    return { code: r.status, out: `${r.stdout}${r.stderr}` };
+  };
+  return { dir, runIn };
+}
+
+test("backlog: done・dropped のタスクと「状態: 決定」の判断を移し、todo・doing・blocked と未決は残す。2 回目は何も変えない", () => {
+  const { dir, runIn } = archiveProject({ "tasks/BACKLOG.md": backlog({ tasks: TASKS, decisions: DECISIONS }) });
+  const r = runIn();
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /タスク 2 件・判断 1 件/);
+  const left = readFileSync(path.join(dir, "tasks/BACKLOG.md"), "utf8");
+  for (const kept of ["T-02: ログインできる", "T-04: 決済", "T-05: 一覧", "**D-2: ログインの不具合を解決する方法**"]) assert.ok(left.includes(kept), kept);
+  for (const gone of ["T-01: アプリの土台", "T-03: 通知", "**D-1: 決済の方法**"]) assert.ok(!left.includes(gone), gone);
+  // 運用ルールの見本（コードブロックの中）は移さない
+  assert.ok(left.includes("### T-NN: <タスク名> `done`") && left.includes("- 状態: 決定（YYYY-MM-DD, 案A）"));
+  assert.ok(left.endsWith("\n") && !left.includes("\n\n\n"));
+
+  const archive = readFileSync(path.join(dir, "tasks/archive/BACKLOG-done.md"), "utf8");
+  const at = (text) => archive.indexOf(text);
+  assert.ok(archive.startsWith(ARCHIVE_TEMPLATE.split("## 決定済み")[0]), "まだ無ければ雛形と同じ前置きで作る");
+  assert.ok(at("## 決定済みの要決定・外部準備") < at("**D-1: 決済の方法**") && at("**D-1: 決済の方法**") < at("## 完了したタスク"));
+  assert.ok(at("## 完了したタスク") < at("### T-01") && at("### T-01") < at("### T-03"));
+  // アーカイブは 1 段深いので、相対リンクだけを 1 段上から指すように直す
+  assert.ok(archive.includes("[PRD](../../docs/PRD.md)・[計画](../REFACTOR_PLAN.md)・[外](https://example.com)"), archive);
+
+  const again = runIn();
+  assert.equal(again.code, 0, again.out);
+  assert.match(again.out, /移すものはありません/);
+  assert.equal(readFileSync(path.join(dir, "tasks/archive/BACKLOG-done.md"), "utf8"), archive);
+});
+
+test("backlog: 既にあるアーカイブへは、判断を「完了したタスク」の見出しの前に、タスクを末尾に足す（見出しが無ければ足す）", () => {
+  const existing = `${ARCHIVE_TEMPLATE.trimEnd()}\n\n### T-00: 前に終えたタスク \`done\`\n- メモ: 前から\n`;
+  const { dir, runIn } = archiveProject({ "tasks/BACKLOG.md": backlog({ tasks: TASKS, decisions: DECISIONS }), "tasks/archive/BACKLOG-done.md": existing });
+  assert.equal(runIn().code, 0);
+  const archive = readFileSync(path.join(dir, "tasks/archive/BACKLOG-done.md"), "utf8");
+  const at = (text) => archive.indexOf(text);
+  assert.ok(at("**D-1: 決済の方法**") < at("## 完了したタスク"));
+  assert.ok(at("### T-00") < at("### T-01") && at("### T-01") < at("### T-03"));
+
+  // 見出しを消してしまったアーカイブでも、見出しを足して移す
+  const bare = archiveProject({ "tasks/BACKLOG.md": backlog({ tasks: TASKS, decisions: DECISIONS }), "tasks/archive/BACKLOG-done.md": "# 控え\n" });
+  assert.equal(bare.runIn().code, 0);
+  const b = readFileSync(path.join(bare.dir, "tasks/archive/BACKLOG-done.md"), "utf8");
+  assert.ok(b.startsWith("# 控え\n"));
+  assert.ok(b.indexOf("## 決定済みの要決定・外部準備") < b.indexOf("**D-1") && b.indexOf("**D-1") < b.indexOf("## 完了したタスク"));
+});
+
+test("backlog: --check は書かずに、移すものがあれば一覧を出して exit 1、無ければ exit 0", () => {
+  const text = backlog({ tasks: TASKS, decisions: DECISIONS });
+  const { dir, runIn } = archiveProject({ "tasks/BACKLOG.md": text });
+  const r = runIn("--check");
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /3 件残っています/);
+  assert.match(r.out, /T-01: アプリの土台を作る/);
+  assert.equal(readFileSync(path.join(dir, "tasks/BACKLOG.md"), "utf8"), text);
+  assert.equal(existsSync(path.join(dir, "tasks/archive/BACKLOG-done.md")), false);
+
+  const clean = archiveProject({ "tasks/BACKLOG.md": backlog({ tasks: [TASKS[1]], decisions: [DECISIONS[1]] }) });
+  assert.equal(clean.runIn("--check").code, 0);
+});
+
+test("backlog: CRLF の BACKLOG は CRLF のまま書く", () => {
+  const text = backlog({ tasks: TASKS, decisions: DECISIONS }).replace(/\n/g, "\r\n");
+  const { dir, runIn } = archiveProject({ "tasks/BACKLOG.md": text });
+  assert.equal(runIn().code, 0);
+  const left = readFileSync(path.join(dir, "tasks/BACKLOG.md"), "utf8");
+  assert.ok(left.includes("T-02: ログインできる") && !left.includes("T-01: アプリ"));
+  assert.equal(left.replace(/\r\n/g, "").includes("\n"), false, "LF だけの行が混ざらない");
+  const archive = readFileSync(path.join(dir, "tasks/archive/BACKLOG-done.md"), "utf8");
+  assert.equal(archive.replace(/\r\n/g, "").includes("\n"), false);
+});
+
+test("backlog: BACKLOG が無い・知らない引数は exit 2", () => {
+  const none = archiveProject({});
+  const r = none.runIn();
+  assert.equal(r.code, 2, r.out);
+  assert.match(r.out, /tasks\/BACKLOG\.md がありません/);
+  const { runIn } = archiveProject({ "tasks/BACKLOG.md": backlog() });
+  const bad = runIn("--apply");
+  assert.equal(bad.code, 2, bad.out);
+  assert.match(bad.out, /--check だけ/);
 });
 
 // ---------------------------------------------------------------------------

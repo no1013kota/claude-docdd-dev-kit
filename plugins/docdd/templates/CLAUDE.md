@@ -12,9 +12,10 @@
 |---|---|
 | `docs/` | 仕様の正本と ADR（技術判断の記録）。どこに何を書くかは `docs/README.md` |
 | `docs/operations/development-and-testing.md` | 開発とテストの進め方（テストの層・いつ回すか・テスト基盤が無いとき・落とし穴）。実装前に読む |
-| `tasks/BACKLOG.md` | 作業キュー（タスク）と要決定（運営者に決めてほしいこと） |
+| `tasks/BACKLOG.md` | 作業キュー（タスク）と要決定（運営者に決めてほしいこと）。まだ動いているものだけを置く |
+| `tasks/archive/BACKLOG-done.md` | 終わったタスクと決まった判断の置き場（`node scripts/backlog-archive.mjs` が移す）。丸ごと読まず、ID や言葉で検索する |
 | `tasks/REFACTOR_PLAN.md` | リファクタ計画（`/docdd:refactor` が読み書きする） |
-| `scripts/` | docs の検査・未記入欄の検査・依存の脆弱性の検査。下の「検証コマンド」表から使う。据え置く脆弱性は、npm（`scripts/audit-check.mjs`）なら `scripts/audit-allowlist.json` に脆弱性の ID（`ids`。GHSA- で始まる）・理由（`why`）・期限（`until`）を書く。npm 以外はこの一覧が読まれないので、`tasks/BACKLOG.md` の「要決定・外部準備」に書く |
+| `scripts/` | docs の検査・未記入欄の検査・依存の脆弱性の検査・BACKLOG の整理（`backlog-archive.mjs`）。下の「検証コマンド」表から使う。据え置く脆弱性は、npm（`scripts/audit-check.mjs`）なら `scripts/audit-allowlist.json` に脆弱性の ID（`ids`。GHSA- で始まる）・理由（`why`）・期限（`until`）を書く。npm 以外はこの一覧が読まれないので、`tasks/BACKLOG.md` の「要決定・外部準備」に書く |
 | `.claude/rules/docdd-kit.md` | キット共通の約束。キットが管理するので直接は直さない（このプロジェクトだけの指示は下の「スキルへの追加指示」へ） |
 | `.claude/settings.json` | Claude Code の許可設定（例: 検査コマンドは確認なしで進め、削除や push は必ず確認する） |
 | `.mcp.json` | Claude Code から使う MCP サーバー（外部の道具とつなぐ設定）。使う道具に合わせて足す（例: Next.js なら shadcn/ui・Next.js DevTools を初期設定し、それ以外は空で置く） |
