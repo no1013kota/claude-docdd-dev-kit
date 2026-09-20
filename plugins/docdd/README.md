@@ -18,8 +18,7 @@
 | 任意 | gh（GitHub をコマンドで操作する道具） | `/docdd:release` の PR 作成と CI 待ち | push の前に止まり、`gh auth login` するか GitHub の画面で PR を作るかを聞く |
 | 任意 | playwright-cli とブラウザ | Web のプロジェクトの `/docdd:ui-polish`・`/docdd:verify-e2e`・release の公開先確認 | 手作業の確認に切り替えて、その旨を報告する |
 
-- フレームワークは問いません（React・Vue・Python など）。ただし、検査スクリプトは Node.js、`/docdd:release` は GitHub を前提にしています。
-- Web アプリが中心です。Unity などのゲーム・ネイティブアプリでも、仕様書・タスク・検証の表の進め方は使えます。Web 専用のスキルは「該当なし」で止まります（下の「Web 以外のプロジェクトで使う（例: Unity）」）。
+- 作るものの技術は問いません（React・Vue・Python など）。ただし、検査スクリプトは Node.js、`/docdd:release` は GitHub を前提にしています。Web アプリが中心で、Unity などのゲーム・ネイティブアプリでは Web 専用のスキルが「該当なし」で止まります（下の「[Web 以外のプロジェクトで使う（例: Unity）](#web-以外のプロジェクトで使う例-unity)」）。
 - playwright-cli は、プロジェクトの Playwright で代用できればそれを使い、できなければ、入れてよいかを聞いてから、動作を確かめた `@playwright/cli@0.1.17` を入れます。詳しい使い方は、道具の中にある公式の手順書（英語）を読みます（作業フォルダの外なので、読むときに確認が出ることがあります）。ブラウザは手元の Google Chrome を使い、無ければ Playwright 用のブラウザ（初回に数百 MB のダウンロード）を、聞いてから取得します。
 - Windows: **Git for Windows を入れてください**（git は init とすべてのスキルで要ります。hook の秘密の値の検査も git を動かします）。
   - Claude Code は、Git for Windows が無いと PowerShell でコマンドを実行します。Git for Windows があっても、claude.ai・Console のアカウントでは PowerShell のツールが既定で有効です（公式: https://code.claude.com/docs/en/tools-reference）。
@@ -30,7 +29,7 @@
 
 ## 全体像
 
-docdd は、次の 4 つをプロジェクトにそろえ、Claude Code がいつも同じ順で動くようにします。
+docdd は、次の 4 つをプロジェクトにそろえ、Claude Code がいつも同じ順で動くようにします。**流れの図は [リポジトリの README](../../README.md#全体像)** にあります（この README は、その細部を書いたものです）。
 
 | 物 | 置き場 | 役割 |
 |---|---|---|
@@ -42,6 +41,8 @@ docdd は、次の 4 つをプロジェクトにそろえ、Claude Code がい�
 - 流れ: 要望 → `/docdd:add-task`（タスクにする）→ `/docdd:dev-loop`（1 タスクを実装・検証・仕様書の更新・コミット）→ 依頼が全部終わったら `/docdd:release`（本番へ反映）。
 - 考え方: 手順書は、`CLAUDE.md` の表に書いたコマンドだけを実行します。表で「無い」の行は飛ばし、未記入（`{{…}}` のまま）の行は実行せずに報告します。表を埋めるほど、検証が確実になります。
 - 背景（補足）: 記事『[コードを書けなくても Claude Code でアプリを壊さず作り続ける「4つのファイル」の仕組み](https://exosai.net/blog/claude-code-non-engineer-workflow)』。手順の細部はこの README が正です。
+
+**この README の読み方**: 導入は「[前提](#前提)」→「[入れ方](#入れ方)」→「[init のあとにやること](#init-のあとにやること)」。困ったときは「[英語で出る確認と答え方](#英語で出る確認と答え方)」「[注意](#注意)」。Unity などは「[Web 以外のプロジェクトで使う](#web-以外のプロジェクトで使う例-unity)」。中身の一覧は「[中身](#中身)」（置くファイル・スキル 15 本・hook）。
 
 ## 入れ方
 
@@ -88,18 +89,19 @@ Claude Code の中で次を順に打ちます。1・2 はどのフォルダで�
 
 - `.claude/settings.json` を置くと、`git add`／`git commit`・検査コマンドは確認なしで進みます（allow の行）。まとめて消す削除（`rm -r`・`rm -f`）・`git push`・依存の追加は、auto モードでも必ず確認が出ます（ask の行）。強制 push・`--no-verify`・`sudo`・`.env` の読み取りは、どのモードでも禁止です（deny の行）。
 - `git add -A` や、秘密の値の入ったコミットは、hook が止めます（下の「hook」の表）。hook は、許可の確認より前に動きます。
-- ファイルの編集のたびに確認が出るかは、Claude Code の始まりのモードで決まります。雛形の `.claude/settings.json` は、モードを決めません。
-  - Pro・Max・Team の人がターミナルで起動すると、プロジェクトの `.claude/settings.json` にも、自分の PC 全体の設定（`~/.claude/settings.json`）にも `defaultMode` が無ければ、auto モード（別のモデルが安全を確かめて、自動で許可する）で始まります。これは Claude Code v2.1.228 以降（Windows でネイティブに動かすときは v2.1.233 以降）の動きで、古い版では Manual で始まります。
-  - Enterprise の人や、Console の API キーの人は、毎回確認するモード（Manual）で始まります。
-  - どのプランでも、Claude Code を入れた・更新したあとの最初の起動は、Manual で始まることがあります。`claude -p` での実行も Manual で始まります。
-- 編集のたびに確認したいときは、Claude Code に「.claude/settings.json の permissions に "defaultMode": "default" を足して」と頼みます。
-- 毎回確認するモードで始まる人（Console の API キーなど）で、ファイルの編集を自動にしたいときは、「.claude/settings.json の permissions に "defaultMode": "acceptEdits" を足して」と頼みます。ファイルの編集と、`mkdir`・`mv` などのファイル操作のコマンドが確認なしになります。
-- プロジェクトの `.claude/settings.json` に `"auto"` と書いても効きません。VS Code 拡張は、プロジェクトの `defaultMode` を読みません。
-- auto モードで始めたいとき:
-  - Pro・Max・Team の人は、「.claude/settings.json の permissions から defaultMode を消して」と頼みます。ただし、自分の PC 全体の設定（`~/.claude/settings.json`）に `"auto"` 以外の `defaultMode` があれば、そちらのモードで始まります（そこを `"auto"` にすれば auto モード）。
-  - Enterprise の人や、Console の API キーの人は、行を消すと Manual で始まります。自分の PC 全体の設定（`~/.claude/settings.json`）の permissions に `"defaultMode": "auto"` を書きます。このファイルはプロジェクトの外にあり、ほかのプロジェクトにも効きます。
-  - auto モードが使えないとき（組織が止めている、モデルが対応していない など）は、Manual で始まります。
-- 公式: https://code.claude.com/docs/en/permission-modes ／ https://code.claude.com/docs/en/permissions
+- **ファイルの編集のたびに確認が出るか**は、Claude Code の始まりのモードで決まります。雛形の `.claude/settings.json` は、モードを決めません。
+  - Pro・Max・Team の人がターミナルで起動し、プロジェクトの `.claude/settings.json` にも、自分の PC 全体の設定（`~/.claude/settings.json`）にも `defaultMode` が無ければ、auto モード（別のモデルが安全を確かめて、自動で許可する）で始まります。これは Claude Code v2.1.228 以降（Windows でネイティブに動かすときは v2.1.233 以降）の動きです。
+  - Enterprise の人・Console の API キーの人・古い版は、毎回確認するモード（Manual）で始まります。Claude Code を入れた・更新したあとの最初の起動と、`claude -p` での実行も Manual です。
+- モードを変えたいときは、Claude Code に次のように頼みます（`"auto"` はプロジェクトの `.claude/settings.json` に書いても効きません。VS Code 拡張は、プロジェクトの `defaultMode` を読みません）。
+
+  | したいこと | 頼むこと |
+  |---|---|
+  | 編集のたびに確認したい | 「`.claude/settings.json` の permissions に `"defaultMode": "default"` を足して」 |
+  | 編集を自動にしたい（Manual で始まる人） | 「`.claude/settings.json` の permissions に `"defaultMode": "acceptEdits"` を足して」。ファイルの編集と、`mkdir`・`mv` などのファイル操作が確認なしになります |
+  | auto モードで始めたい（Pro・Max・Team） | 「`.claude/settings.json` の permissions から defaultMode を消して」。PC 全体の設定に `"auto"` 以外の `defaultMode` があれば、そこを `"auto"` にします |
+  | auto モードで始めたい（Enterprise・Console の API キー） | PC 全体の設定（`~/.claude/settings.json`）の permissions に `"defaultMode": "auto"` を書きます。このファイルはほかのプロジェクトにも効きます |
+
+  auto モードが使えないとき（組織が止めている、モデルが対応していない など）は、Manual で始まります。公式: https://code.claude.com/docs/en/permission-modes ／ https://code.claude.com/docs/en/permissions
 
 ### 目安
 
@@ -277,7 +279,7 @@ mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/
 | `/docdd:speed-up` | 画面が遅いと感じたとき（**Web 専用**。サーバー描画の Web アプリ向け。単体テストが無ければ計測と候補出しだけ） | 計測結果と改善のコミット |
 | `/docdd:security-audit` | 公開前や、認証・課金・外部連携を触ったあと | 見つけた穴の報告。直すのは 1 件ずつあなたの「はい」を得てから |
 | `/docdd:maintenance` | 週 1 回（`/docdd:maintenance monthly` で月次も） | 外部 API の変化・脆弱性・溜まったデータ・費用の点検結果 |
-| `/docdd:release` | 依頼を全部終えたあと（自分で打ったときだけ動く） | 反映の方式（A: push で自動公開／B: staging → PR／C: 反映コマンド／まだ公開しない）で経路を選ぶ。本番へ出す前に必ずあなたの「はい」を得る。公開先の確認結果（Web 以外は、あなたに確かめてもらう手順） |
+| `/docdd:release` | 依頼を全部終えたあと（自分で打ったときだけ動く） | 反映の方式（自動公開／確認してから公開／コマンドで公開／まだ公開しない）で経路を選ぶ。本番へ出す前に必ずあなたの「はい」を得る。公開先の確認結果（Web 以外は、あなたに確かめてもらう手順） |
 | `/docdd:update-kit` | プラグインを更新したあと（自分で打ったときだけ動く） | 置いた雛形を新しい版へ（手付かずは置き換え、手を入れたものは 1 件ずつ決める） |
 
 **Web 専用**のスキルは、`CLAUDE.md`「検証コマンド」表の『開発サーバー起動』行が「無い」プロジェクト（Web 以外）では、「該当なし」と報告して止まります。
@@ -351,32 +353,34 @@ Project の範囲で入れた（プロジェクトの `.claude/settings.json` �
 
 - 検査は git が追跡しているファイルだけを見ます。新しく作ったファイルは、先に `git add` してから検査します。
 - `check-doc-dates` はコミットの日付を読むので、コミットの後に回します（コミットが 1 件も無いと判定できません）。
-- 『依存の脆弱性』行は、init がパッケージマネージャに合わせて推定します。npm 以外も、本番の依存（開発用の依存を除く）の high 以上を見る形です。Python などは自分で書きます（例: `pip-audit`）。
-
-  | パッケージマネージャ | 『依存の脆弱性』行 |
-  |---|---|
-  | npm（`package-lock.json` がある、またはまだ lock が無い） | `node scripts/audit-check.mjs` |
-  | npm（`npm-shrinkwrap.json` だけ） | `npm audit --audit-level=high` |
-  | pnpm | `pnpm audit --audit-level=high --prod` |
-  | yarn v1 | `yarn audit --level high --groups dependencies` |
-  | yarn v2 以上 | `yarn npm audit --recursive --severity high --environment production` |
-  | bun | `bun audit --audit-level=high --prod` |
-
-- yarn v1 は、high 未満の脆弱性だけでも失敗の終了コードで終わります（`--level` は終了コードを変えない。公式: https://classic.yarnpkg.com/lang/en/docs/cli/audit/）。深刻度は出力で見ます。
-- 直さずに据え置く脆弱性の書き方は、『依存の脆弱性』行のコマンドで違います。
-  - **npm（`node scripts/audit-check.mjs`）**: `scripts/audit-allowlist.json` に、脆弱性の ID（`ids`。`GHSA-` で始まる）・理由（`why`）・期限（`until`）を書きます（下の形）。3 つとも必須で、欠けていたり古い書き方（値が文字列）だったりすると、検査は書き方を示して止まります。書くのは脆弱性を持つパッケージ（例: `qs`）で、それを使う親（例: `express`）ではありません。同じパッケージでも `ids` に無い脆弱性が出たら落ち、期限を過ぎても落ちます（依存を上げるか、理由を書き足して期限を延ばす）。critical は据え置けません。検査が落ちたときに、貼れる形の JSON が出ます。
-  - **npm 以外（pnpm・yarn・bun・Python など）**: `scripts/audit-allowlist.json` は読まれません。据え置くなら、`tasks/BACKLOG.md` の「要決定・外部準備（ユーザー作業）」に、ID・理由・期限を書きます。その間、『依存の脆弱性』行は落ちたままです（`/docdd:maintenance` が毎週、出た ID と突き合わせます）。
-
-  ```json
-  { "<パッケージ名>": { "ids": ["GHSA-xxxx-xxxx-xxxx"], "why": "<なぜ今直さないか>", "until": "YYYY-MM-DD" } }
-  ```
-
 - `.env` と `.env.*` は `.claude/settings.json` で**読み取り禁止**にしています。`.env.example` も読めなくなります。変数名を Claude に見せたいときは、その部分をチャットに貼るか、deny の `Read(./.env.*)` を `Read(./.env.local)` などの個別の名前に書き換えてもらいます。
 - Claude Code のサンドボックス（`/sandbox`）を有効にしていると、init が `.claude/settings.json` と `.mcp.json` を書けないことがあります。その場合も残りの雛形は置き、Claude が確認つきで書き直すか、置けなかった中身を報告に載せます。
 - hook と許可設定は「うっかり」を止める柵で、完全な守りではありません。別の書き方（`bash -c '…'` など）までは止められません（安全の仕組みの補助です）。秘密の値の検査も、決まった形のキーと名前だけを見ます。文字列をつないだ値や base64 にした値は見逃し、npm のトークンや Stripe のテスト用のキーは対象外です。
 - `claude -p` のような確認を出せない実行では、`rm -r`・`rm -f` は実行されずに終わります。`/loop` は開いている会話の中で動くので確認が出て、答えるまでそこで止まります。
 - コミットの名前やメールを間違えたときは、push する前なら `git commit --amend --reset-author` で直せます。hook は Claude の `--amend` を止めるので、Claude Code の外のターミナルで自分で打ちます。
 - このキットは 2026 年 9 月時点の Claude Code（2.1 系）の仕組みを前提にしています。公式ドキュメント: https://code.claude.com/docs/en/plugins ／ https://code.claude.com/docs/en/skills ／ https://code.claude.com/docs/en/memory
+
+### 依存の脆弱性の行と、据え置きの書き方
+
+『依存の脆弱性』行は、init がパッケージマネージャに合わせて推定します。npm 以外も、本番の依存（開発用の依存を除く）の high 以上を見る形です。Python などは自分で書きます（例: `pip-audit`）。
+
+| パッケージマネージャ | 『依存の脆弱性』行 |
+|---|---|
+| npm（`package-lock.json` がある、またはまだ lock が無い） | `node scripts/audit-check.mjs` |
+| npm（`npm-shrinkwrap.json` だけ） | `npm audit --audit-level=high` |
+| pnpm | `pnpm audit --audit-level=high --prod` |
+| yarn v1 | `yarn audit --level high --groups dependencies` |
+| yarn v2 以上 | `yarn npm audit --recursive --severity high --environment production` |
+| bun | `bun audit --audit-level=high --prod` |
+
+- yarn v1 は、high 未満の脆弱性だけでも失敗の終了コードで終わります（`--level` は終了コードを変えない。公式: https://classic.yarnpkg.com/lang/en/docs/cli/audit/）。深刻度は出力で見ます。
+- 直さずに据え置く脆弱性の書き方は、『依存の脆弱性』行のコマンドで違います。
+  - **npm（`node scripts/audit-check.mjs`）**: `scripts/audit-allowlist.json` に、脆弱性の ID（`ids`。`GHSA-` で始まる）・理由（`why`）・期限（`until`）を書きます（下の形）。3 つとも必須で、欠けていたり古い書き方（値が文字列）だったりすると、検査は書き方を示して止まります。書くのは脆弱性を持つパッケージ（例: `qs`）で、それを使う親（例: `express`）ではありません。同じパッケージでも `ids` に無い脆弱性が出たら落ち、期限を過ぎても落ちます（依存を上げるか、理由を書き足して期限を延ばす）。critical は据え置けません。検査が落ちたときに、貼れる形の JSON が出ます。
+  - **npm 以外（pnpm・yarn・bun・Python など）**: `scripts/audit-allowlist.json` は読まれません。据え置くなら、`tasks/BACKLOG.md` の「要決定・外部準備（ユーザー作業）」に、ID・理由・期限を書きます。その間、『依存の脆弱性』行は落ちたままです（`/docdd:maintenance` が毎週、出た ID と突き合わせます）。
+
+```json
+{ "<パッケージ名>": { "ids": ["GHSA-xxxx-xxxx-xxxx"], "why": "<なぜ今直さないか>", "until": "YYYY-MM-DD" } }
+```
 
 ## 困ったら
 

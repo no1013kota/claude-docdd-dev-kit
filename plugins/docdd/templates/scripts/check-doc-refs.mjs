@@ -1,4 +1,4 @@
-// docdd-kit v0.5.0 — scripts/check-doc-refs.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
+// docdd-kit v0.6.0 — scripts/check-doc-refs.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
 // CLAUDE.md・.claude/rules/・docs/ の文書が指しているファイルが、本当にあるかを検査する。
 // 存在しないファイルを指す仕様書は、読んだ人（と Claude）を行き止まりへ送る。
 //
