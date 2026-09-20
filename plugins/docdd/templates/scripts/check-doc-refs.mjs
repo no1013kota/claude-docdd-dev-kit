@@ -1,4 +1,4 @@
-// docdd-kit v0.8.0 — scripts/check-doc-refs.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
+// docdd-kit v0.9.0 — scripts/check-doc-refs.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
 // CLAUDE.md・.claude/rules/・docs/ の文書が指しているファイルが、本当にあるかを検査する。
 // 存在しないファイルを指す仕様書は、読んだ人（と Claude）を行き止まりへ送る。
 //
@@ -9,10 +9,11 @@
 // 見ない所（書き方の見本を書けるように）: 「例」の字を含む行（「例外」の「例」は数えない）、
 //   行末が for example・e.g.・for instance・例えば・たとえば の行（末尾のコロンは除いて見る）に続く箇条、
 //   HTML コメントの中、コードブロックの中。
+// あわせて見るもの: docs/decisions/README.md に「## ADR 一覧」があるとき、docs/decisions/ の ADR がすべてその表に載っているか。
 // 大文字・小文字だけが違う参照も失敗にする（macOS では開けても、Linux の CI や clone した先では開けない）。
 // 対象の文書: git が追跡しているもの。docs/_imported/（取り込んだ原文）・docs/requirements/00_template.md・
 //   docs/decisions/0000-template.md（見本）は除く。
-// 終了コード: 0 = 問題なし（警告だけのときも 0）／1 = 無いファイルを指している・対象の文書が git に無い／2 = git が使えない
+// 終了コード: 0 = 問題なし（警告だけのときも 0）／1 = 無いファイルを指している・「ADR 一覧」に載っていない ADR がある・対象の文書が git に無い／2 = git が使えない
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -44,6 +45,15 @@ const PATH_REF = new RegExp(
 );
 /** `](./…)` と `](../…)` の相対リンク。 */
 const LINK = /\]\((\.{1,2}\/[^)\s]*)/g;
+
+/** %xx を戻す（戻せない文字列はそのまま返す）。 */
+function decodeURIComponentSafe(s) {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
 
 /** 見本の箇条を導く行の終わり方（末尾の空白・コロン・全角コロンは除いてから見る。英語の大文字・小文字は問わない）。 */
 const EXAMPLE_INTRO = /(?:(?<![a-z])(?:for example|for instance|e\.g\.)|例えば|たとえば)$/i;
@@ -338,6 +348,46 @@ for (const doc of docs) {
   });
 }
 
+// docs/decisions/ の ADR が、docs/decisions/README.md の「ADR 一覧」に載っているか（手書きの索引を記憶に頼らせない）。
+// 見るのは「ADR 一覧」の見出しから次の見出しまでの、表の行（| で始まる行）だけ。説明の中の書き方の例を「載っている」と数えないため。
+const ADR_INDEX = "docs/decisions/README.md";
+const ADR_FILE = /^docs\/decisions\/(\d{4})-[^/]+\.md$/;
+const ADR_INDEX_HEADING = /^#{2,3}\s*ADR\s*一覧/;
+const ANY_LINK = /\]\(([^)\s]+)\)/g;
+const indexGaps = [];
+let adrIndexFound = false;
+if (tracked.has(ADR_INDEX)) {
+  const lines = readFileSync(ADR_INDEX, "utf8").split(/\r?\n/);
+  const start = lines.findIndex((l) => ADR_INDEX_HEADING.test(l));
+  if (start >= 0) {
+    adrIndexFound = true;
+    const rows = [];
+    for (let i = start + 1; i < lines.length; i += 1) {
+      if (/^#{1,6}\s/.test(lines[i])) break; // 次の見出しで終わり
+      if (lines[i].trimStart().startsWith("|")) rows.push(lines[i]);
+    }
+    const listed = new Set();
+    for (const row of rows) {
+      for (const m of row.matchAll(ANY_LINK)) {
+        const target = m[1].split("#")[0].split("?")[0].trim();
+        if (!target) continue;
+        listed.add(path.posix.normalize(path.posix.join("docs/decisions", decodeURIComponentSafe(target))));
+      }
+    }
+    for (const f of trackedList) {
+      const m = ADR_FILE.exec(f);
+      if (!m || m[1] === "0000" || listed.has(f)) continue;
+      indexGaps.push(f);
+    }
+  }
+}
+
+if (indexGaps.length > 0) {
+  console.error(`❌ 「ADR 一覧」に載っていない ADR が ${indexGaps.length} 件あります（${ADR_INDEX}）\n`);
+  for (const f of indexGaps) console.error(`   ${f}`);
+  console.error("\n   → ADR を足したら、同じコミットで docs/decisions/README.md の「ADR 一覧」にも 1 行足してください\n");
+}
+
 if (warnings.length > 0) {
   console.warn(`⚠️ 確認してほしい参照が ${warnings.length} 件あります（失敗にはしません）`);
   for (const w of warnings) console.warn(`   ${w}`);
@@ -353,9 +403,14 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
+if (indexGaps.length > 0) process.exit(1);
+
 if (checked === 0) {
   console.log(`✅ ファイルを指す記述は 0 件でした（${docs.length} 件の文書を見ました）`);
   console.log(`   検査するのは、バッククォートで囲んだパス（拡張子 ${EXTS.join("・")}）と、](./…) ](../…) の相対リンクです`);
 } else {
   console.log(`✅ ファイルを指す記述は ${checked} 件すべて実在しました（${docs.length} 件の文書を検査）`);
 }
+
+if (adrIndexFound) console.log("✅ ADR はすべて「ADR 一覧」に載っています");
+else if (tracked.has(ADR_INDEX)) console.log(`ℹ️ ${ADR_INDEX} に「## ADR 一覧」の見出しが無いので、一覧との突き合わせはしていません`);
