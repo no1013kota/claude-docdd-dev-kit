@@ -66,6 +66,7 @@
 | 反映の方式 | {{反映の方式}} |
 | staging へ反映 | {{staging へ反映}} |
 | 本番へ反映 | {{本番へ反映}} |
+| 本番 DB のバックアップ | {{本番 DB のバックアップ}} |
 | 公開先 URL | {{公開先 URL}} |
 
 例（書き方の見本。例の行は実行しない）:
@@ -77,6 +78,11 @@
   - 「まだ公開しない」— `/docdd:release` は何もせずに止まる
 - ブランチの例: ブランチ名はそのまま書く。「自動公開」なら作業ブランチと本番ブランチを同じ名前にする（1 本で運用するならどちらも main）。「確認してから公開」は別の名前にする（例: 作業ブランチ develop、本番ブランチ main。staging が無ければ『staging へ反映』を「無い」にすると PR だけの経路）
 - 反映コマンドの例: 「自動公開」なら staging へ反映・本番へ反映はどちらも「無い」。「コマンドで公開」なら本番へ反映に `npm run deploy:production`
+- 本番 DB のバックアップの例: migration（DB の構造変更）を含む反映のとき、`/docdd:release` が本番 DB を変える前にこの行を使う。次の 4 つのどれかを書く。
+  - コマンド: 例 `pg_dump "$PROD_DATABASE_URL" -Fc -f /tmp/claude/db-$(date +%F).dump`（Supabase なら `supabase db dump --db-url "$PROD_DATABASE_URL" -f /tmp/claude/db-$(date +%F).sql`）。接続先は `.env` の変数で渡し、値は書かない。出力先はリポジトリの外（`/tmp/claude/`）にする
+  - 「自動（DB サービス側）: <戻せる範囲。例: 日次バックアップ＋7 日の PITR>」— 取るのはサービス任せ。release は実行せず、この文を報告に写す
+  - 「無い」— 取らない（戻せないまま反映する。release が 1 回だけ確認し、`tasks/BACKLOG.md` の要決定に記録する）
+  - 「無い（DB を使わない）」— DB そのものが無いプロジェクト
 - 公開先 URL の例: https://example.com（まだ公開しないなら「無い」）
 
 ## スキルへの追加指示
