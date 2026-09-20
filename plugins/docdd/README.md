@@ -286,7 +286,7 @@ mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/
 
 **Web 専用**のスキルは、`CLAUDE.md`「検証コマンド」表の『開発サーバー起動』行が「無い」プロジェクト（Web 以外）では、「該当なし」と報告して止まります。
 
-### hook（取り消しにくい操作を止める柵）
+### hook（取り消しにくい操作を止める柵と、更新のお知らせ）
 
 プラグインを入れると、Claude が Bash か PowerShell でコマンドを実行する直前に、`hooks/hooks.json` と `scripts/guard-bash.mjs` が確かめます。
 効くのは docdd のプロジェクト（`.docdd/manifest.json` がある、または `tasks/BACKLOG.md` があり `CLAUDE.md` に `/docdd:` を含む）だけで、ほかのプロジェクトの作業は止めません。Claude の文脈（トークン）は使いません。
@@ -312,6 +312,12 @@ mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/
   - `Remove-Item` の別名（`del`・`rm` など）でも確認が出るかは、確かめていません。hook の呼び出しの条件は `PowerShell(Remove-Item *)` です。公式には、許可の規則では別名も同じに扱うとありますが、hook の条件（`if`）で同じかは書かれていません。
   - macOS・Linux の PowerShell（pwsh）では、`rm` は `Remove-Item` の別名ではなく、OS の `rm` です。`rm -rf` でも確認が出ないことがあります。
 
+**更新のお知らせ（SessionStart）**: docdd のプロジェクトで Claude Code を起動・再開したとき、`scripts/notify-update.mjs` が、プラグインの版と `.docdd/manifest.json` に記録された雛形の版を比べます。プラグインのほうが新しければ、`/docdd:update-kit` を 1 行だけ案内します（v0.1 系なら移行の案内）。
+
+- **何も直しません。** 更新するかはあなたが決めます（`/docdd:update-kit` は、あなたが自分で打ったときだけ動きます）。
+- 版が同じとき・docdd のプロジェクトでないとき・manifest が読めないときは、何も出しません。
+- 案内を止めたいときは、`.docdd/manifest.json` に `"notifyUpdates": false` を足します（`/docdd:update-kit` はこの行を消しません）。
+
 ## 手順書を直したいとき
 
 1. **まず `CLAUDE.md` の「スキルへの追加指示」表に 1 行足します。** 例: `| /docdd:release | PR は作らず main へ直接 push する |`。行があるスキルは、その行を本文より優先します。プラグインを更新しても、この表はそのまま残ります。
@@ -329,6 +335,7 @@ mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/
 - このマーケットプレイス（Anthropic 以外の配布元）は、**自動更新が既定でオフ**です。自動にするには `/plugin` → Marketplaces → 入れた配布元（このリポジトリなら claude-docdd-dev-kit）→ Enable auto-update。
 - 手動で受け取るときは、まず `/plugin marketplace update claude-docdd-dev-kit`（配布元の一覧を取り直す）。そのあと `/plugin` の画面で docdd を更新するか、Claude Code を終了したターミナルで `claude plugin update docdd@claude-docdd-dev-kit`（反映には起動し直し）。入っている版は `/plugin list` で確かめます。ほかの配布元から入れたなら、`claude-docdd-dev-kit` を `/plugin list` に出る名前に読み替えます。
 - 何が変わったかは [`CHANGELOG.md`](./CHANGELOG.md) に書きます。docdd は main に入れた時点で配布されるので、main には CI（自動の検査）で緑にした変更だけを入れます。入れている人が新しい中身を受け取れるのは、版の番号が上がったときです。
+- 更新したあと docdd のプロジェクトを開くと、版のずれを hook が 1 行で知らせます（上の「hook」）。
 - **プラグインを更新しても、プロジェクトに置いた雛形（`CLAUDE.md`・`scripts/` など）は変わりません。** 更新したら、プロジェクトのフォルダで `/docdd:update-kit` と打ちます。手付かずのファイルはまとめて置き換え、手を入れたファイルは差分を見て 1 件ずつ決めます。v0.1 系からの移行もこれで行います。
 - update-kit が足すのは、新しい版で増えた節と表の行だけです。既存の節の中の文言の変更は提案しないので、CHANGELOG の「雛形への影響」を見て、必要なら手で直します。
 - 別の PC で使うときや入れ直したあとは、上の「入れ方」の 1・2 をもう一度打ちます（雛形の `.claude/settings.json` には、プラグインの取得元を書いていません）。

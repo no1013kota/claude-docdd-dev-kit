@@ -1,5 +1,5 @@
 {
-  "description": "docdd: docdd のプロジェクトで、取り消しにくい git 操作（git add -A・git commit --amend・強制 push など）と、秘密の値（API キー・秘密鍵・.env）の入ったコミットを止め、rm -r／rm -f・Remove-Item -Recurse／-Force の前に確認を出す（Bash と PowerShell）",
+  "description": "docdd: docdd のプロジェクトで、取り消しにくい git 操作（git add -A・git commit --amend・強制 push など）と、秘密の値（API キー・秘密鍵・.env）の入ったコミットを止め、rm -r／rm -f・Remove-Item -Recurse／-Force の前に確認を出す（Bash と PowerShell）。セッションの開始時には、プラグインの版と置いた雛形の版がずれていれば /docdd:update-kit を案内する（何も直さない）",
   "hooks": {
     "PreToolUse": [
       {
@@ -31,6 +31,19 @@
             "if": "PowerShell(Remove-Item *)",
             "command": "node",
             "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/guard-bash.mjs"],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/notify-update.mjs"],
             "timeout": 10
           }
         ]
