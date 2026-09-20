@@ -292,7 +292,7 @@ test("空の Node プロジェクト: status → apply → git add → 検査 �
 
   const d = init(dir, "dates");
   assert.equal(d.status, 0, d.stdout);
-  assert.deepEqual(d.json.changed.map((c) => c.file).sort(), ["docs/PRD.md", "docs/operations/development-and-testing.md", "tasks/REFACTOR_PLAN.md"]);
+  assert.deepEqual(d.json.changed.map((c) => c.file).sort(), ["docs/PRD.md", "docs/operations/development-and-testing.md"]);
   assert.ok(read(dir, "docs/requirements/00_template.md").includes("{{YYYY-MM-DD}}"), "見本の日付は埋めない");
   assert.ok(read(dir, "docs/decisions/0000-template.md").includes("{{YYYY-MM-DD}}"), "見本の日付は埋めない");
   assert.ok(!read(dir, "docs/PRD.md").includes("{{YYYY-MM-DD}}"));
@@ -1471,7 +1471,7 @@ test("Python のプロジェクト: .gitignore に「# docdd: Python」の塊も
   const blocks = gitignoreTemplateBlocks();
   const [common, web] = blocks;
   const python = blocks.find((b) => b.header === "# docdd: Python");
-  assert.deepEqual(python.lines, ["__pycache__/", "*.py[cod]", ".venv/", ".pytest_cache/", ".mypy_cache/", ".ruff_cache/"]);
+  assert.deepEqual(python.lines, ["__pycache__/", "*.py[cod]", ".venv/", ".pytest_cache/", ".mypy_cache/", ".ruff_cache/", ".coverage", "htmlcov/"]);
 
   // FastAPI: 共通・Web・Python の順に置き、__pycache__ が git status に出ない
   const fastapi = project({ files: { "pyproject.toml": '[project]\nname = "api"\ndependencies = ["fastapi>=0.115"]\n', "app/main.py": "from fastapi import FastAPI\n\napp = FastAPI()\n" } });
@@ -1492,7 +1492,7 @@ test("Python のプロジェクト: .gitignore に「# docdd: Python」の塊も
   assert.equal(b.status, 0, b.stdout);
   const added = b.json.gitignore.addedLines;
   assert.ok(added.includes("*.py[cod]") && !added.includes("__pycache__/") && !added.includes(".venv/"), added.join(" "));
-  assert.ok(read(py, ".gitignore").endsWith("\n\n# docdd: Python\n*.py[cod]\n.pytest_cache/\n.mypy_cache/\n.ruff_cache/\n"), read(py, ".gitignore"));
+  assert.ok(read(py, ".gitignore").endsWith("\n\n# docdd: Python\n*.py[cod]\n.pytest_cache/\n.mypy_cache/\n.ruff_cache/\n.coverage\nhtmlcov/\n"), read(py, ".gitignore"));
   assert.equal(init(py, "apply", "--settings", "no").json.gitignore.action, "unchanged");
 
   // Python でなければ使わない

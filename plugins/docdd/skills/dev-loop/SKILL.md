@@ -56,7 +56,7 @@ argument-hint: "[T-xx]"
 
 ### 2. 仕様を読む（仕様の門）
 
-タスクの「参照:」が指す節（`docs/PRD.md` の A-番号、`docs/requirements/` の見出し ID）を読む。どの文書が何を定義するかは `docs/README.md`。参照が `docs/operations/development-and-testing.md` の基盤タスクは、その節を読めばよい（この門の対象外）。
+タスクの「参照:」が指す節（`docs/PRD.md` の A-番号、`docs/requirements/` の見出し ID）を読む。どの文書が何を定義するかは `docs/README.md`。参照が `docs/operations/development-and-testing.md` の基盤タスクは、その節を読めばよい（この門の対象外）。 `参照: なし（振る舞いを変えない）` のリファクタ単位も対象外で、仕様は書かない（`/docdd:refactor` で進めるのが本筋。dev-loop で進めるならコミットは `refactor(<scope>): …`）。
 
 **参照先の節が無い、または該当節に `{{…}}` が残っているなら §3 へ進まない。** 先に仕様を書く。
 
@@ -98,7 +98,7 @@ argument-hint: "[T-xx]"
 
 ### 6. 完了処理と報告
 
-- BACKLOG を `done` にし、後続へ影響する判断・注意点を「メモ:」に1〜2行足してから、`node scripts/backlog-archive.mjs` でアーカイブへ移す（このタスクのコミットに `tasks/BACKLOG.md` と `tasks/archive/BACKLOG-done.md` を含める。スクリプトが無ければ移さずに進み、報告で `/docdd:update-kit` を案内する）。
+- BACKLOG を `done` にし、「実装メモ:」（どう作ったか・後続が知るべき判断。1〜2 行）と「検証:」（変更影響表のどの行を回して何を見たか。回さなかった行と理由も）の 2 行を足してから、`node scripts/backlog-archive.mjs` でアーカイブへ移す（このタスクのコミットに `tasks/BACKLOG.md` と `tasks/archive/BACKLOG-done.md` を含める。スクリプトが無ければ移さずに進み、報告で `/docdd:update-kit` を案内する）。
 - 基盤導入タスク自身は、完了条件の見本テスト（単体 1 件。画面があるなら E2E（実際に動かす）も 1 件）が緑（実行件数が 0 件でない。§4）になり、`CLAUDE.md`「検証コマンド」表の該当行が埋まったら完了とする。
 - 新たなユーザー判断事項は「要決定」へ追記する（書式は `tasks/BACKLOG.md` の運用ルールの見本。可能なら推奨案を添える）。
 - コミット前に `git status` を見て、このタスクと無関係な変更を巻き込まない。パスを明示して `git add` する。

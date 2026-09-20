@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const TEMPLATES = path.join(PLUGIN_ROOT, "templates");
-const FALLBACK_VERSION = "0.8.0";
+const FALLBACK_VERSION = "0.9.0";
 const KIT_VERSION = readKitVersion();
 const CWD = realpath(process.cwd());
 
@@ -1230,14 +1230,13 @@ const REQUIRED = [
   "docs/PRD.md",
   "docs/operations/development-and-testing.md",
   "tasks/BACKLOG.md",
-  "tasks/REFACTOR_PLAN.md",
   "scripts/check-doc-dates.mjs",
   "scripts/check-doc-refs.mjs",
   "scripts/check-doc-placeholders.mjs",
   "scripts/audit-check.mjs",
   MANIFEST,
 ];
-const DOCDD_MARKERS = [MANIFEST, ".claude/rules/docdd-kit.md", "tasks/BACKLOG.md", "tasks/REFACTOR_PLAN.md", "scripts/check-doc-dates.mjs", "scripts/check-doc-refs.mjs", "scripts/check-doc-placeholders.mjs", "scripts/audit-check.mjs"];
+const DOCDD_MARKERS = [MANIFEST, ".claude/rules/docdd-kit.md", "tasks/BACKLOG.md", "scripts/check-doc-dates.mjs", "scripts/check-doc-refs.mjs", "scripts/check-doc-placeholders.mjs", "scripts/audit-check.mjs"];
 
 /**
  * v0.1 系の構成か。CLAUDE.md に v0.1 の「変更影響」表があり、表マーカーが無ければ、manifest の有無に関係なく v0.1 系

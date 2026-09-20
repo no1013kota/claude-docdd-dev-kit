@@ -252,14 +252,14 @@ mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/
 | `docs/requirements/README.md`・`00_template.md` | どう作るか（画面・データ・処理）の分け方と、文書の雛形 | あなた・見本 |
 | `docs/decisions/README.md`・`0000-template.md` | 技術判断の記録（ADR）の置き場と雛形 | あなた・見本 |
 | `docs/operations/development-and-testing.md` | テストの層・いつ回すか・テスト基盤が無いとき・落とし穴 | あなた |
+| `docs/operations/backup-and-restore.md` | 控えに何が入らないか・戻す手順・戻せたことを確かめた記録 | あなた |
 | `tasks/BACKLOG.md` | 作業キューと要決定。まだ動いているものだけを置く | あなた |
 | `tasks/archive/BACKLOG-done.md` | 終えたタスクと決まった要決定の置き場（`scripts/backlog-archive.mjs` が移す。丸ごと読まず検索する） | あなた |
-| `tasks/REFACTOR_PLAN.md` | リファクタ計画（`/docdd:refactor` が使う） | あなた |
 | `scripts/check-doc-refs.mjs` | 仕様書が指すファイルが実在するか | キット |
 | `scripts/check-doc-dates.mjs` | 仕様書の更新日がコミットより古くないか、版と変更履歴が合うか | キット |
 | `scripts/check-doc-placeholders.mjs` | 未記入の欄（`{{…}}`）が残っていないか | キット |
 | `scripts/audit-check.mjs` | 依存ライブラリの既知の脆弱性（npm と `package-lock.json` 用。本番の依存の high・critical で落ちる） | キット |
-| `scripts/backlog-archive.mjs` | 終えたタスク（`done`・`dropped`）と決まった要決定を BACKLOG からアーカイブへ移す（`--check` は移さずに見るだけ）。BACKLOG が育つと、読むだけで作業の場所を使い、末尾の未着手を見落とすため。`/docdd:dev-loop` が最初と完了時に回す | キット |
+| `scripts/backlog-archive.mjs` | 終えたタスク（`done`・`dropped`）と決まった要決定を BACKLOG からアーカイブへ移す（`--check` は移さずに見るだけ）。BACKLOG が育つと、読むだけで作業の場所を使い、末尾の未着手を見落とすため。`/docdd:dev-loop` が最初と完了時に、`/docdd:release` が §0 の最初に回し、`/docdd:doc-sync` が `--check` で移し忘れを見る | キット |
 | `scripts/audit-allowlist.json` | 直さずに据え置く脆弱性の一覧（脆弱性の ID の単位。読むのは npm の `audit-check.mjs` だけ。初期は空） | あなた |
 | `.docdd/manifest.json` | キットの版と、置いたファイルの記録（update-kit が使う。手で直さない） | init が作る |
 | `package.json` の `scripts` | `package.json` があれば 4 行（`check:doc-dates`・`check:doc-refs`・`check:doc-placeholders`・`backlog:archive`）を足す。npm（`package-lock.json`、またはまだ lock が無い）なら `audit:check` も足して 5 行。無くても `node scripts/<名前>.mjs` で動く | あなた |
@@ -277,11 +277,11 @@ mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/
 | `/docdd:verify-e2e` | 利用者の操作の流れを変えたあと | 最後まで通した確認の結果（Web はブラウザで、Web 以外は『E2E（実際に動かす）』行のテストで） |
 | `/docdd:ui-polish` | 画面や UI 部品を作る・直すとき（**Web 専用**） | 主な状態・画面幅・アクセシビリティ・実ブラウザの確認 |
 | `/docdd:playwright-cli` | ブラウザ操作の道具箱（ほかのスキルから使う。**Web 専用**） | 画面の操作・スクショ・コンソールの確認 |
-| `/docdd:refactor` | 振る舞いを変えずに中身を整えるとき（単体テストが無ければ監査だけ） | `tasks/REFACTOR_PLAN.md` と小さな改善のコミット |
+| `/docdd:refactor` | 振る舞いを変えずに中身を整えるとき（単体テストが無ければ監査だけ） | 監査の結果（毎回その場で取り直す）と、承認を得た単位の `tasks/BACKLOG.md` への起票、小さな改善のコミット |
 | `/docdd:speed-up` | 画面が遅いと感じたとき（**Web 専用**。サーバー描画の Web アプリ向け。単体テストが無ければ計測と候補出しだけ） | 計測結果と改善のコミット |
 | `/docdd:security-audit` | 公開前や、認証・課金・外部連携を触ったあと | 見つけた穴の報告。直すのは 1 件ずつあなたの「はい」を得てから |
 | `/docdd:maintenance` | 週 1 回（`/docdd:maintenance monthly` で月次も） | 外部 API の変化・脆弱性・溜まったデータ・費用の点検結果 |
-| `/docdd:release` | 依頼を全部終えたあと（自分で打ったときだけ動く） | 反映の方式（自動公開／確認してから公開／コマンドで公開／まだ公開しない）で経路を選ぶ。本番へ出す前に必ずあなたの「はい」を得る。**migration（DB の構造変更）を含むなら、本番 DB を変える前にバックアップを取る**（『本番 DB のバックアップ』行）。公開先の確認結果（Web 以外は、あなたに確かめてもらう手順） |
+| `/docdd:release` | 依頼を全部終えたあと（自分で打ったときだけ動く） | 反映の方式（自動公開／確認してから公開／コマンドで公開／まだ公開しない）で経路を選ぶ。本番へ出す前に必ずあなたの「はい」を得る。**migration（DB の構造変更）を含むなら、本番 DB を変える前にバックアップを取る**（『本番 DB のバックアップ』行）。公開先の確認結果（Web 以外は、あなたに確かめてもらう手順）。壊れていたら『戻し方』行の手順で前の版へ戻す（あなたの「はい」を得てから。行が「無い」・未記入なら戻さずに止めて聞く） |
 | `/docdd:update-kit` | プラグインを更新したあと（自分で打ったときだけ動く） | 置いた雛形を新しい版へ（手付かずは置き換え、手を入れたものは 1 件ずつ決める） |
 
 **Web 専用**のスキルは、`CLAUDE.md`「検証コマンド」表の『開発サーバー起動』行が「無い」プロジェクト（Web 以外）では、「該当なし」と報告して止まります。
@@ -360,7 +360,7 @@ Project の範囲で入れた（プロジェクトの `.claude/settings.json` �
 
 ## 注意
 
-- 本番 DB のバックアップは、`CLAUDE.md`「反映コマンド」表の『本番 DB のバックアップ』行に書いたコマンドを `/docdd:release` が実行するだけです。キットは DB のコマンドを持ちません。取れているかは終了コードと出力の大きさで見ますが、**戻せるか**は `/docdd:maintenance monthly` の復元テストで確かめます。
+- 本番 DB のバックアップは、`CLAUDE.md`「反映コマンド」表の『本番 DB のバックアップ』行に書いたコマンドを `/docdd:release` が実行するだけです。キットは DB のコマンドを持ちません。取れているかは終了コードと出力の大きさで見ますが、**戻せるか**は `/docdd:maintenance monthly` の復元テストで確かめ、結果は `docs/operations/backup-and-restore.md` §5 に残ります。『戻し方』行（壊れた版を前へ戻す手順）も同じで、キットは戻すコマンドを持ちません。
 - 検査は git が追跡しているファイルだけを見ます。新しく作ったファイルは、先に `git add` してから検査します。
 - `check-doc-dates` はコミットの日付を読むので、コミットの後に回します（コミットが 1 件も無いと判定できません）。
 - `.env` と `.env.*` は `.claude/settings.json` で**読み取り禁止**にしています。`.env.example` も読めなくなります。変数名を Claude に見せたいときは、その部分をチャットに貼るか、deny の `Read(./.env.*)` を `Read(./.env.local)` などの個別の名前に書き換えてもらいます。

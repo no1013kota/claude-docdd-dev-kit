@@ -5,6 +5,9 @@
 .claude/settings.local.json
 CLAUDE.local.md
 .DS_Store
+*.pem
+backups/
+*.dump
 
 # docdd: Web（Node.js・ビルド出力・Playwright）
 node_modules/
@@ -13,6 +16,7 @@ node_modules/
 /test-results/
 /playwright-report/
 /traces/
+/coverage/
 .playwright-cli/
 *.auth-state.json
 tmp-*
@@ -25,3 +29,5 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+htmlcov/

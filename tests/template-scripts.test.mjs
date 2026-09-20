@@ -411,6 +411,56 @@ test("refs: 「例外」の「例」は数えずに検査する（「事例」�
   assert.doesNotMatch(r.out, /case_study|example_of_exception/);
 });
 
+/** 「## ADR 一覧」の見出しと表を持つ最小の docs/decisions/README.md。 */
+const adrIndex = (rows = "") =>
+  `# ADR\n\n## ADR 一覧\n\n- 「ADR」の列は本文への相対リンクにする（書き方の例: \`[ADR-0001](./0001-use-postgres.md)\`）。\n\n| ADR | 状態 | 内容 |\n|---|---|---|\n${rows}`;
+
+test("refs: 「ADR 一覧」に載っていない ADR を挙げて exit 1（表に 1 行足せば exit 0）", () => {
+  const dir = repo({
+    "docs/decisions/README.md": adrIndex(),
+    "docs/decisions/0002-x.md": "# ADR-0002\n",
+    "docs/decisions/0000-template.md": "# 見本\n",
+  });
+  const r = run(REFS, dir);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /「ADR 一覧」に載っていない ADR が 1 件/);
+  assert.match(r.out, /docs\/decisions\/0002-x\.md/);
+  assert.doesNotMatch(r.out, /0000-template/, "見本の ADR は数えない");
+
+  write(dir, { "docs/decisions/README.md": adrIndex("| [ADR-0002](./0002-x.md) | 採用 | x に決めた |\n") });
+  git(dir, ["add", "--", "docs/decisions/README.md"]);
+  const ok = run(REFS, dir);
+  assert.equal(ok.code, 0, ok.out);
+  assert.match(ok.out, /ADR はすべて「ADR 一覧」に載っています/);
+});
+
+test("refs: 一覧の判定は表の行だけを見る（説明の中の書き方の例では載っていることにしない）。リンクは ./ 無し・#見出し付きでも数える", () => {
+  // 説明の例に出てくる 0001-use-postgres.md を実在させる。表には無いので落ちる。
+  const dir = repo({
+    "docs/decisions/README.md": adrIndex(),
+    "docs/decisions/0001-use-postgres.md": "# ADR-0001\n",
+  });
+  const r = run(REFS, dir);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /docs\/decisions\/0001-use-postgres\.md/);
+
+  // ./ 無し・#見出し付きのリンクも「載っている」と数える
+  write(dir, { "docs/decisions/README.md": adrIndex("| [ADR-0001](0001-use-postgres.md#背景) | 採用 | postgres |\n") });
+  git(dir, ["add", "--", "docs/decisions/README.md"]);
+  const ok = run(REFS, dir);
+  assert.equal(ok.code, 0, ok.out);
+});
+
+test("refs: 「## ADR 一覧」の見出しが無ければ突き合わせず、その旨を出す（黙って無効にしない）", () => {
+  const dir = repo({
+    "docs/decisions/README.md": "# ADR\n\n1判断1ファイル。\n",
+    "docs/decisions/0003-y.md": "# ADR-0003\n",
+  });
+  const r = run(REFS, dir);
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /「## ADR 一覧」の見出しが無いので/);
+});
+
 // ---------------------------------------------------------------------------
 // check-doc-dates.mjs
 // ---------------------------------------------------------------------------
