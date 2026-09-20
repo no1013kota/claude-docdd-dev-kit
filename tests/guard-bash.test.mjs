@@ -567,7 +567,8 @@ const HOOK_IFS = ['Bash(git *)', 'Bash(rm *)', 'PowerShell(git *)', 'PowerShell(
 
 function loadHandlers() {
   const config = JSON.parse(fs.readFileSync(path.join(PLUGIN_ROOT, 'hooks', 'hooks.json'), 'utf8'));
-  assert.deepEqual(Object.keys(config.hooks), ['PreToolUse']);
+  // このスクリプトは PreToolUse だけを見る（SessionStart は notify-update.mjs。tests/notify-update.test.mjs で確かめる）
+  assert.deepEqual(Object.keys(config.hooks).sort(), ['PreToolUse', 'SessionStart']);
   assert.equal(config.hooks.PreToolUse.length, 1);
   return config.hooks.PreToolUse[0];
 }
