@@ -23,7 +23,7 @@
 4. `npm run check`（`scripts/check-skill-refs.mjs`・`scripts/check-version-stamps.mjs`・`scripts/check-version-bump.mjs` をまとめて回す）。
 5. `npm test`（Node 18 以上・git 2.32 以上。v0.1.4 の移行テストは履歴全体が要る）。
    - `scripts/run-tests.mjs` が `tests/*.test.mjs`（`tests/` の直下だけ）を並べて `node --test` に渡す。シェルの `*` の展開に頼らないので、Windows の npm でも動く形にしている（Windows の実機では確かめていない。CI の `test-windows` で見る）。補助のファイルの名前を `.test.mjs` で終えない。
-   - CI は、Node 22（全部）・Node 18（テストだけ）・Windows（テストだけ。落ちても CI は止めない）で回る。
+   - CI は、Node 22（全部）・Node 18（テストだけ）・Windows（テストだけ。落ちても CI は止めない）で回る。回るのは **PR と main への push** のときで、作業ブランチへの push やタグの push では回らない（同じコミットで 2 本走らないようにしているため）。同じ PR へ続けて push すると、前のコミットの run は畳まれる。
 6. `claude plugin validate --strict .` と `claude plugin validate --strict plugins/docdd`。CI（`.github/workflows/ci.yml`）の Claude Code は `@anthropic-ai/claude-code@2.1.270` に固定している。検証に使う版を上げるときは、ここも上げる。
 7. `npm run check:urls`（README 2 本・CHANGELOG・RELEASING・skills・templates・examples の外部リンクを開けるか。CI には入れていない）。
    - 落ちたら、まずそのリンクをブラウザで開く。サイトの一時的な不調や、機械からのアクセスを断るサイトもある。

@@ -3,8 +3,17 @@
 name: CI
 
 on:
+  # 作業ブランチへの push では回さない（PR の側で 1 回だけ回す）。
+  # 両方を無条件にすると、同じコミットに push 用と PR 用の 2 本が走る。
+  # main への push（PR のマージ）は、配布される状態そのものなので必ず回す。タグの push では回さない。
   push:
+    branches: [main]
   pull_request:
+
+# 同じ PR へ続けて push したら、前のコミットの run を畳む。main は畳まない（配布される状態の記録として残す）。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
