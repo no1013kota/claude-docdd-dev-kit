@@ -45,18 +45,13 @@ docdd は、次の 4 つをプロジェクトにそろえ、Claude Code がい�
 
 ## 入れ方
 
-Claude Code の中で次を順に打ちます。1・2 はどのフォルダで起動していてもよく、一度入れれば全プロジェクトで使えます。
+**まだアプリのコードが無いとき**は、先にアプリの土台を作ります。空のフォルダで Claude Code に「Next.js（など）で新しいアプリの土台を作って、動くところまで」と頼み、画面が出たら次へ進みます（Unity などは Unity Hub で新しいプロジェクトを作る）。土台を作る道具（create-next-app など）は空でないフォルダでは止まることがあるので、docdd の雛形より先に作ります（空のフォルダで init を打つと、先に土台を作るかを聞きます）。
+
+アプリのフォルダで Claude Code を開き、次を順に打ちます。1・2 は一度だけで、ほかのプロジェクトでも使えます。
 
 1. `/plugin marketplace add no1013kota/claude-docdd-dev-kit`
 2. `/plugin install docdd@claude-docdd-dev-kit`（範囲を聞かれたら User。そのまま有効になります。会話を読み直す旨の警告が出たときだけ `/reload-plugins --force`）
-3. プロジェクトのフォルダで Claude Code を起動し、`/docdd:init`（前置きの無い `/init` は Claude Code 組み込みの別コマンドなので打たない）
-
-`docdd@claude-docdd-dev-kit` の `@` の右は、入れた場所（配布元）の名前です。この手順で入れたなら、この名前のままで大丈夫です。別の場所（例えば Anthropic のコミュニティの一覧）から入れたときは名前が変わるので、この README に出てくる `docdd@claude-docdd-dev-kit` と `claude-docdd-dev-kit` を、`/plugin list` に出る名前に読み替えてください。
-
-3 の前に、どちらに当たるかを確かめます。
-
-- **A. 既にアプリのコードがある** → そのフォルダで `/docdd:init`。
-- **B. まだコードが無い** → 先に Claude Code に「Next.js（など）の土台を作って、動くところまで」と頼み、土台ができたフォルダで `/docdd:init`。多くの土台を作る道具（例: create-next-app）は空でないフォルダでは止まるので、雛形を先に置くと土台を作れなくなります（空のフォルダで init を打つと、この A／B を聞きます）。
+3. `/docdd:init`（前置きの無い `/init` は Claude Code 組み込みの別コマンドなので打たない）
 
 `/docdd:init`・`/docdd:release`・`/docdd:update-kit` は、**あなたが自分で打ったときだけ動きます**。Claude が会話の流れで勝手に導入したり、本番へ出したりはしません。
 
@@ -377,7 +372,7 @@ mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/
 ## 更新
 
 - このマーケットプレイス（Anthropic 以外の配布元）は、**自動更新が既定でオフ**です。自動にするには `/plugin` → Marketplaces → 入れた配布元（このリポジトリなら claude-docdd-dev-kit）→ Enable auto-update。
-- 手動で受け取るときは、まず `/plugin marketplace update claude-docdd-dev-kit`（配布元の一覧を取り直す）。そのあと `/plugin` の画面で docdd を更新するか、Claude Code を終了したターミナルで `claude plugin update docdd@claude-docdd-dev-kit`（反映には起動し直し）。入っている版は `/plugin list` で確かめます。ほかの配布元から入れたなら、`claude-docdd-dev-kit` を `/plugin list` に出る名前に読み替えます。
+- 手動で受け取るときは、まず `/plugin marketplace update claude-docdd-dev-kit`（配布元の一覧を取り直す）。そのあと `/plugin` の画面で docdd を更新するか、Claude Code を終了したターミナルで `claude plugin update docdd@claude-docdd-dev-kit`（反映には起動し直し）。入っている版は `/plugin list` で確かめます。
 - 何が変わったかは [`CHANGELOG.md`](./CHANGELOG.md) に書きます。docdd は main に入れた時点で配布されるので、main には CI（自動の検査）で緑にした変更だけを入れます。入れている人が新しい中身を受け取れるのは、版の番号が上がったときです。
 - 更新したあと docdd のプロジェクトを開くと、版のずれを hook が 1 行で知らせます（上の「hook」）。
 - **プラグインを更新しても、プロジェクトに置いた雛形（`CLAUDE.md`・`scripts/` など）は変わりません。** 更新したら、プロジェクトのフォルダで `/docdd:update-kit` と打ちます。手付かずのファイルはまとめて置き換え、手を入れたファイルは差分を見て 1 件ずつ決めます。v0.1 系からの移行もこれで行います。
@@ -386,7 +381,7 @@ mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/
 
 ## やめるとき
 
-`/plugin uninstall docdd@claude-docdd-dev-kit`（`@` の右は `/plugin list` に出る名前）で外すと、プラグインの設定とキャッシュは消えます。hook も一緒に効かなくなります。**プロジェクトに置いたファイルは残ります。**
+`/plugin uninstall docdd@claude-docdd-dev-kit` で外すと、プラグインの設定とキャッシュは消えます。hook も一緒に効かなくなります。**プロジェクトに置いたファイルは残ります。**
 
 Project の範囲で入れた（プロジェクトの `.claude/settings.json` の `enabledPlugins` で docdd を有効にしている）場合は、外すときに「自分だけ無効にする／全員から外す」を聞かれます。全員から外すを選ぶと、Claude Code が `.claude/settings.json` から docdd を消します。自分だけ無効にするを選ぶと、`.claude/settings.local.json` に無効にする指定が書かれ、`.claude/settings.json` の行は残ります。
 
