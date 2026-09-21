@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // docdd init.mjs — /docdd:init と /docdd:update-kit が使う「決まった処理」をまとめたスクリプト（依存なし・Node 18 以上）。
-// 雛形はこのファイルの位置から ../templates を読む。版はプラグインの .claude-plugin/plugin.json の version（無ければ 0.4.0）。
+// 雛形はこのファイルの位置から ../templates を読む。版はプラグインの .claude-plugin/plugin.json の version（読めなければ FALLBACK_VERSION。値は scripts/check-version-stamps.mjs が plugin.json と揃えさせる）。
 // プロジェクトのフォルダ（cwd）で実行する:
 //
 //   node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" status    [--json]
@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const TEMPLATES = path.join(PLUGIN_ROOT, "templates");
-const FALLBACK_VERSION = "0.10.0";
+const FALLBACK_VERSION = "0.11.0";
 const KIT_VERSION = readKitVersion();
 const CWD = realpath(process.cwd());
 
@@ -533,18 +533,6 @@ function gitInfo() {
   };
 }
 
-function toolInfo() {
-  const major = Number(process.versions.node.split(".")[0]);
-  const npm = run("npm", ["-v"], { timeout: 10000, env: { ...process.env, NPM_CONFIG_UPDATE_NOTIFIER: "false" } });
-  const gh = run("gh", ["--version"], { timeout: 5000 });
-  const pw = run("playwright-cli", ["--version"], { timeout: 5000 });
-  return {
-    node: { version: process.version, ok: major >= 18 },
-    npm: { available: npm.ok, version: npm.ok ? npm.stdout.trim() : null },
-    gh: { available: gh.ok },
-    playwrightCli: { available: pw.ok, version: pw.ok ? pw.stdout.trim().split("\n")[0] : null },
-  };
-}
 
 function readPackageJson() {
   const raw = readText("package.json");
@@ -1215,13 +1203,6 @@ function scriptsToAdd(pm) {
   return { scripts, skipped };
 }
 
-function envInfo(gi) {
-  const exists = isFile(".env");
-  if (!gi.isRepo) return { exists, ignored: null, tracked: null };
-  const ign = git(["check-ignore", "-q", "--no-index", "--", ".env"]);
-  const tracked = git(["ls-files", "--error-unmatch", "--", ".env"]).ok;
-  return { exists, ignored: ign.status === 0, tracked };
-}
 
 const REQUIRED = [
   "CLAUDE.md",
@@ -1236,7 +1217,8 @@ const REQUIRED = [
   "scripts/audit-check.mjs",
   MANIFEST,
 ];
-const DOCDD_MARKERS = [MANIFEST, ".claude/rules/docdd-kit.md", "tasks/BACKLOG.md", "scripts/check-doc-dates.mjs", "scripts/check-doc-refs.mjs", "scripts/check-doc-placeholders.mjs", "scripts/audit-check.mjs"];
+// 導入の痕跡はキット固有の名前だけにする（tasks/BACKLOG.md や scripts/audit-check.mjs は、docdd を入れていないプロジェクトにもありうる）。
+const DOCDD_MARKERS = [MANIFEST, ".claude/rules/docdd-kit.md", "scripts/check-doc-dates.mjs", "scripts/check-doc-refs.mjs", "scripts/check-doc-placeholders.mjs"];
 
 /**
  * v0.1 系の構成か。CLAUDE.md に v0.1 の「変更影響」表があり、表マーカーが無ければ、manifest の有無に関係なく v0.1 系
@@ -1248,12 +1230,52 @@ function isLegacy(claude, manifest) {
   return isFile("tasks/BACKLOG.md") && isFile("scripts/check-doc-refs.mjs") && !claude.hasMarkers;
 }
 
+/**
+ * CWD より上（git のルートまで）に docdd のプロジェクトがあれば、git のルートからの相対パスを返す（無ければ null）。
+ * 判定は hook（guard-bash.mjs の isDocddProject・notify-update.mjs の findProjectDir）と同じ。
+ */
+function docddRootAbove(gi) {
+  if (!gi.isRepo || !gi.root || gi.atGitRoot) return null;
+  let dir = path.dirname(CWD);
+  while (dir.length >= gi.root.length) {
+    const has = (rel) => { try { return fs.statSync(path.join(dir, rel)).isFile(); } catch { return false; } };
+    if (has(MANIFEST)) return toPosix(path.relative(gi.root, dir)) || ".";
+    if (has("tasks/BACKLOG.md")) {
+      try {
+        if (fs.readFileSync(path.join(dir, "CLAUDE.md"), "utf8").includes("/docdd:")) return toPosix(path.relative(gi.root, dir)) || ".";
+      } catch {
+        // CLAUDE.md が無い・読めない
+      }
+    }
+    if (dir === gi.root) break;
+    dir = path.dirname(dir);
+  }
+  return null;
+}
+
+/** hook と同じ条件: tasks/BACKLOG.md があり、CLAUDE.md が /docdd: を含む。 */
+function isDocddByBacklog() {
+  if (!isFile("tasks/BACKLOG.md")) return false;
+  try {
+    return fs.readFileSync(abs("CLAUDE.md"), "utf8").includes("/docdd:");
+  } catch {
+    return false;
+  }
+}
+
+/** projectRoot を人が読める形にする（"." は git のルート）。 */
+const rootLabel = (r) => (r === "." ? "git のルート" : `git のルートから ${r}`);
+
 function computeState({ claude, manifest, placeholders, gi }) {
   const missing = REQUIRED.filter((r) => !isFile(r));
   if (claude.exists && !claude.hasVerifyTable) missing.push("CLAUDE.md の「検証コマンド」表");
   const manifestTracked = gi.isRepo && manifest.exists ? git(["ls-files", "--error-unmatch", "--", MANIFEST]).ok : false;
   if (isLegacy(claude, manifest)) return { state: "legacy", missing, manifestTracked };
-  if (!DOCDD_MARKERS.some(isFile)) return { state: "not-installed", missing, manifestTracked };
+  if (!DOCDD_MARKERS.some(isFile) && !isDocddByBacklog()) {
+    const above = docddRootAbove(gi);
+    if (above) return { state: "installed-above", missing, manifestTracked, projectRoot: above };
+    return { state: "not-installed", missing, manifestTracked };
+  }
   if (missing.length === 0 && placeholders.length === 0 && (manifestTracked || !gi.isRepo)) return { state: "installed", missing, manifestTracked };
   return { state: "partial", missing, manifestTracked };
 }
@@ -1265,6 +1287,8 @@ function nextForState(state, s) {
   switch (state) {
     case "not-installed":
       return `未導入です。/docdd:init のヒアリングへ進み、apply で雛形を置きます。${nonWeb}`;
+    case "installed-above":
+      return `このフォルダより上（${rootLabel(s.projectRoot)}）に docdd が導入済みです。ここには何も置きません。そのフォルダで Claude Code を開き直してください。`;
     case "legacy":
       return "v0.1 系の構成で導入済みです（CLAUDE.md に「変更影響」表があり、.claude/rules/docdd-kit.md が無い）。/docdd:init ではなく /docdd:update-kit で新しい版へ移します。";
     case "installed":
@@ -1279,7 +1303,7 @@ function nextForState(state, s) {
   }
 }
 
-function collectStatus({ tools = true } = {}) {
+function collectStatus() {
   const templates = listTemplates();
   const gi = gitInfo();
   const pkg = readPackageJson();
@@ -1300,11 +1324,11 @@ function collectStatus({ tools = true } = {}) {
     kitVersion: KIT_VERSION,
     cwd: CWD,
     state: st.state,
+    projectRoot: st.projectRoot ?? null,
     missing: st.missing,
     next: nextForState(st.state, { ...st, placeholders, web: stack.web }),
     git: gi,
     atGitRoot: gi.atGitRoot,
-    tools: tools ? toolInfo() : null,
     packageManager: pm.name,
     lockfile: pm.lockfile,
     stack,
@@ -1312,14 +1336,12 @@ function collectStatus({ tools = true } = {}) {
     existingCode: sourceFiles.length > 0 && (gi.commits >= 2 || sourceFiles.length > 10),
     inferred: inferVerification(pkg, pm, stack),
     specCandidates,
-    kitFiles: templates.map((rel) => ({ path: rel, owner: ownerOf(rel), exists: isFile(rel) })),
     placeholders,
     manifest: { exists: manifest.exists, kitVersion: manifest.kitVersion, tracked: st.manifestTracked, parseError: manifest.parseError },
     claudeMd: claude,
     settings: settingsDiff(),
     mcp: mcpInfo(stack),
     gitignore: gitignoreInfo(stack),
-    env: envInfo(gi),
     backlog: backlogInfo(),
     packageJson: {
       exists: pkg.exists,
@@ -1870,6 +1892,7 @@ function cmdApply(opts) {
   if (manifest.exists && manifest.parseError) {
     throw new UsageError(`${MANIFEST} を JSON として読めません（${manifest.parseError}）。中身を確かめてから、もう一度実行してください。`);
   }
+  refuseIfInstalledAbove(gi);
   const pkg = readPackageJson();
   const pm = detectPackageManager(pkg, gi);
   const stack = detectStack(pkg, pm);
@@ -2202,10 +2225,21 @@ function cmdDates(opts) {
 
 // ---------------------------------------------------------------- precommit
 
-const ENV_FILE = /(^|\/)\.env(\.[^/]*)?$/;
-const ENV_OK = /(^|\/)\.env\.(example|sample|template|dist)$/i;
+/** .env の形か。guard-bash.mjs の isEnvPath と同じ規則（ファイル名だけを見る・大文字小文字を区別しない・末尾が .example／.sample／.template なら見本）。 */
+function isEnvPath(p) {
+  const base = String(p).replace(/[\\/]+$/, "").replace(/^.*[\\/]/, "");
+  return /^\.env(?:\..+)?$/i.test(base) && !/\.(?:example|sample|template)$/i.test(base);
+}
 /** playwright などがログイン状態を保存する形（stage されていたら止める）。 */
-const AUTH_STATE = /((^|\/)\.auth\/.+\.json$|\.auth-state\.json$|(^|\/)storage-?state[^/]*\.json$|(^|\/)\.playwright-cli\/)/i;
+/** ログイン状態を保存したファイルか。guard-bash.mjs の isAuthStatePath と同じ規則（直すときは両方直す）。 */
+function isAuthStatePath(p) {
+  const norm = String(p).replace(/\\/g, "/");
+  const base = norm.slice(norm.lastIndexOf("/") + 1);
+  if (/\.(?:example|sample|template)\.json$/i.test(base) || /schema/i.test(base)) return false;
+  if (/(^|\/)\.playwright-cli\//.test(norm)) return true;
+  if (/(^|\/)\.auth\/[^/]+\.json$/i.test(norm)) return true;
+  return /(?:auth|storage)[-_]?state[^/]*\.json$/i.test(base);
+}
 /** 名前だけがログイン状態らしいファイル（i18n の auth.json など、よくある名前なので注意に留める）。 */
 const AUTH_LIKE = /(^|[/._-])auth([._-][^/]*)?\.json$/i;
 
@@ -2234,15 +2268,19 @@ function cmdPrecommit() {
     }
     const d = git(["diff", "--cached", "--name-only", "-z"]);
     staged = d.stdout.split("\0").filter(Boolean);
-    for (const f of staged) {
-      if (ENV_FILE.test(f) && !ENV_OK.test(f)) {
-        problems.push({ code: "env-staged", message: `秘密情報のファイル ${f} が stage されています。git restore --staged ${f} で外してください。`, path: f });
-      } else if (AUTH_STATE.test(f)) {
-        problems.push({ code: "auth-state-staged", message: `ログイン状態を保存したファイル ${f} が stage されています。git restore --staged ${f} で外し、.gitignore に足してください。`, path: f });
+    // 秘密の値の判定は、足した・変えたファイルだけを見る（git rm --cached で外した削除を、もう一度指摘しないため。hook と同じ）
+    const added = git(["diff", "--cached", "--name-only", "-z", "--diff-filter=ACMRT"]).stdout.split("\0").filter(Boolean);
+    const here = (f) => (gi.root ? toPosix(path.relative(CWD, path.join(gi.root, f))) : f); // 案内に書くパス（いまのフォルダから）
+    for (const rootPath of added) {
+      const f = here(rootPath);
+      if (isEnvPath(f)) {
+        problems.push({ code: "env-staged", message: `秘密情報のファイル ${f} が stage されています。git rm --cached ${f} で stage から外してください（作業中のファイルは残ります）。`, path: f });
+      } else if (isAuthStatePath(f)) {
+        problems.push({ code: "auth-state-staged", message: `ログイン状態を保存したファイル ${f} が stage されています。git rm --cached ${f} で外し、.gitignore に足してください。`, path: f });
       } else if (AUTH_LIKE.test(f)) {
-        warnings.push({ code: "auth-like-staged", message: `${f} は名前がログイン状態のファイルに似ています。翻訳や設定のファイルならそのままでよい。ログイン状態（Cookie やトークン）なら git restore --staged ${f} で外してください。`, path: f });
+        warnings.push({ code: "auth-like-staged", message: `${f} は名前がログイン状態のファイルに似ています。翻訳や設定のファイルならそのままでよい。ログイン状態（Cookie やトークン）なら git rm --cached ${f} で外してください。`, path: f });
       } else if (/^CLAUDE\.md\.bak/.test(f)) {
-        warnings.push({ code: "backup-staged", message: `${f}（置き換える前の CLAUDE.md の控え）が stage されています。コミットしないなら git restore --staged ${f} で外してください。`, path: f });
+        warnings.push({ code: "backup-staged", message: `${f}（置き換える前の CLAUDE.md の控え）が stage されています。コミットしないなら git rm --cached ${f} で外してください。`, path: f });
       }
     }
     if (!staged.length) problems.push({ code: "nothing-staged", message: "stage されたファイルがありません。先にパスを明示して git add してください。" });
@@ -2560,6 +2598,13 @@ function guessInstalledVersion(manifest) {
   return null;
 }
 
+/** 上のフォルダに docdd があるときは、ここへ雛形や manifest を書かない（入れ子の導入を作らない）。 */
+function refuseIfInstalledAbove(gi) {
+  if (DOCDD_MARKERS.some(isFile) || isDocddByBacklog()) return;
+  const above = docddRootAbove(gi);
+  if (above) throw new UsageError(`このフォルダより上（${rootLabel(above)}）に docdd が導入済みです。ここには書きません。そのフォルダで Claude Code を開き直してください。`);
+}
+
 function planUpdate(opts) {
   const templates = listTemplates();
   const gi = gitInfo();
@@ -2692,6 +2737,9 @@ function cmdUpdate(opts) {
   if (st.state === "not-installed" && requested.length) {
     throw new UsageError("docdd のファイルが見つかりません。update ではなく /docdd:init で導入してください。");
   }
+  if (st.state === "installed-above" && requested.length) {
+    throw new UsageError(`このフォルダより上（${rootLabel(st.projectRoot)}）に docdd が導入済みです。ここには書きません。そのフォルダで Claude Code を開き直して /docdd:update-kit を打ってください。`);
+  }
   for (const p of requested) {
     const e = entries.find((x) => x.path === p);
     if (!e) errors.push({ path: p, message: "update の対象ではないパスです（status や update の files に出ているパスを指定する）" });
@@ -2726,7 +2774,8 @@ function cmdUpdate(opts) {
     });
     const now = claudeMdInfo();
     const migratePending = now.exists && now.legacyTables && !now.hasMarkers;
-    const kitVersion = kitPending || migratePending ? installedVersion : KIT_VERSION;
+    // 版が分からない（manifest が無かった＝v0.1 系）ときは、途中でも「0.1.0〜0.1.4」と書く（null にすると hook の案内が黙る）
+    const kitVersion = kitPending || migratePending ? installedVersion ?? "0.1.0〜0.1.4" : KIT_VERSION;
     writeFile(MANIFEST, `${JSON.stringify({ kitVersion, installedAt: base.installedAt ?? today(), updatedAt: today(), files: sortKeys(files) }, null, 2)}\n`);
     manifestWritten = true;
   }
@@ -2739,6 +2788,7 @@ function cmdUpdate(opts) {
     kitVersion: KIT_VERSION,
     installedVersion,
     state: st.state,
+    projectRoot: st.projectRoot ?? null,
     basis: manifest.exists ? "manifest" : "known-hashes",
     files: entries,
     summary: {

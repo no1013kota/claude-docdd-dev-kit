@@ -719,6 +719,38 @@ test("v0.1.4 の雛形で導入したプロジェクト: status は legacy、upd
   assert.deepEqual(again.json.applicable, [], JSON.stringify(again.json.summary));
 });
 
+test("導入の痕跡: 自前の tasks/BACKLOG.md や scripts/audit-check.mjs があるだけでは「途中まで導入済み」にしない", () => {
+  const backlog = project({ files: { "tasks/BACKLOG.md": "# やること\n\n- ログイン画面\n" } });
+  assert.equal(init(backlog, "status").json.state, "not-installed");
+  const audit = project({ files: { "scripts/audit-check.mjs": "console.log('mine')\n" } });
+  assert.equal(init(audit, "status").json.state, "not-installed");
+});
+
+test("サブフォルダで起動すると、上に docdd があれば installed-above と projectRoot を返し、何も置かない", () => {
+  const dir = project({ files: { "package.json": NPM_INIT_PACKAGE } });
+  const a = init(dir, "apply", "--settings", "no");
+  assert.equal(a.status, 0, a.stdout);
+  fs.mkdirSync(path.join(dir, "src", "app"), { recursive: true });
+  const sub = path.join(dir, "src", "app");
+  const st = init(sub, "status");
+  assert.equal(st.json.state, "installed-above");
+  assert.equal(st.json.projectRoot, ".");
+  assert.match(st.json.next, /開き直して/);
+  assert.equal(init(sub, "update").json.state, "installed-above");
+  // 上に導入があるときは、ここへ雛形も manifest も書かない（入れ子の導入を作らない）
+  const refusedApply = init(sub, "apply", "--settings", "no");
+  assert.equal(refusedApply.status, 2, refusedApply.stdout);
+  assert.ok(!fs.existsSync(path.join(sub, ".docdd")), "サブフォルダに manifest を書いた");
+  const refusedUpdate = init(sub, "update", "--apply", "CLAUDE.md");
+  assert.equal(refusedUpdate.status, 2, refusedUpdate.stdout);
+  assert.match(st.json.next, /git のルート/, "projectRoot が . のときは「git のルート」と書く");
+});
+
+test("起動したフォルダに tasks/BACKLOG.md と /docdd: を含む CLAUDE.md があれば、hook と同じく docdd とみなす（not-installed にしない）", () => {
+  const dir = project({ files: { "tasks/BACKLOG.md": "# BACKLOG\n", "CLAUDE.md": "# 開発ガイド\n\n`/docdd:dev-loop` で進める。\n" } });
+  assert.notEqual(init(dir, "status").json.state, "not-installed");
+});
+
 test("v0.1.4 から一部だけ update --apply しても v0.1 系の判定と CLAUDE.md の移行は残り、apply は拒否する。<…> の未記入は {{…}} にし、できない箇所は報告する", (t) => {
   const files = v014Files();
   if (!files) {
@@ -931,6 +963,39 @@ test("dev が無い Web のプロジェクト: serve・start を開発サーバ�
   assert.equal(devRow(bare).value, null, "Web なのに dev・serve・start が無ければ聞く（「無い」にすると Web の門で止まる）");
   const cli = project({ files: { "package.json": '{\n  "name": "tool",\n  "scripts": { "build": "tsc" }\n}\n' } });
   assert.equal(devRow(cli).value, "無い", "Web のフレームワークが無い Node のプロジェクトは従来どおり「無い」");
+});
+
+test("v0.1.4 から rules だけを update --apply しても、manifest の kitVersion を null にしない（hook の案内を黙らせない）", (t) => {
+  const files = v014Files();
+  if (!files) {
+    t.skip(`このリポジトリに ${V014}（v0.1.4）の履歴が無い（浅い clone）`);
+    return;
+  }
+  for (const f of ["scripts/check-doc-dates.mjs", "scripts/check-doc-refs.mjs", "scripts/audit-check.mjs"]) files[f] = `${files[f]}\n// 手を入れた\n`;
+  const dir = project({ files, commit: true });
+  const part = init(dir, "update", "--apply", ".claude/rules/docdd-kit.md");
+  assert.equal(part.status, 0, part.stdout);
+  const kv = JSON.parse(read(dir, ".docdd/manifest.json")).kitVersion;
+  assert.ok(kv, `kitVersion が空: ${kv}`);
+  const notify = spawnSync(process.execPath, [path.join(ROOT, "plugins/docdd/scripts/notify-update.mjs")], {
+    input: JSON.stringify({ cwd: dir }),
+    encoding: "utf8",
+    env: { ...ENV, CLAUDE_PLUGIN_ROOT: path.join(ROOT, "plugins/docdd"), CLAUDE_PROJECT_DIR: dir },
+  });
+  assert.match(notify.stdout, /\/docdd:update-kit/);
+});
+
+test("precommit: .env の判定は hook と同じ（.env.local.example は見本、.env.dist と .ENV は秘密）。直し方は git rm --cached で、外したあとは指摘しない", () => {
+  const dir = project({ files: { ".gitignore": ".env\n.env.*\n!.env.example\n", ".env.local.example": "A=\n", ".env.dist": "A=1\n", ".ENV": "A=1\n" } });
+  git(dir, ["add", "-f", "--", ".gitignore", ".env.local.example", ".env.dist", ".ENV"]);
+  const r = init(dir, "precommit");
+  const env = r.json.problems.filter((p) => p.code === "env-staged").map((p) => p.path).sort();
+  assert.deepEqual(env, [".ENV", ".env.dist"]);
+  assert.ok(r.json.problems.find((p) => p.path === ".env.dist").message.includes("git rm --cached .env.dist"));
+  assert.ok(r.json.problems.find((p) => p.code === "env-staged").message.includes("git rm --cached"));
+  git(dir, ["rm", "-q", "--cached", "--", ".env.dist", ".ENV"]);
+  const again = init(dir, "precommit");
+  assert.ok(!again.json.problems.some((p) => p.code === "env-staged"), JSON.stringify(again.json.problems));
 });
 
 test("precommit: i18n の auth.json などは注意に留め、playwright の保存形式だけを問題にする", () => {

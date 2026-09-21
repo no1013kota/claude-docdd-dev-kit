@@ -112,16 +112,21 @@ test("共通: 5 本とも先頭 3 行以内に docdd-kit の版の刻印があ�
   }
 });
 
-test("共通: Markdown の読み取り部分は check-doc-*.mjs の 3 本で同じ中身", () => {
-  const block = (name) => {
-    const text = readFileSync(path.join(SCRIPTS, name), "utf8");
-    const m = /\/\/ ---- docdd:scan-markdown begin[\s\S]*?\/\/ ---- docdd:scan-markdown end ----/.exec(text);
-    assert.ok(m, `${name} に scan-markdown の区間が無い`);
-    return m[0];
+test("共通: Markdown の読み取り部分は check-doc-*.mjs の 3 本と init.mjs で同じ中身", () => {
+  // begin 行のコメントは比べない（写しごとに注記が違う）
+  const block = (file) => {
+    const text = readFileSync(file, "utf8");
+    const m = /\/\/ ---- docdd:scan-markdown begin[^\n]*\n([\s\S]*?\/\/ ---- docdd:scan-markdown end ----)/.exec(text);
+    assert.ok(m, `${file} に scan-markdown の区間が無い`);
+    return m[1];
   };
-  const dates = block("check-doc-dates.mjs");
-  assert.equal(block("check-doc-refs.mjs"), dates);
-  assert.equal(block("check-doc-placeholders.mjs"), dates);
+  const INIT = path.join(SCRIPTS, "..", "..", "scripts", "init.mjs");
+  const dates = block(path.join(SCRIPTS, "check-doc-dates.mjs"));
+  assert.equal(block(path.join(SCRIPTS, "check-doc-refs.mjs")), dates);
+  assert.equal(block(path.join(SCRIPTS, "check-doc-placeholders.mjs")), dates);
+  assert.equal(block(INIT), dates, "init.mjs の写しがずれている（init の未記入欄の一覧と検査の結果が食い違う）");
+  const placeholder = (file) => /^const PLACEHOLDER = .*;$/m.exec(readFileSync(file, "utf8"))?.[0];
+  assert.equal(placeholder(INIT), placeholder(path.join(SCRIPTS, "check-doc-placeholders.mjs")));
 });
 
 // ---------------------------------------------------------------------------
@@ -563,6 +568,84 @@ test("dates: 更新日の行だけを変えたコミットは内容の変更に�
   commit(dir, "2026-02-01", "date only");
   const r = run(DATES, dir);
   assert.equal(r.code, 0, r.out);
+});
+
+test("dates: 名前に空白を含む文書でも、内容の変更の日付を読む（置き去りを見つける）", () => {
+  const dir = repo({ "docs/requirements/01 画面 仕様.md": prd({ date: "2026-01-15" }) }, { commitDate: "2026-01-15" });
+  write(dir, { "docs/requirements/01 画面 仕様.md": `${prd({ date: "2026-01-15" })}\n追記\n` });
+  git(dir, ["add", "--", "docs/requirements/01 画面 仕様.md"]);
+  commit(dir, "2026-03-01", "content");
+  const r = run(DATES, dir);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /01 画面 仕様\.md/);
+});
+
+test("dates: 名前を変えたコミット（git mv）は、全行を足した変更として数える", () => {
+  const dir = repo({ "docs/old.md": prd({ date: "2026-01-15" }) }, { commitDate: "2026-01-15" });
+  git(dir, ["mv", "docs/old.md", "docs/new.md"]);
+  commit(dir, "2026-03-01", "rename");
+  const r = run(DATES, dir);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /docs\/new\.md/);
+});
+
+test("dates: 本文の行が「++ 」や「--」で始まっても、内容の変更として数える", () => {
+  const dir = repo({ "docs/PRD.md": prd({ date: "2026-01-15" }) }, { commitDate: "2026-01-15" });
+  write(dir, { "docs/PRD.md": `${prd({ date: "2026-01-15" })}\n++ 足した行\n-- 引いた行\n` });
+  git(dir, ["add", "--", "docs/PRD.md"]);
+  commit(dir, "2026-03-01", "plus plus");
+  const r = run(DATES, dir);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /docs\/PRD\.md/);
+});
+
+test("dates: マージで更新日の衝突だけを解いたコミットは、内容の変更に数えない", () => {
+  const dir = repo({ "docs/PRD.md": prd({ date: "2026-01-15" }) }, { commitDate: "2026-01-15" });
+  git(dir, ["checkout", "-q", "-b", "side"]);
+  write(dir, { "docs/PRD.md": prd({ date: "2026-01-16" }) });
+  git(dir, ["add", "--", "docs/PRD.md"]);
+  commit(dir, "2026-01-16", "side date");
+  git(dir, ["checkout", "-q", "-"]);
+  write(dir, { "docs/PRD.md": prd({ date: "2026-01-17" }) });
+  git(dir, ["add", "--", "docs/PRD.md"]);
+  commit(dir, "2026-01-17", "main date");
+  spawnSync("git", ["merge", "-q", "side", "-m", "merge"], { cwd: dir, env: { ...ENV, GIT_AUTHOR_DATE: "2026-03-01T00:00:00", GIT_COMMITTER_DATE: "2026-03-01T00:00:00" } });
+  write(dir, { "docs/PRD.md": prd({ date: "2026-01-17" }) });
+  git(dir, ["add", "--", "docs/PRD.md"]);
+  commit(dir, "2026-03-01", "merge");
+  const r = run(DATES, dir);
+  assert.equal(r.code, 0, r.out);
+});
+
+test("dates: マージで衝突を新しい本文で解いたコミットは、内容の変更に数える（置き去りを見逃さない）", () => {
+  const body = (line) => `${prd({ date: "2026-01-15" })}\n${line}\n`;
+  const dir = repo({ "docs/PRD.md": body("本文 A") }, { commitDate: "2026-01-15" });
+  git(dir, ["checkout", "-q", "-b", "side"]);
+  write(dir, { "docs/PRD.md": body("本文 B") });
+  git(dir, ["add", "--", "docs/PRD.md"]);
+  commit(dir, "2026-01-15", "side");
+  git(dir, ["checkout", "-q", "-"]);
+  write(dir, { "docs/PRD.md": body("本文 C") });
+  git(dir, ["add", "--", "docs/PRD.md"]);
+  commit(dir, "2026-01-15", "main");
+  spawnSync("git", ["merge", "-q", "side", "-m", "merge"], { cwd: dir, env: ENV });
+  write(dir, { "docs/PRD.md": body("本文 D（どちらの親にも無い）") });
+  git(dir, ["add", "--", "docs/PRD.md"]);
+  commit(dir, "2026-03-01", "merge");
+  const r = run(DATES, dir);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /docs\/PRD\.md/);
+});
+
+test("dates: git が引用する名前（\" や絵文字を含む）の文書も、置き去りを見つける", { skip: process.platform === "win32" }, () => {
+  const name = 'docs/requirements/02 "画面"😀.md';
+  const dir = repo({ [name]: prd({ date: "2026-01-15" }) }, { commitDate: "2026-01-15" });
+  write(dir, { [name]: `${prd({ date: "2026-01-15" })}\n追記\n` });
+  git(dir, ["add", "--", name]);
+  commit(dir, "2026-03-01", "content");
+  const r = run(DATES, dir);
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /画面/);
 });
 
 test("dates: コードブロック内の見本の表と、見本ファイル（00_template・0000-template）は読まない", () => {

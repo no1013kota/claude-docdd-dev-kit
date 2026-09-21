@@ -275,7 +275,7 @@ mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/
 | 起票する | add-task ／ tasks-from-prd |
 | 開発する | dev-loop |
 | 自分で直したあと | **doc-sync**（省かない） |
-| 検証する | verify-integration ／ verify-e2e ／ ui-polish ／ playwright-cli |
+| 検証する | verify-integration ／ verify-e2e ／ ui-polish |
 | 仕上げる（必要なときだけ） | refactor ／ speed-up ／ security-audit |
 | 反映・点検・導入 | release ／ maintenance ／ init ／ update-kit |
 
@@ -290,7 +290,7 @@ mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/
 | `/docdd:verify-integration` | DB・migration（DB の変更手順）・権限・サーバー側の処理を変えたあと | テスト用 DB で通した統合検証の結果 |
 | `/docdd:verify-e2e` | 利用者の操作の流れを変えたあと | 最後まで通した確認の結果（Web はブラウザで、Web 以外は『E2E（実際に動かす）』行のテストで） |
 | `/docdd:ui-polish` | 画面や UI 部品を作る・直すとき（**Web 専用**） | 主な状態・画面幅・アクセシビリティ・実ブラウザの確認 |
-| `/docdd:playwright-cli` | ブラウザ操作の道具箱（ほかのスキルから使う。**Web 専用**） | 画面の操作・スクショ・コンソールの確認 |
+| `/docdd:playwright-cli` | **あなたは打ちません。** Claude が ui-polish・verify-e2e・release の中で使うブラウザ操作の道具箱（`/` メニューには出ない。**Web 専用**） | 画面の操作・スクショ・コンソールの確認 |
 | `/docdd:refactor` | 振る舞いを変えずに中身を整えるとき（単体テストが無ければ監査だけ） | 監査の結果（毎回その場で取り直す）と、承認を得た単位の `tasks/BACKLOG.md` への起票、小さな改善のコミット |
 | `/docdd:speed-up` | 画面が遅いと感じたとき（**Web 専用**。サーバー描画の Web アプリ向け。単体テストが無ければ計測と候補出しだけ） | 計測結果と改善のコミット |
 | `/docdd:security-audit` | 公開前や、認証・課金・外部連携を触ったあと | 見つけた穴の報告。直すのは 1 件ずつあなたの「はい」を得てから |
@@ -302,7 +302,7 @@ mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/
 
 ### hook（取り消しにくい操作を止める柵と、更新のお知らせ）
 
-プラグインを入れると、Claude が Bash か PowerShell でコマンドを実行する直前に、`hooks/hooks.json` と `scripts/guard-bash.mjs` が確かめます。
+プラグインを入れると、Claude が Bash か PowerShell でコマンドを実行する直前に、プラグインの中の `hooks/hooks.json` と `scripts/guard-bash.mjs` が確かめます（あなたのプロジェクトの `scripts/` には置かれません）。
 効くのは docdd のプロジェクト（`.docdd/manifest.json` がある、または `tasks/BACKLOG.md` があり `CLAUDE.md` に `/docdd:` を含む）だけで、ほかのプロジェクトの作業は止めません。Claude の文脈（トークン）は使いません。
 
 | 扱い | コマンド | 代わりにすること |
@@ -313,7 +313,8 @@ mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/
 | 止める | `git commit --no-verify`・`-n`（コミット前の検査を飛ばす） | 検査が落ちた理由を直す |
 | 止める | コミットメッセージに、角括弧つきの CI 省略の印（skip ci など） | 印を書かない |
 | 止める | 強制 push（`--force`・`--force-with-lease`・`-f`・`+ブランチ名`） | 新しいコミットを足して、ふつうに push |
-| 止める | `.env`・`.env.*` のファイルが入るコミット（`.env.example`・`.env.sample`・`.env.template` など、末尾が `.example`・`.sample`・`.template` のものは除く） | `git rm --cached <パス>` で stage から外す（作業中のファイルは残る）。`.gitignore` に `.env` と `.env.*` があるかを確かめる |
+| 止める | `.env`・`.env.*` のファイルが入るコミット（`.env.example`・`.env.sample`・`.env.template` など、末尾が `.example`・`.sample`・`.template` のものは除く。大文字小文字は区別しない） | `git rm --cached <パス>` で stage から外す（作業中のファイルは残る）。`.gitignore` に `.env` と `.env.*` があるかを確かめる |
+| 止める | ログイン状態を保存したファイル（`playwright/.auth/user.json` などの `.auth/*.json`・`storage-state*.json`・`*.auth-state.json`・`.playwright-cli/`）が入るコミット | `git rm --cached <パス>` で外し、`.gitignore` に足す（雛形は `/playwright/.auth/` を除外済み） |
 | 止める | `git add -f`／`--force` で `.env` の形のファイルを stage する | 値を空にした `.env.example` を作り、それを `git add` |
 | 止める | コミットに入る中身に、秘密の値の形がある: 秘密鍵、AWS のアクセスキー ID、Anthropic・OpenAI・Stripe（本番）・GitHub・Slack・Google の API キーやトークン、Slack の Webhook の URL、Supabase の秘密キー、role が service_role の JWT | キーは `.env` に移し、コードでは環境変数から読む（`process.env.OPENAI_API_KEY` など）。直したら、そのファイルをもう一度 `git add` |
 | 確認を出す | コミットに入る中身に、秘密らしい名前（`api_key`・`secret`・`token`・`password` など）へ 16 文字以上の文字列を入れた行がある。中身が大きすぎて（2MB を超える）全部を検査できない | 内容を読んで決める |
@@ -326,7 +327,7 @@ mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/
   - `Remove-Item` の別名（`del`・`rm` など）でも確認が出るかは、確かめていません。hook の呼び出しの条件は `PowerShell(Remove-Item *)` です。公式には、許可の規則では別名も同じに扱うとありますが、hook の条件（`if`）で同じかは書かれていません。
   - macOS・Linux の PowerShell（pwsh）では、`rm` は `Remove-Item` の別名ではなく、OS の `rm` です。`rm -rf` でも確認が出ないことがあります。
 
-**更新のお知らせ（SessionStart）**: docdd のプロジェクトで Claude Code を起動・再開したとき、`scripts/notify-update.mjs` が、プラグインの版と `.docdd/manifest.json` に記録された雛形の版を比べます。プラグインのほうが新しければ、`/docdd:update-kit` を 1 行だけ案内します（v0.1 系なら移行の案内）。
+**更新のお知らせ（SessionStart）**: docdd のプロジェクトで Claude Code を起動・再開したとき、プラグインの中の `scripts/notify-update.mjs` が、プラグインの版と `.docdd/manifest.json` に記録された雛形の版を比べます。プラグインのほうが新しければ、`/docdd:update-kit` を 1 行だけ案内します（v0.1 系なら移行の案内）。
 
 - **何も直しません。** 更新するかはあなたが決めます（`/docdd:update-kit` は、あなたが自分で打ったときだけ動きます）。
 - 版が同じとき・docdd のプロジェクトでないとき・manifest が読めないときは、何も出しません。
@@ -397,7 +398,7 @@ Project の範囲で入れた（プロジェクトの `.claude/settings.json` �
 | `.claude/rules/docdd-kit.md` | 毎回読み込まれ、無いスキルを案内する | ファイルを消す（残すなら `/docdd:` の行を直す） |
 | `.claude/settings.json`（許可設定。Project の範囲で入れて「自分だけ無効にする」を選んだときは、`enabledPlugins` の docdd の行も） | 許可設定は害がない。`enabledPlugins` の行は、docdd を有効にする指定として残る | 要らなければ消す（許可設定は残してよい） |
 | `.mcp.json` | MCP サーバーの設定が残る | 使っていなければ消す |
-| `scripts/` の 4 本と `package.json` に足した行（npm は 4 行、それ以外は 3 行） | 害はない（そのまま動く） | 消すなら `CLAUDE.md` の「docs の検査」「未記入欄の検査」「依存の脆弱性」行と、`docs/README.md` の検査の説明も直す |
+| `scripts/` の 5 本（と `audit-allowlist.json`）と `package.json` に足した行（npm は 5 行、それ以外は 4 行） | 害はない（そのまま動く） | 消すなら `CLAUDE.md` の「docs の検査」「未記入欄の検査」「依存の脆弱性」行と、`docs/README.md` の検査の説明も直す。`backlog-archive.mjs` を消すなら、`tasks/BACKLOG.md` の運用ルールと `.claude/rules/docdd-kit.md` の該当する行も直す |
 | `.docdd/manifest.json`・`.gitignore` の `# docdd:` で始まる見出しの塊 | 害はない | 消してよい（`.gitignore` は残すのがおすすめ） |
 | `docs/`・`tasks/` | あなたの仕様書と作業キュー | 残してよい |
 
@@ -443,6 +444,18 @@ Project の範囲で入れた（プロジェクトの `.claude/settings.json` �
 - API キーや `.env` の中身は貼らないでください。
 
 ## 保守する人へ
+
+**フォルダの役割**（どこに何を置くか）
+
+| フォルダ | 役割 |
+|---|---|
+| `skills/` | 手順書（スキル）15 本 |
+| `templates/` | init が利用者のプロジェクトへ**置く**雛形（`package.scripts.json` だけは `package.json` へ足す）。置いたものは各プロジェクトの正本になるので、見本や試しのファイルは置かない |
+| `examples/` | **置かない**、読むだけの記入例（いまは PRD の 1 本だけ。init の問 3 と「最初の 3 手」から読む） |
+| `scripts/`（プラグインの中） | init・update-kit の処理と hook。利用者のプロジェクトには置かない |
+| `hooks/` | hook の設定（PreToolUse・SessionStart） |
+| `evals/` | `claude plugin eval` の評価ケース |
+| リポジトリ直下の `scripts/`・`tests/` | 配布しない、このリポジトリの検査とテスト |
 
 - リリースの手順は [`RELEASING.md`](../../RELEASING.md)。main に入れた時点で配布されるので、`plugins/docdd/` を変えたら同じ PR で版を上げます（`README.md`・`CHANGELOG.md`・`evals/` だけなら上げない）。検査は `npm run check`（版の上げ忘れも見る）、外部リンクは `npm run check:urls`、テストは `npm test`（リポジトリの一番上で）。
 - スキルの `allowed-tools` に runner 単体（`Bash(npx:*)`・`Bash(npm:*)`・`Bash(pnpm:*)`・`Bash(bash -c *)` など）を書かないでください。そのスキルを呼んだターンの間、中で動く何でもが確認なしで通ります。`Bash(npx playwright-cli *)` のように、runner と内側のコマンドの組で書きます（`npm run check` が見ます）。

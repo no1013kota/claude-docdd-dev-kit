@@ -19,6 +19,7 @@ node_modules/
 /coverage/
 .playwright-cli/
 *.auth-state.json
+/playwright/.auth/
 tmp-*
 *.tmp.*
 

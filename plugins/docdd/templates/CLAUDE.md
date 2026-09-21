@@ -13,7 +13,7 @@
 | 起票する | `/docdd:add-task`（要望を 1 件ずつ）／`/docdd:tasks-from-prd`（PRD の機能をまとめて） |
 | 開発する | `/docdd:dev-loop`（タスクを 1 件。中で検証と docs 同期まで行う） |
 | **スキルを通さず自分で直した** | `/docdd:doc-sync`（実装に合わせて仕様書を直す。**省かない**） |
-| 検証する | `/docdd:verify-integration`（DB・migration・権限）／`/docdd:verify-e2e`（操作の流れ）／`/docdd:ui-polish`・`/docdd:playwright-cli`（Web の画面） |
+| 検証する | `/docdd:verify-integration`（DB・migration・権限）／`/docdd:verify-e2e`（操作の流れ）／`/docdd:ui-polish`（Web の画面。ブラウザ操作は Claude が道具箱の playwright-cli で行う） |
 | 仕上げる（必要なときだけ） | `/docdd:refactor`（中身を整える）／`/docdd:speed-up`（表示が遅い。Web）／`/docdd:security-audit`（公開前や、ログイン・課金・外部連携を触ったあと） |
 | 反映・点検する | `/docdd:release`（本番へ）／`/docdd:maintenance`（週 1 回。`monthly` で月次も） |
 | 運営者が打つ | `/docdd:init`（導入）／`/docdd:update-kit`（雛形を新しい版へ） |
@@ -27,7 +27,7 @@
 | `docs/operations/backup-and-restore.md` | 控えと戻し方（控えに入らないもの・戻す手順・戻せたことを確かめた記録）。migration を含む反映と月次点検で読む |
 | `tasks/BACKLOG.md` | 作業キュー（タスク）と要決定（運営者に決めてほしいこと）。まだ動いているものだけを置く |
 | `tasks/archive/BACKLOG-done.md` | 終わったタスクと決まった判断の置き場（`node scripts/backlog-archive.mjs` が移す）。丸ごと読まず、ID や言葉で検索する |
-| `scripts/` | docs の検査・未記入欄の検査・依存の脆弱性の検査・BACKLOG の整理（`backlog-archive.mjs`）。下の「検証コマンド」表から使う。据え置く脆弱性は、npm（`scripts/audit-check.mjs`）なら `scripts/audit-allowlist.json` に脆弱性の ID（`ids`。GHSA- で始まる）・理由（`why`）・期限（`until`）を書く。npm 以外はこの一覧が読まれないので、`tasks/BACKLOG.md` の「要決定・外部準備」に書く |
+| `scripts/` | docs の検査・未記入欄の検査・依存の脆弱性の検査・BACKLOG の整理。下の「検証コマンド」表から使う（直さずに据え置く脆弱性の書き方は `docs/README.md` §3） |
 | `.claude/rules/docdd-kit.md` | キット共通の約束。キットが管理するので直接は直さない（このプロジェクトだけの指示は下の「スキルへの追加指示」へ） |
 | `.claude/settings.json` | Claude Code の許可設定（例: 検査コマンドは確認なしで進め、削除や push は必ず確認する） |
 | `.mcp.json` | Claude Code から使う MCP サーバー（外部の道具とつなぐ設定）。使う道具に合わせて足す（例: Next.js なら shadcn/ui・Next.js DevTools を初期設定し、それ以外は空で置く） |
@@ -56,7 +56,9 @@
 | 依存の脆弱性 | {{依存の脆弱性}} |
 | 実物1周の費用上限 | {{実物1周の費用上限}} |
 
-例（書き方の見本。例の行は実行しない）:
+書き方の見本は、この表の下のコメントにある（ファイルを開くと見える。毎回の会話には読み込まれない）。
+
+<!-- 書き方の見本（例の行は実行しない）:
 
 - npm の例: 開発サーバー起動 `npm run dev`（http://127.0.0.1:3000 で開く）／型検査 `npx tsc --noEmit`／単体・DBテスト `npm test`／E2E `npx playwright test`／全検査 `npx tsc --noEmit && npm run lint && npm test && npm run build && npx playwright test`
 - pnpm の例: lint `pnpm lint`／ビルド `pnpm build`／本番モード起動 `pnpm build && PORT=3100 pnpm start`（http://127.0.0.1:3100 で開く）
@@ -66,6 +68,7 @@
 - テスト用 DB の例（3 種から選ぶ）: ① ローカル: `supabase start`／② ホスト型の開発専用: 接続先は .env の `DATABASE_URL`（本番と別・開発専用・破棄可能）／③ DB 無し
 - 依存の脆弱性の例: npm で package-lock.json があるなら `node scripts/audit-check.mjs`、pnpm なら `pnpm audit --audit-level=high --prod`（本番の依存だけを見る）
 - 実物1周の費用上限の例: 1 周 $0.50 まで（金額はバッククォートで囲まない。外部 AI や有料 API を使わないなら「無い」）
+-->
 
 ## 反映コマンド
 
@@ -82,7 +85,9 @@
 | 戻し方 | {{戻し方}} |
 | 公開先 URL | {{公開先 URL}} |
 
-例（書き方の見本。例の行は実行しない）:
+書き方の見本は、この表の下のコメントにある（ファイルを開くと見える。毎回の会話には読み込まれない）。
+
+<!-- 書き方の見本（例の行は実行しない）:
 
 - 反映の方式の例: 次の 4 つの言葉から 1 つを書く（説明は書かない）。
   - 「自動公開」— 本番ブランチへ push すると、Vercel などのホスティングが公開する
@@ -103,6 +108,7 @@
   - 配り直す（ゲーム・ネイティブアプリ）: 前の版のビルドを配る／ストアの前の版へ戻す
   - 「無い」— 戻す手段が無い（壊れたら直して出し直すしかない）
 - 公開先 URL の例: https://example.com（まだ公開しないなら「無い」）
+-->
 
 ## スキルへの追加指示
 

@@ -10,7 +10,6 @@
       "Bash(git mv:*)",
       "Bash(git ls-files:*)",
       "Bash(git rev-parse:*)",
-      "Bash(git branch:*)",
       "Bash(ls:*)",
       "Bash(mkdir:*)",
       "Bash(grep:*)",

@@ -22,6 +22,7 @@ allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs update*) Bash(no
 1. `node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" update --json` を実行する。
 2. `state` で分ける。
    - `not-installed` → 止まる。「docdd の雛形が見つかりません。先に `/docdd:init` で導入してください」と伝える。
+   - `installed-above` → 止まる。上のフォルダ（`projectRoot`）に導入済みなので、そのフォルダで Claude Code を開き直してからもう一度打つよう伝える。
    - `legacy` → v0.1 系の構成。手順 1 の中で「v0.1 系からの移行」も扱う。
    - `installed`／`partial` → そのまま進む。
 3. `summary` の件数が全部 0 なら、「新しい版（v<kitVersion>）で変わったところはありません」と伝えて終わる。
@@ -51,7 +52,7 @@ v0.1 系では、キット共通の約束（5原則・変更影響 → 必須の
    - 「スキルへの追加指示」の節を足す
    - v0.1 の雛形のまま未記入（`<…>`）で残っている行（PRD の機能一覧など）は、雛形と完全に同じ行だけ `{{…}}` の形にする（`CLAUDE.md` は migrate、ほかの文書は `additions` の `kind: placeholder`）。`{{…}}` は未記入欄の検査が拾う
 2. `legacy.removals` に `customized: true` の節があれば、その `text` を見せる。運営者が手を入れた節なので、「消す（新しい約束に任せる）／残す」を聞く。残すなら、手順 2 で `--keep-customized` を付ける。消す場合、このプロジェクトだけの指示は「スキルへの追加指示」表へ移すよう提案する。
-3. 検査スクリプト 3 本（`action: replace`）と、新しい `scripts/check-doc-placeholders.mjs`（`action: add`）も同じ承知に含めてよい。
+3. ほかの `replace`・`add`（検査スクリプトや、新しい版で増えたファイル）も、移行と同じ承知にまとめて聞いてよい。
 
 ### 2. 適用する
 

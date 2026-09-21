@@ -1,4 +1,4 @@
-// docdd-kit v0.10.0 — scripts/check-doc-dates.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
+// docdd-kit v0.11.0 — scripts/check-doc-dates.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
 // docs の「更新日」が、その文書の内容を最後に変えたコミットより古くないかを検査する。
 // あわせて、仕様の正本（PRD・requirements/・変更履歴の見出しを持つ文書）の冒頭 version と変更履歴が合うかを見る。
 //
@@ -219,20 +219,75 @@ function compareVersions(a, b) {
   return 0;
 }
 
-/** 更新日の行**以外**を変えた最後のコミット日。無ければ null。 */
-function lastContentChange(file) {
-  const shas = git(["log", "--format=%H", "--", file]).split("\n").filter(Boolean);
-  for (const sha of shas) {
-    // -U0 で文脈行を落とし、変更行だけを見る。
-    const changed = git(["show", "-U0", "--format=", sha, "--", file])
-      .split("\n")
-      .filter((l) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l))
-      .map((l) => l.slice(1));
-    // 更新日の行しか動いていないコミットは「内容の変更」ではない。
-    const substantive = changed.some((l) => !DATE_ROW.test(l) && !DATE_LINE.test(l));
-    if (substantive) return git(["log", "-1", "--format=%ad", "--date=short", sha]).trim();
+/** C の書き方で引用された git のパス（"a\"b" など）を戻す。引用されていなければそのまま。 */
+function unquotePath(p) {
+  if (!p.startsWith('"')) return p;
+  const body = p.slice(1, p.endsWith('"') ? -1 : undefined);
+  const bytes = [];
+  for (let i = 0; i < body.length; i += 1) {
+    const c = body[i];
+    if (c !== "\\") {
+      const ch = String.fromCodePoint(body.codePointAt(i)); // 絵文字など 2 単位の文字をまとめて扱う
+      bytes.push(...Buffer.from(ch, "utf8"));
+      i += ch.length - 1;
+      continue;
+    }
+    const n = body[i + 1];
+    if (/[0-7]/.test(n)) {
+      bytes.push(parseInt(body.slice(i + 1, i + 4), 8));
+      i += 3;
+    } else {
+      bytes.push(({ a: 7, b: 8, t: 9, n: 10, v: 11, f: 12, r: 13, '"': 34, "\\": 92 })[n] ?? n.charCodeAt(0));
+      i += 1;
+    }
   }
-  return null;
+  return Buffer.from(bytes).toString("utf8");
+}
+
+/**
+ * 文書ごとに、更新日の行**以外**を変えた最後のコミット日を返す（Map。無い文書は入らない）。
+ * 文書をまとめて git log を 1 回だけ呼ぶ（文書ごとに履歴をたどると、文書の数 × 履歴の長さで遅くなる）。
+ * マージは --cc の差分で読み、どの親にも無い行を足した（全部 +）か、どの親にもあった行を消した（全部 -）ときだけ数える。
+ * 更新日の衝突だけを解いたマージは数えず、衝突を新しい文で解いたマージは数える。
+ */
+function lastContentChanges(targets) {
+  const result = new Map();
+  if (targets.length === 0) return result;
+  const out = git([
+    "-c", "log.follow=false", // 利用者の設定で --follow が効くと、文書が 1 件のとき改名を数えなくなる
+    "log", "-p", "-U0", "--cc", "--no-color", "--no-ext-diff", "--no-textconv", "--no-renames", "--relative",
+    "--src-prefix=a/", "--dst-prefix=b/", "--format=%x01%ad", "--date=short", "--", ...targets,
+  ]);
+  const wanted = new Set(targets);
+  let date = null;
+  let file = null;
+  let inHunk = false;
+  let parents = 1;
+  for (const line of out.split("\n")) {
+    if (line.startsWith("\x01")) {
+      date = line.slice(1).trim();
+      file = null;
+      inHunk = false;
+    } else if (line.startsWith("diff --git ") || line.startsWith("diff --cc ")) {
+      file = null;
+      inHunk = false;
+    } else if (!inHunk && line.startsWith("+++ ")) {
+      // 見出しの行（hunk の外だけ。本文の「++ 」で始まる行を見出しと取り違えない）
+      const raw = unquotePath(line.slice(4).replace(/\t$/, ""));
+      file = raw === "/dev/null" ? null : raw.replace(/^b\//, "");
+    } else if (line.startsWith("@@")) {
+      inHunk = true;
+      parents = /^@+/.exec(line)[0].length - 1; // 「@@」なら親 1 つ、「@@@」なら親 2 つ
+    } else if (inHunk && file && date && /^[+-]/.test(line)) {
+      if (!wanted.has(file) || result.has(file)) continue; // 新しい順なので、最初に見つけたものが最新
+      const mark = line.slice(0, parents);
+      if (parents > 1 && !/^(?:\++|-+)$/.test(mark)) continue;
+      const text = line.slice(parents);
+      // 更新日の行しか動いていないコミットは「内容の変更」ではない。
+      if (!DATE_ROW.test(text) && !DATE_LINE.test(text)) result.set(file, date);
+    }
+  }
+  return result;
 }
 
 /** 変更履歴の表を読んで、合わない理由を返す（合っていれば null）。 */
@@ -269,6 +324,14 @@ function changelogProblem(lines, headVersion) {
     return `冒頭 v${headVersion} に対し変更履歴の最新は v${newest}`;
   }
   return null;
+}
+
+// まとめて読む。差分が大きすぎて読めない（ENOBUFS）ときは、文書ごとに読む。
+let commits = null;
+try {
+  commits = lastContentChanges(files);
+} catch (e) {
+  if (e.code !== "ENOBUFS") throw e;
 }
 
 const unfilled = [];
@@ -330,8 +393,13 @@ for (const file of files) {
 
   if (docDate !== null) {
     checked += 1;
-    const commit = lastContentChange(file);
-    if (commit && docDate < commit) stale.push({ file, line: dateLine, doc: docDate, commit });
+    const commit = commits ? (commits.get(file) ?? null) : (lastContentChanges([file]).get(file) ?? null);
+    if (commit && docDate < commit) {
+      // まとめて読んだ履歴は、文書ごとの履歴の単純化より多くの枝をたどる（日付が新しく出るだけで、古くは出ない）。
+      // 置き去りと言う前に、その文書だけの履歴で確かめる。
+      const exact = commits ? (lastContentChanges([file]).get(file) ?? null) : commit;
+      if (exact && docDate < exact) stale.push({ file, line: dateLine, doc: docDate, commit: exact });
+    }
   }
 
   if (isSpec && headVersion !== null) {

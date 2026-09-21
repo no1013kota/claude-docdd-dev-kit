@@ -55,6 +55,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
    - `legacy` → 何も置かずに止まる。「v0.1 系の構成で導入済みです。`/docdd:update-kit` で新しい版へ移してください」と伝える。
    - `partial` → 途中まで導入済み。手順 1 では、`placeholders` に残っている欄と、答えが無いと決まらない項目だけを聞く。対応する問いが無い欄だけが残っているなら、手順 1 は聞かずに飛ばす（まだコミットしていなければ手順 2・3 へ進み、残った欄は手順 4 で一覧にする）。
    - `not-installed` → そのまま進む。
+   - `installed-above` → 上のフォルダ（`projectRoot`）に導入済み。**何も置かずに止まり**、`next` の文面どおり、そのフォルダで Claude Code を開き直すよう伝える。
 4. `git.available` が false なら止まる。「git が必要です。macOS はターミナルで `xcode-select --install`、Windows は https://gitforwindows.org から Git for Windows を入れて、Claude Code を起動し直してください」と伝える。
 5. `scaffold.present` が false（`package.json` などもソースコードも無い）なら、AskUserQuestion で聞く（git の準備より先に聞く。A を選んだ人には git の準備も要らない）。
    - **A. 先に土台を作る（おすすめ）**: 止まって、「このフォルダで Claude Code に『Next.js（など）の土台を作って、動くところまで』と頼んでください。できたら `/docdd:init` をもう一度打ってください（雛形はまだ置いていないので、このフォルダで作れます）」と伝える。
@@ -172,7 +173,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
 - `CLAUDE.md.bak` を作った場合は「不要なら消してよい（コミットしていない）」
 - Web 以外のプロジェクト（手順 0-10）なら、「Web 以外のプロジェクトです。検証コマンドは一部しか推定できません。README『Web 以外のプロジェクトで使う』を見て埋め、必要なら『スキルへの追加指示』を書いてください」と伝え、次を添える
   - `.gitignore` には「# docdd: 共通」の塊を使った（`stack.languages` に Python があるときは「# docdd: Python」の塊も使った）。Web 向けの塊（`node_modules/` など）は足していない
-  - `/docdd:ui-polish`・`/docdd:speed-up`・`/docdd:playwright-cli` は Web 専用で、このプロジェクトでは「該当なし」と報告して止まる。画面・操作は、`/docdd:verify-e2e` が『E2E（実際に動かす）』行のコマンドで確かめ、自動で確かめられないものは運営者に確かめてもらう
+  - `/docdd:ui-polish`・`/docdd:speed-up` は Web 専用で、このプロジェクトでは「該当なし」と報告して止まる。画面・操作は、`/docdd:verify-e2e` が『E2E（実際に動かす）』行のコマンドで確かめ、自動で確かめられないものは運営者に確かめてもらう
   - 既存の `CLAUDE.md` や運用文書に、コミットの前に承知を得る・決まったブランチで作業する・手で直さないファイルがある、などの約束があれば、「スキルへの追加指示」表に行を足すよう勧める（スキルは本文より追加指示を優先する）。許可設定（`.claude/settings.json`）の直し方も README の同じ節にある
 - 次の一手（上から最初に当てはまるもの）:
   - 既存コードあり（手順 0-9）→ `/docdd:doc-sync --full`（いまのコードから docs を起こす）

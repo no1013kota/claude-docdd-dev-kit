@@ -2,6 +2,7 @@
 name: playwright-cli
 description: ブラウザ操作の道具箱。画面を開く・操作する・スクショを撮る・コンソールや通信を確かめるときに使う。ui-polish・verify-e2e・release から使う。接続先はローカル（公開先の確認は release のときだけ）。Web 以外のプロジェクト（ゲーム・ネイティブアプリなど）では使わない。
 allowed-tools: Bash(playwright-cli *) Bash(npx playwright-cli *) Bash(npx @playwright/cli *) Bash(npx playwright cli *) Bash(npx --no-install playwright cli *)
+user-invocable: false
 ---
 
 # playwright-cli：ブラウザ操作の道具箱

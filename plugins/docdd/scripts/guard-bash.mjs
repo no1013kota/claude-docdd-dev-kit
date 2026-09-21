@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // docdd guard-bash — Claude Code の PreToolUse hook（Bash ツールと PowerShell ツール用）。
 // docdd のプロジェクトでだけ、取り消しにくい git 操作を止め（exit 2）、rm・Remove-Item の再帰・強制削除では確認を出す（permissionDecision "ask"）。
-// git commit の直前には、コミットに入る中身から秘密の値（API キー・秘密鍵・.env）を探し、確実な形は止め、怪しい形は確認を出す。
+// git commit の直前には、コミットに入る中身から秘密の値（API キー・秘密鍵・.env・ログイン状態のファイル）を探し、確実な形は止め、怪しい形は確認を出す。
 // 依存なし・Node 18 以上。読めない入力・解析の失敗・対象外のプロジェクト・git が動かないときは何もしない（exit 0）。
 
 import fs from 'node:fs';
@@ -42,6 +42,11 @@ const MSG = {
     'docdd: .env の形のファイル（.env・.env.local など）はコミットに入れられません。API キーなどの秘密の値が入るからです。' +
     '「git rm --cached <パス>」で stage から外し（作業中のファイルは残ります）、.gitignore に .env と .env.* があるかを確かめてください。' +
     '設定の見本を共有したいときは、値を空にした .env.example をコミットしてください。',
+  authCommit:
+    'docdd: ログイン状態を保存したファイル（Playwright の storageState など。Cookie やトークンが入る）はコミットに入れられません。' +
+    '「git rm --cached <パス>」で stage から外し（作業中のファイルは残ります）、そのファイルかフォルダを .gitignore に足してください。' +
+    'git rm と git commit は、別のコマンドとして実行してください（同じコマンドでつなぐと、まだ外れていない状態で止まります）。' +
+    'ログイン状態でなく見本やスキーマなら、名前に .example.json・.sample.json・.template.json を付けると止まりません。',
   secretBlock:
     'docdd: コミットに入る中身に、秘密の値（API キー・秘密鍵など）の形があります。コミットすると履歴に残り、漏れると不正に使われるおそれがあります。' +
     'キーは .env に移し、コードでは環境変数から読んでください（process.env.OPENAI_API_KEY など）。直したら、そのファイルをもう一度 git add してください。' +
@@ -983,6 +988,27 @@ function isEnvPath(p) {
   return /^\.env(?:\..+)?$/i.test(base) && !/\.(?:example|sample|template)$/i.test(base);
 }
 
+// ログイン状態を保存したファイル（Cookie やトークンが入る）。init.mjs の isAuthStatePath と同じ規則（直すときは両方直す）。
+// 見本・スキーマ（名前に .example.／.sample.／.template.／schema を含む）は止めない。
+function isAuthStatePath(p) {
+  const norm = String(p).replace(/\\/g, '/');
+  const base = norm.slice(norm.lastIndexOf('/') + 1);
+  if (/\.(?:example|sample|template)\.json$/i.test(base) || /schema/i.test(base)) return false;
+  if (/(^|\/)\.playwright-cli\//.test(norm)) return true;
+  if (/(^|\/)\.auth\/[^/]+\.json$/i.test(norm)) return true;
+  return /(?:auth|storage)[-_]?state[^/]*\.json$/i.test(base);
+}
+
+// dir が git のルートから見てどこか（"" か "sub/dir/"）。ls-files --others は dir からの相対パスを返すので、判定の前にルートからのパスへ直す。
+const prefixCache = new Map();
+function prefixOf(dir) {
+  if (!prefixCache.has(dir)) {
+    const r = runGit(['rev-parse', '--show-prefix'], dir);
+    prefixCache.set(dir, !r.error && r.status === 0 ? r.stdout.trim() : '');
+  }
+  return prefixCache.get(dir);
+}
+
 function jwtRole(token) {
   try {
     const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
@@ -1068,6 +1094,10 @@ function scanAddedLines(files, out) {
   for (const f of files) {
     if (isEnvPath(f.path)) {
       out.envPaths.add(f.path);
+      continue;
+    }
+    if (isAuthStatePath(f.path)) {
+      out.authPaths.add(f.path);
       continue;
     }
     const lines = f.added;
@@ -1208,7 +1238,10 @@ function collectStaged(dir, out) {
   if (!names.error && names.status !== 0) return false;
   if (names.error) out.truncated = true;
   const list = (names.stdout || '').split('\0').filter(Boolean);
-  for (const p of list) if (isEnvPath(p)) out.envPaths.add(p);
+  for (const p of list) {
+    if (isEnvPath(p)) out.envPaths.add(p);
+    else if (isAuthStatePath(p)) out.authPaths.add(p);
+  }
   if (!list.length) return true;
   const files = readDiff(['--cached', '--diff-filter=ACMRT'], dir, out);
   if (files) scanAddedLines(files, out);
@@ -1219,6 +1252,11 @@ function collectStaged(dir, out) {
 function readUntracked(dir, rel, out) {
   if (isEnvPath(rel)) {
     out.envPaths.add(rel);
+    return;
+  }
+  const full = prefixOf(dir) + rel;
+  if (isAuthStatePath(full)) {
+    out.authPaths.add(full);
     return;
   }
   if (out.truncated) return;
@@ -1250,12 +1288,12 @@ function readUntracked(dir, rel, out) {
 
 // 同じコマンドで git commit より前にある git add（や git commit <パス>）が入れる中身。
 // 追跡済みは HEAD との差分の追加行（コミットがまだ無ければ index との差分）、未追跡はファイル全体。
-function collectPending({ dir, paths, force, update }, out) {
+function collectPending({ dir, paths, force, update, untracked = true }, out) {
   if (!paths.length && !update) return;
   const spec = paths.length ? ['--', ...paths] : [];
   const files = readDiff(['HEAD', ...spec], dir, out) || readDiff(spec, dir, out);
   if (files) scanAddedLines(files, out);
-  if (!paths.length) return;
+  if (!paths.length || !untracked) return;
   const lists = [['ls-files', '-z', '--others', '--exclude-standard', '--', ...paths]];
   if (force) lists.push(['ls-files', '-z', '--others', '--ignored', '--exclude-standard', '--', ...paths]);
   for (const args of lists) {
@@ -1280,7 +1318,7 @@ function listFindings(set) {
 
 // commits: [{ dir, pending: [{ dir, paths, force, update }], paths }]
 function scanSecrets(commits, cwd) {
-  const out = { blocks: new Set(), asks: new Set(), envPaths: new Set(), scanned: 0, truncated: false };
+  const out = { blocks: new Set(), asks: new Set(), envPaths: new Set(), authPaths: new Set(), scanned: 0, truncated: false };
   const usable = (d) => (d && exists(d) ? d : cwd);
   const stagedDone = new Set();
   for (const c of commits) {
@@ -1290,11 +1328,13 @@ function scanSecrets(commits, cwd) {
       if (!collectStaged(dir, out)) continue;
     }
     const pending = [...c.pending];
-    if (c.paths.length) pending.push({ dir: c.dir, paths: c.paths, force: false, update: false });
+    // git commit <パス> は追跡中のファイルだけを入れる（未追跡は git が拒む）ので、未追跡は読まない
+    if (c.paths.length) pending.push({ dir: c.dir, paths: c.paths, force: false, update: false, untracked: false });
     for (const p of pending) collectPending({ ...p, dir: usable(p.dir) }, out);
   }
   const blocks = [];
   if (out.envPaths.size) blocks.push(`${MSG.envCommit}\n${listFindings(new Set([...out.envPaths].map((p) => `- ${p}`)))}`);
+  if (out.authPaths.size) blocks.push(`${MSG.authCommit}\n${listFindings(new Set([...out.authPaths].map((p) => `- ${p}`)))}`);
   if (out.blocks.size) blocks.push(`${MSG.secretBlock}\n${listFindings(out.blocks)}`);
   const asks = [];
   if (out.asks.size) asks.push(`${MSG.secretAsk}\n${listFindings(out.asks)}`);

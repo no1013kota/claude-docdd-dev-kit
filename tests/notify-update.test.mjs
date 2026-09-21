@@ -89,6 +89,16 @@ test('docdd のプロジェクトでなければ何も出さない', () => {
   assert.equal(runHook(dir).out, '');
 });
 
+test('サブフォルダで起動すると、docdd を入れたフォルダで開き直すよう伝える', () => {
+  const dir = project('sub', { kitVersion: '0.1.0', files: {} });
+  const sub = path.join(dir, 'src', 'app');
+  fs.mkdirSync(sub, { recursive: true });
+  const r = runHook(sub);
+  assert.match(r.out, /\/docdd:update-kit/);
+  assert.ok(r.out.includes(dir), r.out);
+  assert.equal(r.out.split('\n').length, 1);
+});
+
 test('git のルートより上は見ない（docdd の中の別リポジトリでは黙る）', () => {
   const outer = project('outer', { kitVersion: '0.1.0', files: {} });
   const inner = path.join(outer, 'vendor', 'lib');
