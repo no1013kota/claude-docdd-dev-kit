@@ -1,5 +1,20 @@
 # リリース手順（著者用）
 
+## フォルダの役割（plugins/docdd の中）
+
+| フォルダ | 役割 |
+|---|---|
+| `skills/` | 手順書（スキル）14 本 |
+| `templates/` | init が利用者のプロジェクトへ**置く**雛形（`package.scripts.json` だけは `package.json` へ足す）。置いたものは各プロジェクトの正本になるので、見本や試しのファイルは置かない |
+| `examples/` | **置かない**、読むだけの記入例（いまは PRD の 1 本だけ） |
+| `scripts/` | init・update-kit の処理と hook。利用者のプロジェクトには置かない |
+| `hooks/` | hook の設定（PreToolUse・SessionStart） |
+| `evals/` | `claude plugin eval` の評価ケース |
+
+リポジトリ直下の `scripts/`・`tests/` は、配布しない、このリポジトリの検査とテスト（hook の動作は `tests/guard-bash.test.mjs`）。
+
+- スキルの `allowed-tools` に runner 単体（`Bash(npx:*)`・`Bash(npm:*)`・`Bash(pnpm:*)`・`Bash(bash -c *)` など）を書かない。そのスキルを呼んだターンの間、中で動く何でもが確認なしで通る。`Bash(npx playwright-cli *)` のように、runner と内側のコマンドの組で書く（`npm run check` が見る）。
+
 ## main と配布
 
 - **main に入れた時点で配布されます。** タグを打った時点ではありません。
