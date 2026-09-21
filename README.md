@@ -2,8 +2,7 @@
 
 Claude Code のプラグイン マーケットプレイスです。プラグイン `docdd` を入れると、1 人の非エンジニアが Web アプリやゲームなどを作り続けるための「約束（CLAUDE.md）・仕様書（docs）・作業キュー（BACKLOG）・手順書（スキル）」がそろいます。
 要望をタスクにし、実装・検証・仕様書の更新・コミット・本番反映までを、毎回同じ手順で Claude Code に進めさせます。
-作るものの技術（React・Vue・Python など）は問いません。Web アプリが中心ですが、Unity などのゲーム・ネイティブアプリでも、仕様書・タスク・検証の表の進め方は使えます。
-Claude Code（ターミナル・Desktop・IDE）向けです。git・Node.js・ターミナルが要るので、Cowork では動作を確かめていません。
+Claude Code（ターミナル・Desktop・IDE）向けです。
 背景と考え方はブログ記事「[コードを書けなくても Claude Code でアプリを壊さず作り続ける「4つのファイル」の仕組み](https://exosai.net/blog/claude-code-non-engineer-workflow)」にあります。
 
 ## 全体像
@@ -12,23 +11,25 @@ Claude Code（ターミナル・Desktop・IDE）向けです。git・Node.js・�
 
 ```mermaid
 flowchart TD
-  I["/docdd:init<br/>最初の 1 回。雛形と表を置く"] --> S
+  I["/docdd:init<br/>最初の 1 回。雛形を置き、表を埋める"] --> C[("CLAUDE.md の表<br/>検証コマンド・反映コマンド<br/>スキルが実行するのはここのコマンドだけ")]
+  I --> S
+  Y["docs を自分で書き換えたとき<br/>（PRD に機能を足した など）"] --> S
   S[("docs/ 仕様の正本<br/>PRD＝何を作るか／requirements＝どう作るか")] --> A["/docdd:add-task<br/>要望を 1 件のタスクにする<br/>（PRD からまとめてなら /docdd:tasks-from-prd）"]
   A -->|タスクと要決定を書く| B[("tasks/BACKLOG.md<br/>いま動いているものだけ<br/>todo のタスク／あなたへの要決定 D-番号")]
-  B -->|上から 1 件だけ取る| D["/docdd:dev-loop<br/>仕様を読む → 実装 → 検証 → 仕様書を更新 → コミット"]
-  S -.->|読む| D
-  D -.->|書き足す| S
+  B -->|上から 1 件だけ取る| D["/docdd:dev-loop<br/>仕様を読む → 実装 → 検証<br/>→ 仕様書を更新（中で doc-sync）→ コミット"]
+  S -.->|タスクの仕様を読む| D
+  D -.->|書き足す・直す| S
   D -->|決めてほしいことが出た| Q["あなたが D-番号に答える"]
   Q --> B
   D -->|done にして次の 1 件へ| B
   D -->|終わったタスク・決まった判断を移す| AR[("tasks/archive/BACKLOG-done.md")]
-  X["スキルを通さず自分で直したとき"] --> DS["/docdd:doc-sync<br/>実装に合わせて仕様書を直す"]
+  B ~~~ X
+  X["スキルを通さず<br/>自分でコードを直したとき"] --> DS["/docdd:doc-sync<br/>実装に合わせて仕様書を直す"]
   DS -.->|書き直す| S
   D -->|依頼が全部終わった| F["仕上げ（必要なときだけ）<br/>/docdd:refactor・/docdd:speed-up・/docdd:security-audit"]
+  DS -->|直し終わった| F
   F --> R["/docdd:release<br/>本番へ出す前に必ず「はい」を聞く"]
   R --> L["公開<br/>自動公開／確認してから公開／コマンドで公開"]
-  C[("CLAUDE.md の表<br/>検証コマンド・反映コマンド")] -.->|実行するコマンドはこの表だけ| D
-  C -.-> R
 ```
 
 | 置き場 | 何が入るか | 誰が書くか |
@@ -39,14 +40,25 @@ flowchart TD
 | スキル（`/docdd:…`） | 起票・開発・検証・反映の決まった手順 | プラグインが持つ |
 
 - **スキルを通さずに自分でコードを直したときは、`/docdd:doc-sync` を打ちます**（仕様書と実装がずれたままにしない）。`/docdd:dev-loop` と `/docdd:refactor` は中で doc-sync を呼ぶので、その必要はありません。
+- **docs を自分で書き換えたときは、`/docdd:add-task` で変えた所をタスクにします**（PRD に機能をまとめて足したなら `/docdd:tasks-from-prd`）。docs を書き換えただけでは、アプリは変わりません。
 - 本番へ出す前に、必要なら仕上げを回します。`/docdd:refactor`（中身を整える）・`/docdd:speed-up`（表示が遅い）・`/docdd:security-audit`（公開前や、ログイン・課金・外部連携を触ったあと）。
 - ほかにも検証・点検のスキルがあります（全 15 本。`/docdd:` と打つと一覧が出ます）。
 - 本番へ出す操作は `/docdd:release` だけで、あなたが自分で打ったときにしか動かず、出す前に必ずあなたの「はい」を聞きます。公開のしかたは init で選び、あとから変えられます。データの控えと、壊れたときに前の版へ戻す手順は「[控えと戻し方](plugins/docdd/README.md#控えと戻し方壊れたときに戻せるようにする)」にあります。
 - 取り消しにくい git 操作と、秘密の値（API キーなど）が入ったコミットは、プラグインの hook（自動の見張り）が止めます。
 
+## 使える条件
+
+- **Claude Code の有料プラン**（Pro・Max・Team・Enterprise）か Console のアカウント。ターミナル・Desktop アプリ・VS Code などで使えます。ブラウザで動く claude.ai/code では `/plugin` が使えないので、この手順では入れられません。
+- **git と Node.js 18 以上**。macOS・Linux で使えます。Windows は Git for Windows を入れれば動く見込みですが、実機では確かめていません。
+- **1 人で、日本語で**使う前提です。チームで分担するための仕組みはありません。
+- **作るものの技術は問いません**（仕様書・タスク・コミットの流れはどれでも同じ）。ただし、テストやビルドのコマンドが自動で整うのは Next.js・Vite などの Node.js の Web アプリが中心で、ほかの技術では一部、または全部を自分で書きます（init が聞くので、分かる範囲で答えます）。画面を開いて確かめるスキルは Web アプリ向けで、Unity などのゲームやネイティブアプリでは飛ばします。
+- **本番へ出す `/docdd:release`** には、git の push 先が要ります。GitHub で gh（GitHub をコマンドで操作する道具）にログインしていれば、PR の作成と CI の待ちまで自動で進みます。
+
+技術ごとの詳しい対応は「[どこまで使えるか](plugins/docdd/README.md#どこまで使えるか)」にあります。
+
 ## 入れ方
 
-**用意するもの**: Claude Code（有料プラン）・git・Node.js 18 以上。入れるだけなら GitHub のアカウントは要りません（本番へ出す `/docdd:release` は GitHub のリポジトリを前提にしています）。
+**用意するもの**: Claude Code（有料プラン）・git・Node.js 18 以上。入れるのに GitHub のアカウントは要りません。
 
 ### 1. アプリのフォルダを用意する（すでにアプリがあれば飛ばす）
 
