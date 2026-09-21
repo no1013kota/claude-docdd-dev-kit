@@ -51,7 +51,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
    - 動かない、または 18 未満なら止まり、「Node.js 18 以上が必要です。https://nodejs.org/ja から LTS 版（推奨版）を入れて、Claude Code を起動し直してください」と伝える。
 2. `node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" status --json` を実行する。以下は、この結果を見て判断する。
 3. `state` で分ける。
-   - `installed` → 何も置かずに止まる。「導入済みです。仕様は `docs/PRD.md`。次は `/docdd:add-task <やりたいこと>`（PRD に機能を複数書いたなら `/docdd:tasks-from-prd`）」と伝える。
+   - `installed` → 何も置かずに止まる。「導入済みです。仕様は `docs/PRD.md`。次は `/docdd:add-task <やりたいこと>`（仕様書に機能を複数書いたなら `/docdd:tasks-from-docs`）」と伝える。
    - `legacy` → 何も置かずに止まる。「v0.1 系の構成で導入済みです。`/docdd:update-kit` で新しい版へ移してください」と伝える。
    - `partial` → 途中まで導入済み。手順 1 では、`placeholders` に残っている欄と、答えが無いと決まらない項目だけを聞く。対応する問いが無い欄だけが残っているなら、手順 1 は聞かずに飛ばす（まだコミットしていなければ手順 2・3 へ進み、残った欄は手順 4 で一覧にする）。
    - `not-installed` → そのまま進む。
@@ -177,7 +177,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
   - 既存の `CLAUDE.md` や運用文書に、コミットの前に承知を得る・決まったブランチで作業する・手で直さないファイルがある、などの約束があれば、「スキルへの追加指示」表に行を足すよう勧める（スキルは本文より追加指示を優先する）。許可設定（`.claude/settings.json`）の直し方も README の同じ節にある
 - 次の一手（上から最初に当てはまるもの）:
   - 既存コードあり（手順 0-9）→ `/docdd:doc-sync --full`（いまのコードから docs を起こす）
-  - PRD に機能を複数書いた → `/docdd:tasks-from-prd`（PRD の機能一覧からタスクをまとめて起票する）
+  - PRD に機能を複数書いた → `/docdd:tasks-from-docs`（仕様書からタスクをまとめて起票する）
   - 基盤のタスク（アプリの土台・テスト基盤）を起票した → `/docdd:dev-loop T-01`（T-01 は起票した基盤タスクの番号）
   - それ以外 → `/docdd:add-task <最初に作りたいこと>`
 - 次に Claude Code を起動したときに出る英語の確認:

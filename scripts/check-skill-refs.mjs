@@ -43,7 +43,7 @@ const PREAMBLE_B = [
 ].join("\n");
 
 const USES_A = ["dev-loop", "doc-sync", "verify-integration", "verify-e2e", "ui-polish", "refactor", "speed-up", "security-audit", "maintenance", "release"];
-const USES_B = ["add-task", "tasks-from-prd"];
+const USES_B = ["add-task", "tasks-from-docs"];
 const NO_PREAMBLE = ["init", "update-kit", "playwright-cli"];
 const MANUAL_ONLY = ["init", "release", "update-kit"];
 const OLD_PREAMBLE = "前提（プラグイン版）";

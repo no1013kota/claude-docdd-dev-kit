@@ -36,7 +36,7 @@ allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs update*) Bash(no
 | `replace` | キットのファイルで、置いたときから手が入っていない（`status: untouched`） | 一覧（パスと `matchedVersion`）を示し、「まとめて新しい版に置き換えてよいか」を 1 回だけ聞く |
 | `add` | 新しい版で増えたファイル、または見当たらないファイル | 一覧を示し、「置いてよいか」をまとめて聞く |
 | `review` | キットのファイルだが、手が入っている（`status: modified`） | `diff` を見せ、「新しい版で置き換える（入れた変更は消える）／いまのまま」を**1 件ずつ**聞く。いまのままを選んだファイルは、次回も同じ質問が出ると伝える |
-| `append` | 利用者のファイルに、新しい版で増えた節・行・`.gitignore` の行・`package.json` の script がある | `additions` の中身（見出しと本文、または行）を見せ、「足してよいか」をファイルごとに聞く |
+| `append` | 利用者のファイルに、新しい版で増えた節・行・`.gitignore` の行・`package.json` の script がある。または、名前の変わったスキルを指す行が雛形のまま残っている（`kind: rename`。`from` を `to` に置き換える） | `additions` の中身（見出しと本文、行、または置き換える前と後）を見せ、「足してよいか（置き換えてよいか）」をファイルごとに聞く |
 | `migrate` | v0.1 系の `CLAUDE.md` | 下の「v0.1 系からの移行」 |
 | `none` | することが無い | 聞かない |
 
