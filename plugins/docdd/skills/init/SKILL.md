@@ -171,7 +171,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
 - `--claude-md keep` にした場合は、「表が無いので `/docdd:dev-loop` などのスキルは止まります。`/docdd:init` をもう一度打つと、同じ 3 択で『表だけ末尾に足す』を選び直せます」
 - コミットした場合は、記録に使った名前とメール（`<名前> <メール>`。メールは push すると公開される）
 - `CLAUDE.md.bak` を作った場合は「不要なら消してよい（コミットしていない）」
-- Web 以外のプロジェクト（手順 0-10）なら、「Web 以外のプロジェクトです。検証コマンドは一部しか推定できません。README『Web 以外のプロジェクトで使う』を見て埋め、必要なら『スキルへの追加指示』を書いてください」と伝え、次を添える
+- Web 以外のプロジェクト（手順 0-10）なら、「Web 以外のプロジェクトです。検証コマンドは一部しか推定できません。README『Web 以外のプロジェクトで使う』を見て埋め、必要なら『スキルへの追加指示』を書いてください（README: https://github.com/no1013kota/claude-docdd-dev-kit/blob/main/plugins/docdd/README.md#web-以外のプロジェクトで使う例-unity）」と伝え、次を添える
   - `.gitignore` には「# docdd: 共通」の塊を使った（`stack.languages` に Python があるときは「# docdd: Python」の塊も使った）。Web 向けの塊（`node_modules/` など）は足していない
   - `/docdd:ui-polish`・`/docdd:speed-up` は Web 専用で、このプロジェクトでは「該当なし」と報告して止まる。画面・操作は、`/docdd:verify-e2e` が『E2E（実際に動かす）』行のコマンドで確かめ、自動で確かめられないものは運営者に確かめてもらう
   - 既存の `CLAUDE.md` や運用文書に、コミットの前に承知を得る・決まったブランチで作業する・手で直さないファイルがある、などの約束があれば、「スキルへの追加指示」表に行を足すよう勧める（スキルは本文より追加指示を優先する）。許可設定（`.claude/settings.json`）の直し方も README の同じ節にある

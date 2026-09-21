@@ -14,7 +14,7 @@ flowchart TD
   I["/docdd:init<br/>最初の 1 回。雛形を置き、表を埋める"] --> C[("CLAUDE.md の表<br/>検証コマンド・反映コマンド<br/>スキルは検証・反映にここのコマンドを使う")]
   I --> S
   Y["docs を自分で書き換えたとき<br/>（PRD に機能を足した など）"] --> S
-  S[("docs/ 仕様の正本<br/>PRD＝何を作るか／requirements＝どう作るか")] --> A["/docdd:add-task<br/>要望を 1 件のタスクにする<br/>（仕様書からまとめてなら /docdd:tasks-from-docs）"]
+  S[("docs/ 仕様の正本<br/>PRD＝何を作るか／requirements＝どう作るか")] --> A["/docdd:add-task<br/>要望を 1 件のタスクにする<br/>（仕様書を書いた・書き換えたなら /docdd:tasks-from-docs）"]
   A -->|タスクと要決定を書く| B[("tasks/BACKLOG.md<br/>いま動いているものだけ<br/>todo のタスク／あなたへの要決定 D-番号")]
   B -->|上から 1 件だけ取る| D["/docdd:dev-loop<br/>仕様を読む → 実装 → 検証<br/>→ 仕様書を更新（中で doc-sync）→ コミット"]
   S -.->|タスクの仕様を読む| D
@@ -24,7 +24,7 @@ flowchart TD
   D -->|done にして次の 1 件へ| B
   D -->|終わったタスク・決まった判断を移す| AR[("tasks/archive/BACKLOG-done.md")]
   B ~~~ X
-  X["スキルを通さず<br/>自分でコードを直したとき"] --> DS["/docdd:doc-sync<br/>実装に合わせて仕様書を直す"]
+  X["スキルを通さず<br/>自分でコードを直したとき<br/>（ui-polish だけで直したときも）"] --> DS["/docdd:doc-sync<br/>実装に合わせて仕様書を直す"]
   DS -.->|書き直す| S
   D -->|依頼が全部終わった| F["仕上げ（必要なときだけ）<br/>/docdd:refactor・/docdd:speed-up・/docdd:security-audit"]
   DS -->|直し終わった| F
@@ -40,8 +40,8 @@ flowchart TD
 | `tasks/BACKLOG.md` | **作業キュー**。いま動いているタスクと「要決定」（あなたに決めてほしいこと）だけを置く。dev-loop はここから 1 件ずつ取る | スキルが書き、あなたが要決定に答える |
 | `tasks/archive/BACKLOG-done.md` | 終わったタスクと決まった判断 | スキルが移す |
 
-- **スキルを通さずに自分でコードを直したときは、`/docdd:doc-sync` を打ちます**（仕様書と実装がずれたままにしない）。`/docdd:dev-loop`・`/docdd:refactor`・`/docdd:speed-up`・`/docdd:security-audit` は中で doc-sync を呼ぶので、その必要はありません。
-- **docs を自分で書き換えたときは、`/docdd:tasks-from-docs` で書き換えた所をタスクにします**（PRD・requirements・自分で置いた仕様書のどれでも）。docs を書き換えただけでは、アプリは変わりません。
+- **スキルを通さずに自分でコードを直したとき、`/docdd:ui-polish` だけで画面を直したときは、`/docdd:doc-sync` を打ちます**（仕様書と実装がずれたままにしない）。`/docdd:dev-loop`・`/docdd:refactor`・`/docdd:speed-up`・`/docdd:security-audit` は中で doc-sync を呼ぶので、その必要はありません。
+- **docs を自分で書き換えたときは、コミットせずに `/docdd:tasks-from-docs` → `/docdd:dev-loop` と進めます**（PRD・requirements・自分で置いた仕様書のどれでも）。tasks-from-docs が書き換えた所をタスクにし、dev-loop がそのとおりに実装して、書き換えた文書も一緒にコミットします（表記の直しなど、タスクにならない書き換えは tasks-from-docs が聞いてからコミットします）。
 - 本番へ出す前に、必要なら仕上げを回します。`/docdd:refactor`（中身を整える）・`/docdd:speed-up`（表示が遅い）・`/docdd:security-audit`（公開前や、ログイン・課金・外部連携を触ったあと）。
 - ほかにも検証・点検のスキルがあります（`/docdd:` と打つと一覧が出ます）。
 - 本番へ出す操作は `/docdd:release` だけで、あなたが自分で打ったときにしか動かず、出す前に必ずあなたの「はい」を聞きます。公開のしかたは init で選び、あとから `CLAUDE.md` の表で変えられます。データの控えと、前の版へ戻す手順は「[控えと戻し方](plugins/docdd/README.md#控えと戻し方)」にあります。
@@ -82,7 +82,7 @@ flowchart TD
 
 ## 詳しい説明書
 
-**使い方の詳細は [plugins/docdd/README.md](plugins/docdd/README.md) にあります。** Windows や Desktop アプリで入れるときは「[前提](plugins/docdd/README.md#前提)」、init が終わったら「[init のあとにやること](plugins/docdd/README.md#init-のあとにやること)」、英語の確認が出て迷ったら「[英語で出る確認と答え方](plugins/docdd/README.md#英語で出る確認と答え方)」を読みます。
+**使い方の詳細は [plugins/docdd/README.md](plugins/docdd/README.md) にあります。** Windows・Desktop アプリ・VS Code で入れるときは「[前提](plugins/docdd/README.md#前提)」、init が終わったら「[init のあとにやること](plugins/docdd/README.md#init-のあとにやること)」、英語の確認が出て迷ったら「[英語で出る確認と答え方](plugins/docdd/README.md#英語で出る確認と答え方)」を読みます。
 
 変更履歴は [plugins/docdd/CHANGELOG.md](plugins/docdd/CHANGELOG.md)。
 

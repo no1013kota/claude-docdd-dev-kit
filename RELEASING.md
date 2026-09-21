@@ -55,16 +55,16 @@ Anthropic のコミュニティのマーケットプレイス（`anthropics/clau
 | ライセンス | Apache-2.0 |
 | カテゴリ（聞かれたら） | development |
 | 版 | 申請する時点の plugin.json の版とタグ（`X.Y.Z` なら `docdd--vX.Y.Z`） |
-| 使える環境 | Claude Code（ターミナル・Desktop・IDE）。git・Node.js 18 以上・ターミナルが要る。Cowork では確かめていない |
+| 使える環境 | Claude Code（ターミナル・Desktop・IDE）。git と Node.js 18 以上が要る。claude.ai/code とクラウドのセッションには対応していない |
 | 問い合わせ先 | https://github.com/no1013kota/claude-docdd-dev-kit/issues/new/choose |
 
 ### 説明（日本語）
 
-1 人の非エンジニアが Claude Code で Web アプリやゲームなどを作り続けるための、日本語の開発キットです。`/docdd:init` が、約束（`CLAUDE.md`。検証コマンドと反映コマンドの表）・仕様書（PRD と requirements）・作業キュー（「要決定」つきの BACKLOG）・文書の検査スクリプトをプロジェクトに置きます。スキルが、要望をタスクにし、実装・検証・仕様書の更新・コミット・本番反映までを、毎回同じ手順で進めます。docdd のプロジェクトでは、PreToolUse の hook が、取り消しにくい git 操作（まとめての `git add`・`--amend`・`--no-verify`・強制 push）と、秘密の値（秘密鍵・既知の形の API キー・`.env`）が入ったコミットを止めます。Web アプリが中心で、Unity などの Web 以外のプロジェクトにも制限つきで対応します（Web 専用のスキルは「該当なし」で止まります）。Claude Code（ターミナル・Desktop・IDE）向けです。git・Node.js 18 以上・ターミナルが要るので、Cowork では動作を確かめていません。
+1 人の非エンジニアが Claude Code で Web アプリやゲームなどを作り続けるための、日本語の開発キットです。`/docdd:init` が、約束（`CLAUDE.md`。検証コマンドと反映コマンドの表）・仕様書（PRD と requirements）・作業キュー（「要決定」つきの BACKLOG）・文書の検査スクリプトをプロジェクトに置きます。スキルが、要望をタスクにし、実装・検証・仕様書の更新・コミット・本番反映までを、毎回同じ手順で進めます。docdd のプロジェクトでは、PreToolUse の hook が、取り消しにくい git 操作（まとめての `git add`・`--amend`・`--no-verify`・強制 push）と、秘密の値（秘密鍵・既知の形の API キー・`.env`）が入ったコミットを止めます。Web アプリが中心で、Unity などの Web 以外のプロジェクトにも制限つきで対応します（Web 専用のスキルは「該当なし」で止まります）。Claude Code（ターミナル・Desktop・IDE）向けです。git と Node.js 18 以上が要ります（claude.ai/code とクラウドのセッションには対応していません）。
 
 ### 説明（英語）
 
-A Japanese-language, spec-driven development kit for solo non-engineers who build apps and games with Claude Code. `/docdd:init` sets up a `CLAUDE.md` with verification and release command tables, a PRD and requirements docs as the single source of truth, a task backlog with a "decisions needed" queue, and doc-consistency check scripts. Skills turn a request into a task, implement and verify it, sync the docs, commit, and release, the same way every time. In docdd projects, a PreToolUse hook blocks risky git operations (bulk `git add`, `--amend`, `--no-verify`, force push) and commits that contain secrets (private keys, known API key formats, `.env` files). Web apps come first; Unity and other non-web projects are supported with limits (web-only skills report "not applicable"). Built for Claude Code in the terminal, the Desktop app and IDE extensions. It needs git, Node.js 18 or later and a terminal, so it has not been tested in Cowork.
+A Japanese-language, spec-driven development kit for solo non-engineers who build apps and games with Claude Code. `/docdd:init` sets up a `CLAUDE.md` with verification and release command tables, a PRD and requirements docs as the single source of truth, a task backlog with a "decisions needed" queue, and doc-consistency check scripts. Skills turn a request into a task, implement and verify it, sync the docs, commit, and release, the same way every time. In docdd projects, a PreToolUse hook blocks risky git operations (bulk `git add`, `--amend`, `--no-verify`, force push) and commits that contain secrets (private keys, known API key formats, `.env` files). Web apps come first; Unity and other non-web projects are supported with limits (web-only skills report "not applicable"). Built for Claude Code in the terminal, the Desktop app and IDE extensions. It needs git and Node.js 18 or later (claude.ai/code and cloud sessions are not supported).
 
 ### 使い方の例（日本語）
 

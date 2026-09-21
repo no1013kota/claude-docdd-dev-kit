@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// docdd-kit v0.12.0 — scripts/audit-check.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
+// docdd-kit v0.12.1 — scripts/audit-check.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
 //
 // 依存ライブラリの脆弱性ゲート（npm と package-lock.json を使うプロジェクト向け）。
 //
@@ -85,7 +85,6 @@ if (!(Number(lock?.lockfileVersion) >= 2) || lock.packages === null || typeof lo
   console.error(
     `audit-check: ${LOCK_NAME} が古い形式です（lockfileVersion ${lock?.lockfileVersion ?? "なし"}）。npm 7 以上で \`npm install\` を実行して作り直してください`,
   );
-  console.error("  （古い形式のままだと、脆弱性の問い合わせで依存を読めず、見落とすことがあります）");
   process.exit(2);
 }
 
