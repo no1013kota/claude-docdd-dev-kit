@@ -51,7 +51,7 @@ Claude Code の中で次を順に打ちます。1・2 はどのフォルダで�
 2. `/plugin install docdd@claude-docdd-dev-kit`（範囲を聞かれたら User。そのまま有効になります。会話を読み直す旨の警告が出たときだけ `/reload-plugins --force`）
 3. プロジェクトのフォルダで Claude Code を起動し、`/docdd:init`（前置きの無い `/init` は Claude Code 組み込みの別コマンドなので打たない）
 
-ほかの配布元から docdd を入れた場合は、`@` の右の名前（配布元の名前）が `claude-docdd-dev-kit` と違います。この README の `docdd@claude-docdd-dev-kit` と `claude-docdd-dev-kit` は、`/plugin list` に出る名前に読み替えてください。
+`docdd@claude-docdd-dev-kit` の `@` の右は、入れた場所（配布元）の名前です。この手順で入れたなら、この名前のままで大丈夫です。別の場所（例えば Anthropic のコミュニティの一覧）から入れたときは名前が変わるので、この README に出てくる `docdd@claude-docdd-dev-kit` と `claude-docdd-dev-kit` を、`/plugin list` に出る名前に読み替えてください。
 
 3 の前に、どちらに当たるかを確かめます。
 
