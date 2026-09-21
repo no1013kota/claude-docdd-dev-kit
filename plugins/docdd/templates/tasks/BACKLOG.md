@@ -9,7 +9,7 @@
 - 優先順: 上のタスクほど優先。「依存」のタスク・要決定が片付いていないタスクには着手しない（依存先がこのファイルに無ければ、`tasks/archive/BACKLOG-done.md` を ID で検索して `done`・「決定」かを確かめる）
 - 並べ替えの基準（どちらを上にするか迷ったとき）: ①失敗が記録されず、運営者に知らされない → ②利用者・運営者に実害がある（使えない・お金やデータに関わる）→ ③保守性（同じ直しを何度も繰り返す）→ ④見た目・統一。運営者が「これを先に」と言ったものは、この基準より上に置く
 - サイズ: S（半日以内）／M（1日）／L（それ以上。原則、分けて起票する）
-- 参照の書き方: `PRD A-1 / requirements/<ファイル名> <見出しID>`。requirements がまだ無ければ `PRD A-1（requirements は本タスクで追記）`。そのほかの仕様書は `<docs/ からのパス> <見出し>`（例: `specs/booking.md 予約の取り消し`）。基盤・環境のタスク（テスト基盤・CI など）は `docs/operations/development-and-testing.md §4`
+- 参照の書き方: `PRD A-1 / requirements/<ファイル名> <見出しID>`。requirements がまだ無ければ `PRD A-1（requirements は本タスクで追記）`。ID を付けない requirements の文書は `requirements/<ファイル名> <見出し>`。そのほかの仕様書は `<docs/ からのパス> <見出し>`（例: `specs/booking.md 予約の取り消し`）。基盤・環境のタスク（テスト基盤・CI など）は `docs/operations/development-and-testing.md §4`
 - 振る舞いを変えない改善（リファクタ）も、このキューに起票する。`参照:` は `なし（振る舞いを変えない）` と書き、完了条件に「外部から見た振る舞いが変わらない」を 1 行入れる。候補出しと実行は `/docdd:refactor`
 - 終えたタスクは `done` にし、「実装メモ:」「検証:」の 2 行（書き方は下の見本）を足す。**足すのはこの 2 行だけ**（1 件を短く保ち、あとで検索したときに読みやすくする）。`done`・`dropped` のタスクは `node scripts/backlog-archive.mjs` で `tasks/archive/BACKLOG-done.md` へ移し、このファイルには、まだ動いているもの（`todo`・`doing`・`blocked` と未決の判断）だけを置く
 - 運営者に判断・準備してほしいことは「要決定・外部準備」に追記する。決まったら正本（事業判断は PRD、画面・データの細部は requirements、技術判断は ADR）へ書き戻し、「状態」行を書き換えてから、同じコマンドで移す

@@ -13,11 +13,11 @@
 |---|---|
 | 起票する | `/docdd:add-task`（要望を 1 件ずつ）／`/docdd:tasks-from-docs`（仕様書からまとめて。docs を自分で書き換えたあとも） |
 | 開発する | `/docdd:dev-loop`（タスクを 1 件。中で検証と docs 同期まで行う） |
-| **スキルを通さず自分で直した** | `/docdd:doc-sync`（直したコードに合わせて仕様書を直す。**省かない**） |
+| **スキルを通さず自分で直した・ui-polish だけで直した** | `/docdd:doc-sync`（直したコードに合わせて仕様書を直す。**省かない**） |
 | 検証する | `/docdd:verify-integration`（DB・migration・権限・API）／`/docdd:verify-e2e`（操作の流れ）／`/docdd:ui-polish`（Web の画面） |
 | 仕上げる（必要なときだけ） | `/docdd:refactor`（中身を整える）／`/docdd:speed-up`（表示が遅い。Web）／`/docdd:security-audit`（公開前や、ログイン・課金・外部連携を触ったあと） |
 | 反映・点検する | `/docdd:release`（本番へ。運営者が打つ）／`/docdd:maintenance`（週 1 回。`monthly` で月次も） |
-| 運営者が打つ | `/docdd:init`（導入）／`/docdd:update-kit`（雛形を新しい版へ） |
+| 導入・更新する | `/docdd:init`（導入。運営者が打つ）／`/docdd:update-kit`（雛形を新しい版へ。運営者が打つ） |
 
 ## ディレクトリ構成
 
@@ -25,20 +25,20 @@
 |---|---|
 | `docs/` | 仕様の正本と ADR（技術判断の記録） |
 | `docs/operations/development-and-testing.md` | 開発とテストの進め方（テストの層・いつ回すか・テスト基盤が無いとき・落とし穴）。実装前に読む |
-| `docs/operations/backup-and-restore.md` | 控えと戻し方（控えに入らないもの・戻す手順・戻せたことを確かめた記録）。データを戻すときと月次点検で読む |
+| `docs/operations/backup-and-restore.md` | 控えと戻し方（何を守るか・置き場所・戻す手順・戻せたことを確かめた記録）。データを戻すときと月次点検で読む |
 | `tasks/BACKLOG.md` | 作業キュー（タスク）と要決定（運営者に決めてほしいこと）。まだ動いているものだけを置く |
 | `tasks/archive/BACKLOG-done.md` | 終わったタスクと決まった判断の置き場（`node scripts/backlog-archive.mjs` が移す） |
 | `scripts/` | docs の検査・未記入欄の検査・依存の脆弱性の検査・BACKLOG の整理のスクリプト。検査は下の「検証コマンド」表から使う |
-| `.claude/rules/docdd-kit.md` | キット共通の約束。キットが管理するので直接は直さない（このプロジェクトだけの指示は下の「スキルへの追加指示」へ） |
+| `.claude/rules/docdd-kit.md` | キット共通の約束。`/docdd:update-kit` が新しい版にするので、直接は直さない（このプロジェクトだけの指示は下の「スキルへの追加指示」へ） |
 | `.claude/settings.json` | Claude Code の許可設定（例: 検査コマンドは確認なしで進め、削除や push は必ず確認する） |
 | `.mcp.json` | Claude Code から使う MCP サーバー（外部の道具とつなぐ設定）。使う道具に合わせて足す |
-| `.docdd/manifest.json` | キットの版と、キットが置いたファイルの記録（`/docdd:update-kit` が使う。手で直さない） |
+| `.docdd/manifest.json` | キットの版と、キットが置いたファイルの記録（`/docdd:update-kit` が使う。更新のお知らせを止める `"notifyUpdates": false` を足すほかは、手で直さない） |
 | アプリ本体 | {{フレームワーク名}} |
 
 <!-- docdd:tables:begin -->
 ## 検証コマンド
 
-スキルはこの表のコマンドを実行する。コマンドはバッククォートで囲み、このプロジェクトに無いものは「無い」と書く。
+スキルは検証のコマンドをこの表から使う。コマンドはバッククォートで囲み、このプロジェクトに無いものは「無い」と書く。
 二重波かっこ（`{{…}}`）のままの行は未記入として扱い、スキルは実行せずに「未記入」と報告する。
 
 | 用途 | コマンド |

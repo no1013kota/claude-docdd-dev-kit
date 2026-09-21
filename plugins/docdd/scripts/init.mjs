@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const TEMPLATES = path.join(PLUGIN_ROOT, "templates");
-const FALLBACK_VERSION = "0.12.0";
+const FALLBACK_VERSION = "0.12.1";
 const KIT_VERSION = readKitVersion();
 const CWD = realpath(process.cwd());
 
@@ -918,7 +918,7 @@ function inferVerification(pkg, pm, stack) {
       if (bin && emits === false) set("型検査", execCmd(name, bin, "-b"), `tsconfig.json が references の形で、scripts.build が ${bin} -b を使う（参照先の tsconfig は JS を書き出さない）`);
       else if (!bin) row.source = "tsconfig.json が references の形（files: [] と references）なので tsc --noEmit では何も調べない。scripts.build にも tsc -b・vue-tsc -b が無い（ヒアリングで聞く）";
       else if (emits === true) row.source = `tsconfig.json が references の形だが、参照先の tsconfig に noEmit も emitDeclarationOnly も無く、${bin} -b が JS を書き出す（ヒアリングで聞く）`;
-      else row.source = `tsconfig.json が references の形だが、参照先の tsconfig（extends の先）を読めず、${bin} -b が JS を書き出すか確かめられない（npm install のあとに /docdd:init をもう一度打つか、ヒアリングで聞く）`;
+      else row.source = `tsconfig.json が references の形だが、参照先の tsconfig（extends の先）を読めず、${bin} -b が JS を書き出すか分からない（npm install のあとに /docdd:init をもう一度打つか、ヒアリングで聞く）`;
     } else if (hasDep("typescript") && isFile("tsconfig.json")) set("型検査", execCmd(name, "tsc", "--noEmit"), "tsconfig.json と typescript の依存");
     else set("型検査", "無い", "型検査の script も tsconfig.json も無い");
 
@@ -988,7 +988,7 @@ function inferVerification(pkg, pm, stack) {
       set("lint", "無い", why);
     }
     for (const token of ["単体・DBテスト", "E2E", "ビルド"]) {
-      set(token, null, "推定しない（Web 以外のプロジェクト。README『Web 以外のプロジェクトで使う』の例を見て書く）");
+      set(token, null, "推定しない（Web 以外のプロジェクト。plugins/docdd の README『Web 以外のプロジェクトで使う』の例を見て書く）");
     }
   }
   return [...rows.values()];
@@ -1296,7 +1296,7 @@ function computeState({ claude, manifest, placeholders, gi }) {
   return { state: "partial", missing, manifestTracked };
 }
 
-const NON_WEB_NEXT = "Web 以外のプロジェクトです。検証コマンドは一部しか推定できません。README『Web 以外のプロジェクトで使う』を見て埋め、必要なら『スキルへの追加指示』を書いてください。";
+const NON_WEB_NEXT = "Web 以外のプロジェクトです。検証コマンドは一部しか推定できません。README『Web 以外のプロジェクトで使う』を見て埋め、必要なら『スキルへの追加指示』を書いてください（README: https://github.com/no1013kota/claude-docdd-dev-kit/blob/main/plugins/docdd/README.md#web-以外のプロジェクトで使う例-unity）。";
 
 function nextForState(state, s) {
   const nonWeb = s.web === false ? NON_WEB_NEXT : "";
@@ -2946,7 +2946,7 @@ function main() {
   }
   try {
     if (!fs.existsSync(path.join(TEMPLATES, "CLAUDE.md"))) {
-      throw new UsageError(`雛形が見つかりません（${TEMPLATES}）。プラグインが壊れている可能性があります。/plugin で docdd を入れ直してください。`);
+      throw new UsageError(`雛形が見つかりません（${TEMPLATES}）。/plugin で docdd を入れ直してください。`);
     }
     switch (sub) {
       case "status":

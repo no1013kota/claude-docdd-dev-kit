@@ -13,7 +13,7 @@ import { spawnSync } from 'node:child_process';
 
 const MSG = {
   addAll:
-    'docdd: まとめて全部を stage する git add（-A／--all／.／:/／*）は使えません。別の作業の変更や秘密情報（.env など）まで入るおそれがあります。' +
+    'docdd: まとめて全部を stage する git add（-A／--all／.／:/／*）は使えません。別の作業の変更や秘密情報（.env など）まで入ることがあります。' +
     '代わりに、今回のタスクで変えたファイルだけを「git add <パス> <パス>」のように書いてください。変えたファイルは「git status --short」で確かめられます。',
   commitAll:
     'docdd: git commit -a（変更したファイルを全部まとめてコミット）は使えません。' +
@@ -48,7 +48,7 @@ const MSG = {
     'git rm と git commit は、別のコマンドとして実行してください（同じコマンドでつなぐと、まだ外れていない状態で止まります）。' +
     'ログイン状態でなく見本やスキーマなら、名前に .example.json・.sample.json・.template.json を付けると止まりません。',
   secretBlock:
-    'docdd: コミットに入る中身に、秘密の値（API キー・秘密鍵など）の形があります。コミットすると履歴に残り、漏れると不正に使われるおそれがあります。' +
+    'docdd: コミットに入る中身に、秘密の値（API キー・秘密鍵など）の形があります。コミットすると履歴に残ります。' +
     'キーは .env に移し、コードでは環境変数から読んでください（process.env.OPENAI_API_KEY など）。直したら、そのファイルをもう一度 git add してください。' +
     '秘密の値でない（偽の値・公開してよい値）なら、運営者に確かめてから、その行に docdd-allow-secret と書いてください。',
   secretAsk:
