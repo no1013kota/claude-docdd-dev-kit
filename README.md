@@ -41,7 +41,7 @@ flowchart TD
 | `tasks/archive/BACKLOG-done.md` | 終わったタスクと決まった判断 | スキルが移す |
 
 - **スキルを通さずに自分でコードを直したとき、`/docdd:ui-polish` だけで画面を直したときは、`/docdd:doc-sync` を打ちます**（仕様書と実装がずれたままにしない）。`/docdd:dev-loop`・`/docdd:refactor`・`/docdd:speed-up`・`/docdd:security-audit` は中で doc-sync を呼ぶので、その必要はありません。
-- **docs を自分で書き換えたときは、コミットせずに `/docdd:add-task`（何も書かずに打つ）→ `/docdd:dev-loop` と進めます**（PRD・requirements・自分で置いた仕様書のどれでも）。add-task が書き換えた所をタスクにし、dev-loop がそのとおりに実装して、書き換えた文書も一緒にコミットします（表記の直しなど、タスクにならない書き換えは add-task が聞いてからコミットします）。
+- **docs を自分で書き換えたときは、コミットせずに `/docdd:add-task`（何も書かずに打つ）→ `/docdd:dev-loop` と進めます**（PRD・requirements・自分で置いた仕様書のどれでも）。add-task が書き換えた所をタスクにし、dev-loop がそのとおりに実装して、書き換えた文書も一緒にコミットします（表記の直しや運用の文書など、タスクにならない書き換えは、Claude に「コミットして」と頼みます）。
 - 本番へ出す前に、必要なら仕上げを回します。`/docdd:refactor`（中身を整える）・`/docdd:speed-up`（表示が遅い）・`/docdd:security-audit`（公開前や、ログイン・課金・外部連携を触ったあと）。
 - ほかにも検証・点検のスキルがあります（`/docdd:` と打つと一覧が出ます）。
 - 本番へ出す操作は `/docdd:release` だけで、あなたが自分で打ったときにしか動かず、出す前に必ずあなたの「はい」を聞きます。公開のしかたは init で選び、あとから `CLAUDE.md` の表で変えられます。データの控えと、前の版へ戻す手順は「[控えと戻し方](plugins/docdd/README.md#控えと戻し方)」にあります。
