@@ -1,4 +1,4 @@
-// docdd-kit v0.12.1 — scripts/check-doc-placeholders.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
+// docdd-kit v0.13.0 — scripts/check-doc-placeholders.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
 // 雛形の「埋める欄」（二重波かっこの {{…}}）が、書き換えられずに残っていないかを検査する。
 // 残った欄をスキルが読むと、未記入の値を前提に動いてしまう。
 //

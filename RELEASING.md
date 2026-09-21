@@ -68,12 +68,12 @@ A Japanese-language, spec-driven development kit for solo non-engineers who buil
 
 ### 使い方の例（日本語）
 
-1. **新しい Web アプリを始める**: Next.js などの土台を作ったフォルダで `/docdd:init` を打つ。プロジェクト名と作りたいものに答えると、検証コマンド（型検査・lint・テストなど）を `package.json` から推定した `CLAUDE.md` と、`docs/PRD.md`・`tasks/BACKLOG.md` が置かれ、最初のコミットまで進む。PRD などの仕様書に機能を書いたら、`/docdd:tasks-from-docs` がタスクをまとめて下書きし、承認したら起票する。
+1. **新しい Web アプリを始める**: Next.js などの土台を作ったフォルダで `/docdd:init` を打つ。プロジェクト名と作りたいものに答えると、検証コマンド（型検査・lint・テストなど）を `package.json` から推定した `CLAUDE.md` と、`docs/PRD.md`・`tasks/BACKLOG.md` が置かれ、最初のコミットまで進む。PRD などの仕様書に機能を書いたら、何も書かずに `/docdd:add-task` と打つと、タスクをまとめて下書きし、承認したら起票する。
 2. **要望を 1 件、実装して反映する**: `/docdd:add-task メールアドレスで登録・ログインできるようにしたい` でタスクにし、`/docdd:dev-loop` で実装・検証・仕様書の更新・コミットまで進める。依頼が全部終わったら、`/docdd:release` が本番へ出す前に「はい」を取ってから反映し、公開先で確かめる。
 3. **Unity のゲームで使う**: Unity のプロジェクトで `/docdd:init` を打つ。Web 以外と判定され、『開発サーバー起動』『型検査』『lint』などを「無い」にする。README の例を見て『単体・DBテスト』に EditMode テストのコマンドを書くと、`/docdd:dev-loop` が変更のたびにそのコマンドを回す。`/docdd:verify-e2e` は『E2E（実際に動かす）』行のコマンドで確かめ、テストが 0 件なら合格にしない。Web 専用の `/docdd:ui-polish` などは「該当なし」と報告して止まる。
 
 ### 使い方の例（英語）
 
-1. **Start a new web app**: In a folder with a working scaffold such as Next.js, run `/docdd:init`. Answer the project name and what you are building. docdd places a `CLAUDE.md` whose verification commands (type check, lint, tests) are inferred from `package.json`, plus `docs/PRD.md` and `tasks/BACKLOG.md`, and makes the first commit. After you write features in the PRD or other spec docs, `/docdd:tasks-from-docs` drafts the tasks and files them once you approve.
+1. **Start a new web app**: In a folder with a working scaffold such as Next.js, run `/docdd:init`. Answer the project name and what you are building. docdd places a `CLAUDE.md` whose verification commands (type check, lint, tests) are inferred from `package.json`, plus `docs/PRD.md` and `tasks/BACKLOG.md`, and makes the first commit. After you write features in the PRD or other spec docs, run `/docdd:add-task` with no request to draft the tasks and file them once you approve.
 2. **Ship one request**: `/docdd:add-task` followed by the request (such as sign-up and login with an email address) turns it into a task. `/docdd:dev-loop` implements it, runs the verification commands, updates the docs, and commits. When all requests are done, `/docdd:release` asks for your OK before deploying to production, then checks the live site.
 3. **Use it in a Unity game**: Run `/docdd:init` in a Unity project. docdd detects a non-web project and sets rows such as the dev server, type check and lint to "none". After you add the EditMode test command from the README to the unit test row, `/docdd:dev-loop` runs it for every change. `/docdd:verify-e2e` uses the command in the E2E row and does not pass when zero tests ran. Web-only skills such as `/docdd:ui-polish` report "not applicable" and stop.
