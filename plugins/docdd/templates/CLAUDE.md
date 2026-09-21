@@ -13,7 +13,7 @@
 |---|---|
 | 起票する | `/docdd:add-task`（やりたいことを書けば 1 件。何も書かなければ、書き換えた仕様書やまだタスクになっていない所からまとめて） |
 | 開発する | `/docdd:dev-loop`（タスクを 1 件。中で検証と docs 同期まで行う） |
-| **スキルを通さず自分で直した・ui-polish だけで直した** | `/docdd:doc-sync`（直したコードに合わせて仕様書を直す。**省かない**） |
+| **スキルを通さず自分で直した** | `/docdd:doc-sync`（直したコードに合わせて仕様書を直す。**省かない**） |
 | 検証する | `/docdd:verify-integration`（DB・migration・権限・API）／`/docdd:verify-e2e`（操作の流れ）／`/docdd:ui-polish`（Web の画面） |
 | 仕上げる（必要なときだけ） | `/docdd:refactor`（中身を整える）／`/docdd:speed-up`（表示が遅い。Web）／`/docdd:security-audit`（公開前や、ログイン・課金・外部連携を触ったあと） |
 | 反映・点検する | `/docdd:release`（本番へ。運営者が打つ）／`/docdd:maintenance`（週 1 回。`monthly` で月次も） |
