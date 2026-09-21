@@ -14,6 +14,8 @@
 
 ### 変更（実際の動きと違っていた説明を直した）
 
+- **全体像の図**: 入口に「docs を自分で書き換えたとき」を足した（docs → add-task へ進む）。「自分でコードを直したとき → doc-sync」を下へ移し、doc-sync から docs と仕上げの両方へ矢印を引いた。dev-loop が中で doc-sync を呼ぶことを箱に書いた。「CLAUDE.md の表」は dev-loop と release にだけ矢印があり、ほかのスキルは使わないように見えていたので、init が埋める表とし、スキルが実行するのはここのコマンドだけ、と箱に書いた。
+- **docs を自分で書き換えたとき**: add-task で変えた所をタスクにする、と両方の README に書いた。
 - **release に要るもの**: 「GitHub のリポジトリが必須」と書いていたが、実際に要るのは git の push 先（`origin`）。GitHub と gh は、PR の作成と CI の待ちを自動にするためのもの。
 - **refactor・speed-up**: 「単体テストが無ければ監査だけ」と書いていたが、実際は `--audit` を付けないと止まる。スキルの説明文と README を本文の動きに合わせた。
 - **依存の追加の確認**: 「必ず確認が出る」と書いていたが、効くのは `npm install`・`pnpm add`・`yarn add`・`pip install` の形だけ（`pip3 install` などには効かない）。

@@ -11,23 +11,25 @@ Claude Code（ターミナル・Desktop・IDE）向けです。
 
 ```mermaid
 flowchart TD
-  I["/docdd:init<br/>最初の 1 回。雛形と表を置く"] --> S
+  I["/docdd:init<br/>最初の 1 回。雛形を置き、表を埋める"] --> C[("CLAUDE.md の表<br/>検証コマンド・反映コマンド<br/>スキルが実行するのはここのコマンドだけ")]
+  I --> S
+  Y["docs を自分で書き換えたとき<br/>（PRD に機能を足した など）"] --> S
   S[("docs/ 仕様の正本<br/>PRD＝何を作るか／requirements＝どう作るか")] --> A["/docdd:add-task<br/>要望を 1 件のタスクにする<br/>（PRD からまとめてなら /docdd:tasks-from-prd）"]
   A -->|タスクと要決定を書く| B[("tasks/BACKLOG.md<br/>いま動いているものだけ<br/>todo のタスク／あなたへの要決定 D-番号")]
-  B -->|上から 1 件だけ取る| D["/docdd:dev-loop<br/>仕様を読む → 実装 → 検証 → 仕様書を更新 → コミット"]
-  S -.->|読む| D
-  D -.->|書き足す| S
+  B -->|上から 1 件だけ取る| D["/docdd:dev-loop<br/>仕様を読む → 実装 → 検証<br/>→ 仕様書を更新（中で doc-sync）→ コミット"]
+  S -.->|タスクの仕様を読む| D
+  D -.->|書き足す・直す| S
   D -->|決めてほしいことが出た| Q["あなたが D-番号に答える"]
   Q --> B
   D -->|done にして次の 1 件へ| B
   D -->|終わったタスク・決まった判断を移す| AR[("tasks/archive/BACKLOG-done.md")]
-  X["スキルを通さず自分で直したとき"] --> DS["/docdd:doc-sync<br/>実装に合わせて仕様書を直す"]
+  B ~~~ X
+  X["スキルを通さず<br/>自分でコードを直したとき"] --> DS["/docdd:doc-sync<br/>実装に合わせて仕様書を直す"]
   DS -.->|書き直す| S
   D -->|依頼が全部終わった| F["仕上げ（必要なときだけ）<br/>/docdd:refactor・/docdd:speed-up・/docdd:security-audit"]
+  DS -->|直し終わった| F
   F --> R["/docdd:release<br/>本番へ出す前に必ず「はい」を聞く"]
   R --> L["公開<br/>自動公開／確認してから公開／コマンドで公開"]
-  C[("CLAUDE.md の表<br/>検証コマンド・反映コマンド")] -.->|実行するコマンドはこの表だけ| D
-  C -.-> R
 ```
 
 | 置き場 | 何が入るか | 誰が書くか |
@@ -38,6 +40,7 @@ flowchart TD
 | スキル（`/docdd:…`） | 起票・開発・検証・反映の決まった手順 | プラグインが持つ |
 
 - **スキルを通さずに自分でコードを直したときは、`/docdd:doc-sync` を打ちます**（仕様書と実装がずれたままにしない）。`/docdd:dev-loop` と `/docdd:refactor` は中で doc-sync を呼ぶので、その必要はありません。
+- **docs を自分で書き換えたときは、`/docdd:add-task` で変えた所をタスクにします**（PRD に機能をまとめて足したなら `/docdd:tasks-from-prd`）。docs を書き換えただけでは、アプリは変わりません。
 - 本番へ出す前に、必要なら仕上げを回します。`/docdd:refactor`（中身を整える）・`/docdd:speed-up`（表示が遅い）・`/docdd:security-audit`（公開前や、ログイン・課金・外部連携を触ったあと）。
 - ほかにも検証・点検のスキルがあります（全 15 本。`/docdd:` と打つと一覧が出ます）。
 - 本番へ出す操作は `/docdd:release` だけで、あなたが自分で打ったときにしか動かず、出す前に必ずあなたの「はい」を聞きます。公開のしかたは init で選び、あとから変えられます。データの控えと、壊れたときに前の版へ戻す手順は「[控えと戻し方](plugins/docdd/README.md#控えと戻し方壊れたときに戻せるようにする)」にあります。
