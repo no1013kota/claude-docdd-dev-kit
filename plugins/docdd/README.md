@@ -68,6 +68,7 @@ Claude Code の中で次を順に打ちます。1・2 はどのフォルダで�
 - 分からないことだけを聞きます。**選んで答える問いを先に**（選択の画面。多いときは 2 回に分かれます）、**書いて答える問いをあとで**（番号付きの 1 つのメッセージ）、分けて聞きます。
   - 選んで答える: 反映の方式（自動公開／確認してから公開／コマンドで公開／まだ公開しない）・テスト用 DB・`.claude/settings.json` を置いてよいか（まだ無いときだけ）・既存の `CLAUDE.md` の扱い・既存の `tasks/BACKLOG.md` に書式の節を足すか・終わったらコミットしてよいか
   - 書いて答える: プロジェクト名と何を作るか・既にある仕様書・PRD のやること／やらないこと・公開先 URL・本番ブランチ（「確認してから公開」なら作業ブランチも）・テスト用 DB の起動コマンドかキー名・有料 API の費用上限・推定できなかった検証コマンドの行
+- 『本番 DB のバックアップ』と『戻し方』は init では聞きません（未記入のまま置きます）。migration を含む反映のとき・公開先が壊れたときに、`/docdd:release` が候補を示して聞き、その場で表へ書きます。
 - テスト用 DB は「① 手元で起動する／② ホスト型の開発専用／③ 使わない」から選びます。ホスト型の DB は、本番と別・開発専用・破棄可能な接続先だけにします（`CLAUDE.md` にこの語が無いと `/docdd:verify-integration` は止まります）。
 - **検証コマンド（型検査・lint・テストなど）は聞きません。** `package.json`・`pyproject.toml` などから推定して表に書きます（違っていたら直します）。Web 以外のプロジェクトでは一部しか推定できません（下の「Web 以外のプロジェクトで使う（例: Unity）」）。
 - 雛形はスクリプト（`init.mjs`）がまとめて置くので、ファイルを 1 つずつ確認されることはありません。その代わり、`.claude/settings.json` だけは、まだ無ければ置く前に 1 回聞きます。置き場所がふさがっているとき（例: `tasks` という名前のファイルがある）は、1 つも置かずに止まって理由を伝えます（退けてから、もう一度 `/docdd:init`）。
@@ -245,7 +246,7 @@ mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/
 | `CLAUDE.md` | このプロジェクトのコマンドの表（検証コマンド・反映コマンド）と「スキルへの追加指示」 | あなた |
 | `.claude/rules/docdd-kit.md` | キット共通の約束（5 原則・変更影響 → 必須の検証・Definition of Done・規約）。毎回自動で読まれる | キット（直すと update-kit が聞く） |
 | `.claude/settings.json` | 許可設定（確認なしで進めるコマンド・必ず確認するコマンド・禁止する操作）。始まりのモードは決めない。まだ無いときだけ、置く前に聞く | あなた |
-| `.gitignore` | `.env`・ログイン状態・一時ファイルを git に入れない。塊は「# docdd: 共通」「# docdd: Web（Node.js・ビルド出力・Playwright）」「# docdd: Python」の 3 つ。共通はいつも、Web は Web のプロジェクトだけ、Python は Python を見つけたときだけ使う。既にあれば足りない行だけ足す | あなた |
+| `.gitignore` | `.env`・秘密鍵・DB の控え・ログイン状態・一時ファイルを git に入れない（控えは一度 git へ入れると履歴から消せない）。塊は「# docdd: 共通」「# docdd: Web（Node.js・ビルド出力・Playwright）」「# docdd: Python」の 3 つ。共通はいつも、Web は Web のプロジェクトだけ、Python は Python を見つけたときだけ使う。既にあれば足りない行だけ足す | あなた |
 | `.mcp.json` | MCP サーバーの設定。Next.js なら shadcn/ui と Next.js DevTools（版を固定）、それ以外は空 | あなた |
 | `docs/README.md` | 仕様書の地図と「どこに何を書くか」 | あなた |
 | `docs/PRD.md` | 何を作るか | あなた |
@@ -255,7 +256,7 @@ mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/
 | `docs/operations/backup-and-restore.md` | 控えに何が入らないか・戻す手順・戻せたことを確かめた記録 | あなた |
 | `tasks/BACKLOG.md` | 作業キューと要決定。まだ動いているものだけを置く | あなた |
 | `tasks/archive/BACKLOG-done.md` | 終えたタスクと決まった要決定の置き場（`scripts/backlog-archive.mjs` が移す。丸ごと読まず検索する） | あなた |
-| `scripts/check-doc-refs.mjs` | 仕様書が指すファイルが実在するか | キット |
+| `scripts/check-doc-refs.mjs` | 仕様書が指すファイルが実在するか。`docs/decisions/` の ADR が `decisions/README.md` の「ADR 一覧」に載っているか（見出しが無いプロジェクトでは突き合わせず、その旨を出す） | キット |
 | `scripts/check-doc-dates.mjs` | 仕様書の更新日がコミットより古くないか、版と変更履歴が合うか | キット |
 | `scripts/check-doc-placeholders.mjs` | 未記入の欄（`{{…}}`）が残っていないか | キット |
 | `scripts/audit-check.mjs` | 依存ライブラリの既知の脆弱性（npm と `package-lock.json` 用。本番の依存の high・critical で落ちる） | キット |
@@ -280,7 +281,7 @@ mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/
 | `/docdd:refactor` | 振る舞いを変えずに中身を整えるとき（単体テストが無ければ監査だけ） | 監査の結果（毎回その場で取り直す）と、承認を得た単位の `tasks/BACKLOG.md` への起票、小さな改善のコミット |
 | `/docdd:speed-up` | 画面が遅いと感じたとき（**Web 専用**。サーバー描画の Web アプリ向け。単体テストが無ければ計測と候補出しだけ） | 計測結果と改善のコミット |
 | `/docdd:security-audit` | 公開前や、認証・課金・外部連携を触ったあと | 見つけた穴の報告。直すのは 1 件ずつあなたの「はい」を得てから |
-| `/docdd:maintenance` | 週 1 回（`/docdd:maintenance monthly` で月次も） | 外部 API の変化・脆弱性・溜まったデータ・費用の点検結果 |
+| `/docdd:maintenance` | 週 1 回（`/docdd:maintenance monthly` で月次も） | 外部 API の変化・脆弱性・溜まったデータ・控えの鮮度の点検結果。月次は費用の実績と、控えから戻せるかの復元テスト（結果は `docs/operations/backup-and-restore.md` §5 へ） |
 | `/docdd:release` | 依頼を全部終えたあと（自分で打ったときだけ動く） | 反映の方式（自動公開／確認してから公開／コマンドで公開／まだ公開しない）で経路を選ぶ。本番へ出す前に必ずあなたの「はい」を得る。**migration（DB の構造変更）を含むなら、本番 DB を変える前にバックアップを取る**（『本番 DB のバックアップ』行）。公開先の確認結果（Web 以外は、あなたに確かめてもらう手順）。壊れていたら『戻し方』行の手順で前の版へ戻す（あなたの「はい」を得てから。行が「無い」・未記入なら戻さずに止めて聞く） |
 | `/docdd:update-kit` | プラグインを更新したあと（自分で打ったときだけ動く） | 置いた雛形を新しい版へ（手付かずは置き換え、手を入れたものは 1 件ずつ決める） |
 
@@ -337,7 +338,7 @@ mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/
 - 何が変わったかは [`CHANGELOG.md`](./CHANGELOG.md) に書きます。docdd は main に入れた時点で配布されるので、main には CI（自動の検査）で緑にした変更だけを入れます。入れている人が新しい中身を受け取れるのは、版の番号が上がったときです。
 - 更新したあと docdd のプロジェクトを開くと、版のずれを hook が 1 行で知らせます（上の「hook」）。
 - **プラグインを更新しても、プロジェクトに置いた雛形（`CLAUDE.md`・`scripts/` など）は変わりません。** 更新したら、プロジェクトのフォルダで `/docdd:update-kit` と打ちます。手付かずのファイルはまとめて置き換え、手を入れたファイルは差分を見て 1 件ずつ決めます。v0.1 系からの移行もこれで行います。
-- update-kit が足すのは、新しい版で増えた節と表の行だけです。既存の節の中の文言の変更は提案しないので、CHANGELOG の「雛形への影響」を見て、必要なら手で直します。
+- update-kit が足すのは、**新しい版で増えた `##` の節**と、**`CLAUDE.md` の 3 つの表に増えた行**だけです。既存の節の中の箇条や文言の変更、`CLAUDE.md` 以外の文書の表の行は提案しないので、CHANGELOG の「雛形への影響」の『手で直すもの』を見て手で足します。
 - 別の PC で使うときや入れ直したあとは、上の「入れ方」の 1・2 をもう一度打ちます（雛形の `.claude/settings.json` には、プラグインの取得元を書いていません）。
 
 ## やめるとき
