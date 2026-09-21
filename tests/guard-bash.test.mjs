@@ -276,6 +276,72 @@ test('秘密の値: stage した .env は止め、.env.example は通す', () =>
   assertAllowed('git commit -m "docs: 設定の見本"', ok);
 });
 
+test('秘密の値: .env の判定は init の precommit と同じ（.env.dist・.ENV は止め、.env.local.example は通す）', () => {
+  for (const name of ['.env.dist', '.ENV']) {
+    const repo = makeRepo();
+    write(repo, name, 'A=1\n');
+    git(repo, 'add', '-f', name);
+    const r = assertBlocked('git commit -m x', repo);
+    assert.match(r.stderr, new RegExp(`- ${name.replace('.', '\\.')}`));
+  }
+  const ok = makeRepo();
+  write(ok, '.env.local.example', 'A=\n');
+  git(ok, 'add', '-f', '.env.local.example');
+  assertAllowed('git commit -m x', ok);
+});
+
+test('ログイン状態: playwright/.auth/user.json などを含むコミットは止める。i18n の auth.json は止めない', () => {
+  const repo = makeRepo();
+  write(repo, 'playwright/.auth/user.json', '{"cookies":[{"name":"sid","value":"abc"}]}\n');
+  git(repo, 'add', '-f', 'playwright/.auth/user.json');
+  const r = assertBlocked('git commit -m "test: ログイン"', repo);
+  assert.match(r.stderr, /ログイン状態を保存したファイル/);
+  assert.match(r.stderr, /- playwright\/\.auth\/user\.json/);
+  assert.match(r.stderr, /git rm --cached/);
+
+  const ok = makeRepo();
+  write(ok, 'src/i18n/ja/auth.json', '{"login":"ログイン"}\n');
+  git(ok, 'add', 'src/i18n/ja/auth.json');
+  assertAllowed('git commit -m "feat: 文言"', ok);
+});
+
+test('ログイン状態: よくある名前を止め、見本・スキーマ・i18n は通す（init の precommit と同じ規則）', () => {
+  const blocked = ['auth-state.json', 'my-auth-state.json', 'storage_state.json', 'adminStorageState.json', 'e2e/storage-state.json', '.playwright-cli/profile/state.json', 'tests/.auth/admin.json'];
+  for (const name of blocked) {
+    const repo = makeRepo();
+    write(repo, name, '{"cookies":[]}\n');
+    git(repo, 'add', '-f', name);
+    const r = assertBlocked('git commit -m x', repo);
+    assert.match(r.stderr, /ログイン状態を保存したファイル/, name);
+  }
+  const allowed = ['auth-state.example.json', 'storageStateSchema.json', 'src/lib/.auth/schema.json', 'src/i18n/ja/auth.json'];
+  for (const name of allowed) {
+    const repo = makeRepo();
+    write(repo, name, '{"a":1}\n');
+    git(repo, 'add', '-f', name);
+    assertAllowed('git commit -m x', repo);
+  }
+});
+
+test('ログイン状態: サブフォルダから add しても止める（判定はルートからのパスで行う）', () => {
+  const repo = makeRepo();
+  write(repo, 'playwright/.auth/user.json', '{"cookies":[]}\n');
+  const sub = path.join(repo, 'playwright', '.auth');
+  const r = assertBlocked('git add -f user.json && git commit -m x', sub);
+  assert.match(r.stderr, /- playwright\/\.auth\/user\.json/);
+});
+
+test('秘密の値: git commit <パス> は、git が入れない未追跡のファイルを理由に止めない', () => {
+  const repo = makeRepo();
+  write(repo, 'README.md', 'a\n');
+  git(repo, 'add', 'README.md');
+  git(repo, 'commit', '-q', '-m', 'seed');
+  write(repo, 'README.md', 'b\n');
+  write(repo, 'notes/.env', 'A=1\n');
+  write(repo, 'notes/storage-state.json', '{}\n');
+  assertAllowed('git commit README.md -m x', repo);
+});
+
 test('秘密の値: git add -f で .env の形を足すのは、それだけで止める', () => {
   const repo = makeRepo();
   write(repo, '.env', 'OPENAI_API_KEY=abc\n');

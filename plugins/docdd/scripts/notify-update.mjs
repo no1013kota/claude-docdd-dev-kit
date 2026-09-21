@@ -73,18 +73,20 @@ export function compareVersions(a, b) {
 }
 
 /** 伝える文（1 行）。伝えることが無ければ null。 */
-export function noticeFor({ pluginVersion, manifestVersion, legacy }) {
+export function noticeFor({ pluginVersion, manifestVersion, legacy, root = null }) {
+  // サブフォルダで起動したときは、update-kit を打つ場所（docdd を入れたフォルダ）も「」の中で伝える
+  const where = root ? `docdd を入れたフォルダ（${String(root).replace(/[\r\n]+/g, ' ')}）で Claude Code を開いてから、` : '';
   if (legacy) {
     return (
       'docdd: このプロジェクトは古い構成（v0.1 系）のままです。' +
-      `プラグインは v${pluginVersion} です。運営者に「/docdd:update-kit を実行すると、いまの版の雛形へ移行できます」と 1 行だけ伝えてください。` +
+      `プラグインは v${pluginVersion} です。運営者に「${where}/docdd:update-kit を実行すると、いまの版の雛形へ移行できます」と 1 行だけ伝えてください。` +
       'あなた（Claude）は雛形を勝手に移行しないでください。'
     );
   }
   if (compareVersions(pluginVersion, manifestVersion) !== 1) return null;
   return (
     `docdd: プラグインは v${pluginVersion}、このプロジェクトに置いた雛形は v${manifestVersion} です。` +
-    '運営者に「/docdd:update-kit を実行すると、検査スクリプトや表の行を新しい版へ追随できます（変更点は CHANGELOG.md）」と 1 行だけ伝えてください。' +
+    `運営者に「${where}/docdd:update-kit を実行すると、検査スクリプトや表の行を新しい版へ追随できます（変更点は CHANGELOG.md）」と 1 行だけ伝えてください。` +
     'あなた（Claude）は雛形を勝手に更新しないでください。'
   );
 }
@@ -110,7 +112,8 @@ export function run(startDir) {
   const manifest = readJson(manifestPath);
   if (manifest?.notifyUpdates === false) return null; // 運営者が知らせを止めている
   // manifest が無い（v0.1 系。tasks/BACKLOG.md と CLAUDE.md で見つけた）なら移行を案内する
-  return noticeFor({ pluginVersion, manifestVersion: manifest?.kitVersion, legacy: !isFile(manifestPath) });
+  const root = path.resolve(startDir) !== dir ? dir : null; // サブフォルダで起動した（そこでは update-kit が上の導入を指すだけになる）
+  return noticeFor({ pluginVersion, manifestVersion: manifest?.kitVersion, legacy: !isFile(manifestPath), root });
 }
 
 function readStdin() {
