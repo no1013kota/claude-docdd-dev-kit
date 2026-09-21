@@ -11,7 +11,7 @@
 
 | 場面 | スキル |
 |---|---|
-| 起票する | `/docdd:add-task`（要望を 1 件ずつ）／`/docdd:tasks-from-docs`（仕様書からまとめて。docs を自分で書き換えたあとも） |
+| 起票する | `/docdd:add-task`（やりたいことを書けば 1 件。何も書かなければ、書き換えた仕様書やまだタスクになっていない所からまとめて） |
 | 開発する | `/docdd:dev-loop`（タスクを 1 件。中で検証と docs 同期まで行う） |
 | **スキルを通さず自分で直した・ui-polish だけで直した** | `/docdd:doc-sync`（直したコードに合わせて仕様書を直す。**省かない**） |
 | 検証する | `/docdd:verify-integration`（DB・migration・権限・API）／`/docdd:verify-e2e`（操作の流れ）／`/docdd:ui-polish`（Web の画面） |

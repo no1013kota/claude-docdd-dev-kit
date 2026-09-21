@@ -24,7 +24,7 @@
 | A-1 | {{機能名}} | {{機能の説明1行}} | {{Must／Should}} |
 
 ID は A-1, A-2… の連番（消した番号は使い回さない）。`tasks/BACKLOG.md` の「参照: PRD A-1」と、`docs/requirements/` の各文書から指される。
-機能は3〜7個を目安に、Must（最初の版に必須）か Should（あると良い）を付ける。`/docdd:tasks-from-docs` がまとめて起票するのは Must の行。
+機能は3〜7個を目安に、Must（最初の版に必須）か Should（あると良い）を付ける。何も書かずに `/docdd:add-task` と打つと、Must の行をまとめて起票する。
 
 ### 3.2 やらないこと（最初の版では作らない）
 

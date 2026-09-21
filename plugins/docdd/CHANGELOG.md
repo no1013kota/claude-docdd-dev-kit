@@ -3,6 +3,29 @@
 版ごとの変更と、プロジェクトに置いた雛形への影響をまとめます。
 「雛形への影響: あり」の版へ上げたら、プロジェクトのフォルダで `/docdd:update-kit` を打ちます（プラグインを更新しただけでは、置いた雛形は変わりません）。
 
+## 0.13.0（2026-09-21）
+
+**`/docdd:tasks-from-docs` を `/docdd:add-task` にまとめた。** タスクを作るスキルは add-task だけになった。やりたいことを書けば 1 件、何も書かなければ仕様書からまとめて起票する。
+
+### 変更
+
+- **add-task**: 何も書かずに打つと、仕様書（PRD・requirements・自分で置いた仕様書）の書き換えと、まだタスクになっていない所から、まとめて起票する（0.12 の tasks-from-docs と同じ動き。下書きを見せて、承認を得てから書く）。`/docdd:add-task docs/requirements/`・`/docdd:add-task HEAD~1` のように範囲も絞れる。書き換えも、まだタスクになっていない所も無ければ「何をしたいですか」と聞く。
+- **説明書・雛形・ほかのスキルの案内**: 「docs を書き換えたら、何も書かずに `/docdd:add-task`」に合わせた。スキルは 14 本（`/docdd:` の一覧に出るのは 13 本）。
+
+### 置いた仮説
+
+- 利用者は「1 件か、まとめてか」ではなく「タスクを作りたい」で考える。入口を 1 つにして、書くか書かないかで分けるほうが迷わない。
+
+### 雛形への影響: あり
+
+- `/docdd:update-kit` が置き換えを提案する: `CLAUDE.md` のスキルの表の「起票する」行（0.12 の tasks-from-docs の行や、それより前の tasks-from-prd の行が雛形のまま残っていれば）。
+- `/docdd:update-kit` で置き換わる: `.claude/rules/docdd-kit.md`（中身の変更あり）と検査スクリプト 5 本（刻印だけ）。
+- 手で直すもの（任意。Claude Code に「docdd の新しい雛形と見比べて、文言をそろえて」と頼んでもよい）:
+  - `CLAUDE.md`「スキルへの追加指示」表に `/docdd:tasks-from-docs` の行があれば、その中身を `/docdd:add-task` の行へ移す。「起票する」行を自分で書き換えていたら、`/docdd:tasks-from-docs` の案内を「何も書かずに `/docdd:add-task`」に直す。
+  - `tasks/BACKLOG.md` の冒頭の 1 行と、`docs/README.md`・`docs/PRD.md` にある `/docdd:tasks-from-docs` の案内を「何も書かずに `/docdd:add-task`」に直す。
+  - `docs/operations/development-and-testing.md` §4 の「無ければ `/docdd:add-task` で起票する」を「`/docdd:add-task テスト基盤の導入`」に直す（何も書かずに打つと、仕様書からまとめて起票するほうになるため）。
+- 打ち方が変わる: `/docdd:tasks-from-docs` は無くなった。何も書かずに `/docdd:add-task` と打つ。
+
 ## 0.12.1（2026-09-21）
 
 **0.12.0 の変更が届いていなかった所を直した。** 説明書だけでなく、スキルの説明文・雛形・利用者に出るメッセージまで、0.12.0 の流れ（docs を自分で書き換えたら `/docdd:tasks-from-docs` → `/docdd:dev-loop`）に合わせた。

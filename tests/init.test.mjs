@@ -661,10 +661,12 @@ test("update --apply と apply で manifest を書き直しても、運営者が
   assert.equal(JSON.parse(read(dir, ".docdd/manifest.json")).notifyUpdates, false);
 });
 
-test("update: 名前の変わったスキル（tasks-from-prd → tasks-from-docs）を指す CLAUDE.md の行は、雛形のままのときだけ rename で置き換える", () => {
-  const OLD = "| 起票する | `/docdd:add-task`（要望を 1 件ずつ）／`/docdd:tasks-from-prd`（PRD の機能をまとめて） |";
+for (const OLD of [
+  "| 起票する | `/docdd:add-task`（要望を 1 件ずつ）／`/docdd:tasks-from-prd`（PRD の機能をまとめて） |",
+  "| 起票する | `/docdd:add-task`（要望を 1 件ずつ）／`/docdd:tasks-from-docs`（仕様書からまとめて。docs を自分で書き換えたあとも） |",
+]) test(`update: 無くなったスキルを指す CLAUDE.md の行（${OLD.match(/tasks-from-\w+/)[0]}）は、雛形のままのときだけ rename で置き換える`, () => {
   const NEW = fs.readFileSync(path.join(TEMPLATES, "CLAUDE.md"), "utf8").split(/\r?\n/).find((l) => l.startsWith("| 起票する |"));
-  assert.match(NEW, /tasks-from-docs/);
+  assert.doesNotMatch(NEW, /tasks-from-/);
 
   const dir = project({ files: { "package.json": NPM_INIT_PACKAGE } });
   assert.equal(init(dir, "apply").status, 0);
@@ -679,7 +681,7 @@ test("update: 名前の変わったスキル（tasks-from-prd → tasks-from-doc
   const applied = init(dir, "update", "--apply", "CLAUDE.md");
   assert.equal(applied.status, 0, applied.stdout);
   assert.ok(read(dir, "CLAUDE.md").includes(NEW));
-  assert.ok(!read(dir, "CLAUDE.md").includes("tasks-from-prd"));
+  assert.ok(!read(dir, "CLAUDE.md").includes("tasks-from-"));
   assert.ok(!init(dir, "update").json.files.find((f) => f.path === "CLAUDE.md").additions?.some((a) => a.kind === "rename"));
 
   // 利用者が書き換えた行は変えない

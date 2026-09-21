@@ -44,7 +44,7 @@
 
 ## 4. テスト基盤が無いとき
 
-`CLAUDE.md`「検証コマンド」表の『単体・DBテスト』（または『E2E（実際に動かす）』）が「無い」か未記入なら、テスト基盤（テストを動かす道具と設定）が無い。テストを書く前に、土台を1つのタスクで入れる（`/docdd:init` が起票する「テスト基盤の導入」。無ければ `/docdd:add-task` で起票する）。
+`CLAUDE.md`「検証コマンド」表の『単体・DBテスト』（または『E2E（実際に動かす）』）が「無い」か未記入なら、テスト基盤（テストを動かす道具と設定）が無い。テストを書く前に、土台を1つのタスクで入れる（`/docdd:init` が起票する「テスト基盤の導入」。無ければ `/docdd:add-task テスト基盤の導入` で起票する）。
 
 - 選び方の目安: TypeScript／JavaScript は vitest（単体）と @playwright/test（E2E）。Python は pytest。依存を増やしたくなければ Node.js 標準の node:test。Unity は Unity Test Framework（EditMode／PlayMode）。Godot はアドオン（addons/ に入れる追加の部品）の GUT か gdUnit4 を入れる。GDScript だけなら GUT、C# でも書くなら gdUnit4（どちらもコマンドで回せる）。ほかの言語は、その言語の標準のテスト道具（例: go test、dotnet test）。どれにするかは運営者の承知を得てから入れる。
 - 最小構成: 設定ファイル1つ ＋ 見本テスト1件 ＋ 実行コマンド（Node.js なら package.json の scripts に test と test:e2e。Unity なら設定はテスト用の asmdef）。見本テスト1件が緑になったら完了。

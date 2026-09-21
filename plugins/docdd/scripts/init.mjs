@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const TEMPLATES = path.join(PLUGIN_ROOT, "templates");
-const FALLBACK_VERSION = "0.12.1";
+const FALLBACK_VERSION = "0.13.0";
 const KIT_VERSION = readKitVersion();
 const CWD = realpath(process.cwd());
 
@@ -180,8 +180,9 @@ const LEGACY_PLACEHOLDER_LINES = {
  */
 const RENAMED_LINES = {
   "CLAUDE.md": [
-    // v0.12.0: tasks-from-prd → tasks-from-docs
+    // v0.12.0: tasks-from-prd → tasks-from-docs。v0.13.0: tasks-from-docs を add-task にまとめた
     ["| 起票する | `/docdd:add-task`（要望を 1 件ずつ）／`/docdd:tasks-from-prd`（PRD の機能をまとめて） |", { templateRow: "起票する" }],
+    ["| 起票する | `/docdd:add-task`（要望を 1 件ずつ）／`/docdd:tasks-from-docs`（仕様書からまとめて。docs を自分で書き換えたあとも） |", { templateRow: "起票する" }],
   ],
 };
 
@@ -1308,7 +1309,7 @@ function nextForState(state, s) {
     case "legacy":
       return "v0.1 系の構成で導入済みです（CLAUDE.md に「変更影響」表があり、.claude/rules/docdd-kit.md が無い）。/docdd:init ではなく /docdd:update-kit で新しい版へ移します。";
     case "installed":
-      return "導入済みです。仕様は docs/PRD.md。次は /docdd:add-task <やりたいこと>（仕様書に機能を複数書いたなら /docdd:tasks-from-docs）。";
+      return "導入済みです。仕様は docs/PRD.md。次は /docdd:add-task <やりたいこと>（PRD に書いた機能をまとめてタスクにするなら、何も書かずに /docdd:add-task）。";
     default: {
       const parts = [];
       if (s.missing.length) parts.push(`足りないファイル ${s.missing.length} 件`);
