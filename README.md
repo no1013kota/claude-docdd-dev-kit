@@ -7,14 +7,14 @@ Claude Code（ターミナル・Desktop・IDE）向けです。
 
 ## 全体像
 
-あなたが打つのは図の四角（`/docdd:…`）だけで、丸みのある箱はファイルです。
+図の `/docdd:…` は、あなたが打つスキル（プラグインが持つ手順書）です。円柱の箱はファイル・フォルダです。
 
 ```mermaid
 flowchart TD
-  I["/docdd:init<br/>最初の 1 回。雛形を置き、表を埋める"] --> C[("CLAUDE.md の表<br/>検証コマンド・反映コマンド<br/>スキルが実行するのはここのコマンドだけ")]
+  I["/docdd:init<br/>最初の 1 回。雛形を置き、表を埋める"] --> C[("CLAUDE.md の表<br/>検証コマンド・反映コマンド<br/>スキルは検証・反映にここのコマンドを使う")]
   I --> S
   Y["docs を自分で書き換えたとき<br/>（PRD に機能を足した など）"] --> S
-  S[("docs/ 仕様の正本<br/>PRD＝何を作るか／requirements＝どう作るか")] --> A["/docdd:add-task<br/>要望を 1 件のタスクにする<br/>（PRD からまとめてなら /docdd:tasks-from-prd）"]
+  S[("docs/ 仕様の正本<br/>PRD＝何を作るか／requirements＝どう作るか")] --> A["/docdd:add-task<br/>要望を 1 件のタスクにする<br/>（仕様書からまとめてなら /docdd:tasks-from-docs）"]
   A -->|タスクと要決定を書く| B[("tasks/BACKLOG.md<br/>いま動いているものだけ<br/>todo のタスク／あなたへの要決定 D-番号")]
   B -->|上から 1 件だけ取る| D["/docdd:dev-loop<br/>仕様を読む → 実装 → 検証<br/>→ 仕様書を更新（中で doc-sync）→ コミット"]
   S -.->|タスクの仕様を読む| D
@@ -32,27 +32,28 @@ flowchart TD
   R --> L["公開<br/>自動公開／確認してから公開／コマンドで公開"]
 ```
 
-| 置き場 | 何が入るか | 誰が書くか |
+| ファイル・フォルダ | 何が入るか | 誰が書くか |
 |---|---|---|
-| `CLAUDE.md`・`.claude/rules/docdd-kit.md` | 毎回読まれる約束。このプロジェクトの検証コマンドと反映コマンドの表 | init が置き、あなたが直す |
-| `docs/`（まず `docs/PRD.md`） | 何を作るか・どう作るかの正本（正しい 1 か所）。技術判断の記録（ADR）と、控えと戻し方などの運用文書もここ | あなたと Claude |
-| `tasks/BACKLOG.md`（と `tasks/archive/`） | **作業キュー**。いま動いているタスク（todo・doing）と「要決定」（あなたに決めてほしいこと）だけを置き、終わったものはアーカイブへ移す。dev-loop はここから 1 件だけ取る | スキルが書き、あなたが決める |
-| スキル（`/docdd:…`） | 起票・開発・検証・反映の決まった手順 | プラグインが持つ |
+| `CLAUDE.md` | このプロジェクトの約束。検証コマンド・反映コマンドの表と、スキルへの追加指示。Claude が毎回読む | init が置いて表を埋め、あなたが直す |
+| `.claude/rules/docdd-kit.md` | どのプロジェクトにも共通の約束（仕様書と実装をそろえる・変更に合わせて回す検証など）。Claude が毎回読む | init が置き、`/docdd:update-kit` が新しい版にする。あなたは直さない（このプロジェクトだけの指示は `CLAUDE.md` へ） |
+| `docs/`（まず `docs/PRD.md`） | 何を作るか・どう作るかの正本（正しい 1 か所）。自分で書いた仕様書も置ける。技術判断の記録（ADR）と、控えと戻し方などの運用文書もここ | あなたと Claude |
+| `tasks/BACKLOG.md` | **作業キュー**。いま動いているタスクと「要決定」（あなたに決めてほしいこと）だけを置く。dev-loop はここから 1 件ずつ取る | スキルが書き、あなたが要決定に答える |
+| `tasks/archive/BACKLOG-done.md` | 終わったタスクと決まった判断 | スキルが移す |
 
-- **スキルを通さずに自分でコードを直したときは、`/docdd:doc-sync` を打ちます**（仕様書と実装がずれたままにしない）。`/docdd:dev-loop` と `/docdd:refactor` は中で doc-sync を呼ぶので、その必要はありません。
-- **docs を自分で書き換えたときは、`/docdd:add-task` で変えた所をタスクにします**（PRD に機能をまとめて足したなら `/docdd:tasks-from-prd`）。docs を書き換えただけでは、アプリは変わりません。
+- **スキルを通さずに自分でコードを直したときは、`/docdd:doc-sync` を打ちます**（仕様書と実装がずれたままにしない）。`/docdd:dev-loop`・`/docdd:refactor`・`/docdd:speed-up`・`/docdd:security-audit` は中で doc-sync を呼ぶので、その必要はありません。
+- **docs を自分で書き換えたときは、`/docdd:tasks-from-docs` で書き換えた所をタスクにします**（PRD・requirements・自分で置いた仕様書のどれでも）。docs を書き換えただけでは、アプリは変わりません。
 - 本番へ出す前に、必要なら仕上げを回します。`/docdd:refactor`（中身を整える）・`/docdd:speed-up`（表示が遅い）・`/docdd:security-audit`（公開前や、ログイン・課金・外部連携を触ったあと）。
-- ほかにも検証・点検のスキルがあります（全 15 本。`/docdd:` と打つと一覧が出ます）。
-- 本番へ出す操作は `/docdd:release` だけで、あなたが自分で打ったときにしか動かず、出す前に必ずあなたの「はい」を聞きます。公開のしかたは init で選び、あとから変えられます。データの控えと、壊れたときに前の版へ戻す手順は「[控えと戻し方](plugins/docdd/README.md#控えと戻し方壊れたときに戻せるようにする)」にあります。
+- ほかにも検証・点検のスキルがあります（`/docdd:` と打つと一覧が出ます）。
+- 本番へ出す操作は `/docdd:release` だけで、あなたが自分で打ったときにしか動かず、出す前に必ずあなたの「はい」を聞きます。公開のしかたは init で選び、あとから `CLAUDE.md` の表で変えられます。データの控えと、前の版へ戻す手順は「[控えと戻し方](plugins/docdd/README.md#控えと戻し方)」にあります。
 - 取り消しにくい git 操作と、秘密の値（API キーなど）が入ったコミットは、プラグインの hook（自動の見張り）が止めます。
 
 ## 使える条件
 
-- **Claude Code の有料プラン**（Pro・Max・Team・Enterprise）か Console のアカウント。ターミナル・Desktop アプリ・VS Code などで使えます。ブラウザで動く claude.ai/code では `/plugin` が使えないので、この手順では入れられません。
-- **git と Node.js 18 以上**。macOS・Linux で使えます。Windows は Git for Windows を入れれば動く見込みですが、実機では確かめていません。
+- **Claude Code の有料プラン**（Pro・Max・Team・Enterprise）か Console のアカウント。ターミナル・Desktop アプリ・VS Code などで使えます（ブラウザで動く claude.ai/code には対応していません）。
+- **git と Node.js 18 以上**。macOS・Linux で使えます。Windows では Git for Windows を入れてください。
 - **1 人で、日本語で**使う前提です。チームで分担するための仕組みはありません。
-- **作るものの技術は問いません**（仕様書・タスク・コミットの流れはどれでも同じ）。ただし、テストやビルドのコマンドが自動で整うのは Next.js・Vite などの Node.js の Web アプリが中心で、ほかの技術では一部、または全部を自分で書きます（init が聞くので、分かる範囲で答えます）。画面を開いて確かめるスキルは Web アプリ向けで、Unity などのゲームやネイティブアプリでは飛ばします。
-- **本番へ出す `/docdd:release`** には、git の push 先が要ります。GitHub で gh（GitHub をコマンドで操作する道具）にログインしていれば、PR の作成と CI の待ちまで自動で進みます。
+- **作るものの技術は問いません**（仕様書・タスク・コミットの流れはどれでも同じです）。テストやビルドのコマンドは、Next.js・Vite などの Node.js の Web アプリなら init がほぼ自動で埋め、ほかの技術では埋まらない所を init が聞くので、分かる範囲で答えます。ブラウザで画面を確かめるスキルは Web アプリ向けで、Unity などのゲームやネイティブアプリでは使いません。
+- **本番へ出す `/docdd:release`** には、git の push 先が要ります。公開のしかたが「確認してから公開」「コマンドで公開」なら、gh（GitHub をコマンドで操作する道具）にログインしておくと、PR の作成と CI の待ちまで自動で進みます。
 
 技術ごとの詳しい対応は「[どこまで使えるか](plugins/docdd/README.md#どこまで使えるか)」にあります。
 
@@ -67,14 +68,14 @@ flowchart TD
    - Next.js 以外でもよい（例: 「Vite と React で」「Python の FastAPI で」）。Unity などのゲームは、Unity Hub で新しいプロジェクトを作る
 3. ブラウザで画面が出たら完了
 
-先に土台を作るのは、あとから土台を作ろうとすると、道具（create-next-app など）が「フォルダが空でない」と止まることがあるためです。
+土台を作る道具（create-next-app など）は空のフォルダで使うので、docdd より先に作ります。
 
 ### 2. docdd を入れる
 
 アプリのフォルダで Claude Code を開き、次を順に打ちます。
 
 1. `/plugin marketplace add no1013kota/claude-docdd-dev-kit`
-2. `/plugin install docdd@claude-docdd-dev-kit`
+2. `/plugin install docdd@claude-docdd-dev-kit`（範囲を聞かれたら User）
 3. `/docdd:init`（プロジェクト名や作りたいものを聞かれるので、答えていく）
 
 1・2 は一度だけで、ほかのプロジェクトでも使えます。新しいプロジェクトでは 3 だけを打ちます。

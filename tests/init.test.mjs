@@ -640,6 +640,54 @@ test("update（v0.2 で導入済み）: 手付かずのキットのファイル�
   assert.equal(wrong.json.errors[0].path, "docs/PRD.md");
 });
 
+test("update --apply と apply で manifest を書き直しても、運営者が足した notifyUpdates: false を残す", () => {
+  const dir = project({ files: { "package.json": NPM_INIT_PACKAGE } });
+  assert.equal(init(dir, "apply").status, 0);
+  const man = JSON.parse(read(dir, ".docdd/manifest.json"));
+  man.notifyUpdates = false;
+  // manifest の記録どおりのまま雛形だけが新しい形にして、update で置き換えさせる
+  write(dir, { "scripts/check-doc-refs.mjs": `${read(dir, "scripts/check-doc-refs.mjs")}// old\n` });
+  man.files["scripts/check-doc-refs.mjs"].sha256 = sha(fs.readFileSync(path.join(dir, "scripts/check-doc-refs.mjs")));
+  write(dir, { ".docdd/manifest.json": `${JSON.stringify(man, null, 2)}\n` });
+
+  const applied = init(dir, "update", "--apply", "scripts/check-doc-refs.mjs");
+  assert.equal(applied.status, 0, applied.stdout);
+  assert.equal(JSON.parse(read(dir, ".docdd/manifest.json")).notifyUpdates, false);
+
+  // apply でも（消した雛形を置き直して manifest を書き直すとき）
+  fs.rmSync(path.join(dir, "scripts/check-doc-dates.mjs"));
+  assert.equal(init(dir, "apply").status, 0);
+  assert.ok(exists(dir, "scripts/check-doc-dates.mjs"));
+  assert.equal(JSON.parse(read(dir, ".docdd/manifest.json")).notifyUpdates, false);
+});
+
+test("update: 名前の変わったスキル（tasks-from-prd → tasks-from-docs）を指す CLAUDE.md の行は、雛形のままのときだけ rename で置き換える", () => {
+  const OLD = "| 起票する | `/docdd:add-task`（要望を 1 件ずつ）／`/docdd:tasks-from-prd`（PRD の機能をまとめて） |";
+  const NEW = fs.readFileSync(path.join(TEMPLATES, "CLAUDE.md"), "utf8").split(/\r?\n/).find((l) => l.startsWith("| 起票する |"));
+  assert.match(NEW, /tasks-from-docs/);
+
+  const dir = project({ files: { "package.json": NPM_INIT_PACKAGE } });
+  assert.equal(init(dir, "apply").status, 0);
+  const cur = read(dir, "CLAUDE.md");
+  write(dir, { "CLAUDE.md": cur.replace(NEW, OLD) });
+
+  const up = init(dir, "update");
+  const e = up.json.files.find((f) => f.path === "CLAUDE.md");
+  assert.equal(e.action, "append");
+  assert.deepEqual(e.additions.filter((a) => a.kind === "rename").map((a) => [a.from, a.to]), [[OLD, NEW]]);
+
+  const applied = init(dir, "update", "--apply", "CLAUDE.md");
+  assert.equal(applied.status, 0, applied.stdout);
+  assert.ok(read(dir, "CLAUDE.md").includes(NEW));
+  assert.ok(!read(dir, "CLAUDE.md").includes("tasks-from-prd"));
+  assert.ok(!init(dir, "update").json.files.find((f) => f.path === "CLAUDE.md").additions?.some((a) => a.kind === "rename"));
+
+  // 利用者が書き換えた行は変えない
+  const custom = "| 起票する | `/docdd:add-task`／`/docdd:tasks-from-prd`（わたしのメモ） |";
+  write(dir, { "CLAUDE.md": read(dir, "CLAUDE.md").replace(NEW, custom) });
+  assert.ok(!init(dir, "update").json.files.find((f) => f.path === "CLAUDE.md").additions?.some((a) => a.kind === "rename"));
+});
+
 test("v0.1.4 の雛形で導入したプロジェクト: status は legacy、update は scripts を「手付かず→置換」に分類し、移行後は参照の検査が通る", (t) => {
   const files = v014Files();
   if (!files) {

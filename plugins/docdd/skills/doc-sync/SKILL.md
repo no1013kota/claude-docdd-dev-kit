@@ -14,7 +14,7 @@ argument-hint: "[HEAD~N | --full]"
 
 # doc-sync：ドキュメント同期
 
-`/docdd:dev-loop`・`/docdd:refactor` は中でこのスキルを呼ぶ。**スキルを通さずに自分でコードを直したときは、コミットの前に自分で打つ**（仕様書と実装がずれたままコミットしない）。
+`/docdd:dev-loop`・`/docdd:refactor`・`/docdd:speed-up`・`/docdd:security-audit` は中でこのスキルを呼ぶ。**スキルを通さずに自分でコードを直したときは、コミットの前に自分で打つ**（仕様書と実装がずれたままコミットしない）。
 
 コードとドキュメントの乖離（ずれ）を検出し、**その場で解消する**。
 

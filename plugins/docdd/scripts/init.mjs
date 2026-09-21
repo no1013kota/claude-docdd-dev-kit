@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const TEMPLATES = path.join(PLUGIN_ROOT, "templates");
-const FALLBACK_VERSION = "0.11.2";
+const FALLBACK_VERSION = "0.12.0";
 const KIT_VERSION = readKitVersion();
 const CWD = realpath(process.cwd());
 
@@ -29,6 +29,11 @@ const BEGIN = "<!-- docdd:tables:begin -->";
 const END = "<!-- docdd:tables:end -->";
 const DATE_TOKEN = "{{YYYY-MM-DD}}";
 const MANIFEST = ".docdd/manifest.json";
+
+/** manifest を書き直すときも残す、運営者が足した設定（notifyUpdates: false で更新のお知らせを止める。hook の notify-update.mjs が読む）。 */
+function keptManifestSettings(base) {
+  return base?.notifyUpdates === false ? { notifyUpdates: false } : {};
+}
 const EMPTY_MCP = '{\n  "mcpServers": {}\n}\n';
 
 /** キットが管理するファイル（利用者は直さない前提。update で手付かずなら置き換える）。 */
@@ -167,6 +172,17 @@ const LEGACY_PLACEHOLDER_LINES = {
     ["| v0.1 | <YYYY-MM-DD> | 初版 |", "| v0.1 | {{YYYY-MM-DD}} | 初版 |"],
   ],
   "tasks/REFACTOR_PLAN.md": [["## 現況（<YYYY-MM-DD> 時点）", "## 現況（{{YYYY-MM-DD}} 時点）"]],
+};
+
+/**
+ * スキルの名前が変わった版で、雛形のまま残った行を新しい名前の行へ置き換える（行が完全に一致するときだけ）。
+ * templateRow は、いまの雛形の同じ行（先頭のセル）に置き換える。
+ */
+const RENAMED_LINES = {
+  "CLAUDE.md": [
+    // v0.12.0: tasks-from-prd → tasks-from-docs
+    ["| 起票する | `/docdd:add-task`（要望を 1 件ずつ）／`/docdd:tasks-from-prd`（PRD の機能をまとめて） |", { templateRow: "起票する" }],
+  ],
 };
 
 /** v0.1 の雛形の未記入（<…>）の文字列。置き換えられずに残ったものを update が報告する（コードブロック・HTML コメントの中は見ない）。 */
@@ -1292,7 +1308,7 @@ function nextForState(state, s) {
     case "legacy":
       return "v0.1 系の構成で導入済みです（CLAUDE.md に「変更影響」表があり、.claude/rules/docdd-kit.md が無い）。/docdd:init ではなく /docdd:update-kit で新しい版へ移します。";
     case "installed":
-      return "導入済みです。仕様は docs/PRD.md。次は /docdd:add-task <やりたいこと>（PRD に機能を複数書いたなら /docdd:tasks-from-prd）。";
+      return "導入済みです。仕様は docs/PRD.md。次は /docdd:add-task <やりたいこと>（仕様書に機能を複数書いたなら /docdd:tasks-from-docs）。";
     default: {
       const parts = [];
       if (s.missing.length) parts.push(`足りないファイル ${s.missing.length} 件`);
@@ -2075,7 +2091,7 @@ function cmdApply(opts) {
   const manifestWritten = !manifest.exists || placed.size > 0 || adopted > 0;
   const buildManifestText = () =>
     `${JSON.stringify(
-      { kitVersion: base.kitVersion ?? KIT_VERSION, installedAt: base.installedAt ?? today(), updatedAt: today(), files: sortKeys(manFiles) },
+      { kitVersion: base.kitVersion ?? KIT_VERSION, installedAt: base.installedAt ?? today(), updatedAt: today(), ...keptManifestSettings(base), files: sortKeys(manFiles) },
       null,
       2,
     )}\n`;
@@ -2465,17 +2481,26 @@ function normalizeBlankLines(text) {
   return out.endsWith("\n") ? out : `${out}\n`;
 }
 
-/** rel の中で、v0.1 の雛形のまま <…> が残った行を {{…}} の形へ置き換える案（LEGACY_PLACEHOLDER_LINES）。 */
+/**
+ * rel の中で、雛形のまま残った古い行を新しい形へ置き換える案。
+ * kind は、v0.1 の <…> を {{…}} にするなら placeholder（LEGACY_PLACEHOLDER_LINES）、スキルの名前が変わった行なら rename（RENAMED_LINES）。
+ */
 function legacyLineConversions(rel, text) {
-  const table = LEGACY_PLACEHOLDER_LINES[rel];
-  if (!table || text == null) return [];
+  const tables = [
+    ["placeholder", LEGACY_PLACEHOLDER_LINES[rel]],
+    ["rename", RENAMED_LINES[rel]],
+  ].filter(([, t]) => t);
+  if (!tables.length || text == null) return [];
   const res = [];
   text.split(/\r?\n/).forEach((line, i) => {
-    const hit = table.find(([from]) => line === from);
-    if (!hit) return;
-    let to = hit[1];
-    if (typeof to !== "string") to = tplText(rel).split(/\r?\n/).find((t) => t.startsWith(`| ${to.templateRow} |`)) ?? null;
-    if (to != null && to !== line) res.push({ kind: "placeholder", line: i + 1, from: line, to });
+    for (const [kind, table] of tables) {
+      const hit = table.find(([from]) => line === from);
+      if (!hit) continue;
+      let to = hit[1];
+      if (typeof to !== "string") to = tplText(rel).split(/\r?\n/).find((t) => t.startsWith(`| ${to.templateRow} |`)) ?? null;
+      if (to != null && to !== line) res.push({ kind, line: i + 1, from: line, to });
+      return;
+    }
   });
   return res;
 }
@@ -2776,7 +2801,7 @@ function cmdUpdate(opts) {
     const migratePending = now.exists && now.legacyTables && !now.hasMarkers;
     // 版が分からない（manifest が無かった＝v0.1 系）ときは、途中でも「0.1.0〜0.1.4」と書く（null にすると hook の案内が黙る）
     const kitVersion = kitPending || migratePending ? installedVersion ?? "0.1.0〜0.1.4" : KIT_VERSION;
-    writeFile(MANIFEST, `${JSON.stringify({ kitVersion, installedAt: base.installedAt ?? today(), updatedAt: today(), files: sortKeys(files) }, null, 2)}\n`);
+    writeFile(MANIFEST, `${JSON.stringify({ kitVersion, installedAt: base.installedAt ?? today(), updatedAt: today(), ...keptManifestSettings(base), files: sortKeys(files) }, null, 2)}\n`);
     manifestWritten = true;
   }
 
