@@ -1,6 +1,6 @@
 ---
 name: doc-sync
-description: コードの変更を docs/ の該当文書へ反映し、docs の検査を回す。コミットの前に使う。スキルを通さず自分でコードを直したとき、ui-polish だけで画面を直したときにも使う（dev-loop・refactor・speed-up・security-audit は中で呼ぶ）。引数で git diff の範囲を指定でき、--full で実装全体と docs のずれを監査する。
+description: コードの変更を docs/ の該当文書へ反映し、docs の検査を回す。コミットの前に使う。スキルを通さず自分でコードを直したときにも使う（dev-loop・refactor・speed-up・security-audit・ui-polish は中で呼ぶ）。引数で git diff の範囲を指定でき、--full で実装全体と docs のずれを監査する。
 argument-hint: "[HEAD~N | --full]"
 ---
 
@@ -14,7 +14,7 @@ argument-hint: "[HEAD~N | --full]"
 
 # doc-sync：ドキュメント同期
 
-`/docdd:dev-loop`・`/docdd:refactor`・`/docdd:speed-up`・`/docdd:security-audit` は中でこのスキルを呼ぶ。**スキルを通さずに自分でコードを直したとき（`/docdd:ui-polish` だけで画面を直したときも）は、コミットの前に自分で打つ**（仕様書と実装がずれたままコミットしない）。
+`/docdd:dev-loop`・`/docdd:refactor`・`/docdd:speed-up`・`/docdd:security-audit`・`/docdd:ui-polish` は中でこのスキルを呼ぶ。**スキルを通さずに自分でコードを直したときは、コミットの前に自分で打つ**（仕様書と実装がずれたままコミットしない）。
 
 コードとドキュメントの乖離（ずれ）を検出し、**その場で解消する**。
 
