@@ -13,7 +13,7 @@
 | 起票する | `/docdd:add-task`（要望を 1 件ずつ）／`/docdd:tasks-from-prd`（PRD の機能をまとめて） |
 | 開発する | `/docdd:dev-loop`（タスクを 1 件。中で検証と docs 同期まで行う） |
 | **スキルを通さず自分で直した** | `/docdd:doc-sync`（実装に合わせて仕様書を直す。**省かない**） |
-| 検証する | `/docdd:verify-integration`（DB・migration・権限）／`/docdd:verify-e2e`（操作の流れ）／`/docdd:ui-polish`（Web の画面。ブラウザ操作は Claude が道具箱の playwright-cli で行う） |
+| 検証する | `/docdd:verify-integration`（DB・migration・権限）／`/docdd:verify-e2e`（操作の流れ）／`/docdd:ui-polish`（Web の画面） |
 | 仕上げる（必要なときだけ） | `/docdd:refactor`（中身を整える）／`/docdd:speed-up`（表示が遅い。Web）／`/docdd:security-audit`（公開前や、ログイン・課金・外部連携を触ったあと） |
 | 反映・点検する | `/docdd:release`（本番へ）／`/docdd:maintenance`（週 1 回。`monthly` で月次も） |
 | 運営者が打つ | `/docdd:init`（導入）／`/docdd:update-kit`（雛形を新しい版へ） |
@@ -22,15 +22,15 @@
 
 | パス | 内容 |
 |---|---|
-| `docs/` | 仕様の正本と ADR（技術判断の記録）。どこに何を書くかは `docs/README.md` |
+| `docs/` | 仕様の正本と ADR（技術判断の記録） |
 | `docs/operations/development-and-testing.md` | 開発とテストの進め方（テストの層・いつ回すか・テスト基盤が無いとき・落とし穴）。実装前に読む |
 | `docs/operations/backup-and-restore.md` | 控えと戻し方（控えに入らないもの・戻す手順・戻せたことを確かめた記録）。migration を含む反映と月次点検で読む |
 | `tasks/BACKLOG.md` | 作業キュー（タスク）と要決定（運営者に決めてほしいこと）。まだ動いているものだけを置く |
-| `tasks/archive/BACKLOG-done.md` | 終わったタスクと決まった判断の置き場（`node scripts/backlog-archive.mjs` が移す）。丸ごと読まず、ID や言葉で検索する |
-| `scripts/` | docs の検査・未記入欄の検査・依存の脆弱性の検査・BACKLOG の整理。下の「検証コマンド」表から使う（直さずに据え置く脆弱性の書き方は `docs/README.md` §3） |
+| `tasks/archive/BACKLOG-done.md` | 終わったタスクと決まった判断の置き場（`node scripts/backlog-archive.mjs` が移す） |
+| `scripts/` | docs の検査・未記入欄の検査・依存の脆弱性の検査・BACKLOG の整理。下の「検証コマンド」表から使う |
 | `.claude/rules/docdd-kit.md` | キット共通の約束。キットが管理するので直接は直さない（このプロジェクトだけの指示は下の「スキルへの追加指示」へ） |
 | `.claude/settings.json` | Claude Code の許可設定（例: 検査コマンドは確認なしで進め、削除や push は必ず確認する） |
-| `.mcp.json` | Claude Code から使う MCP サーバー（外部の道具とつなぐ設定）。使う道具に合わせて足す（例: Next.js なら shadcn/ui・Next.js DevTools を初期設定し、それ以外は空で置く） |
+| `.mcp.json` | Claude Code から使う MCP サーバー（外部の道具とつなぐ設定）。使う道具に合わせて足す |
 | `.docdd/manifest.json` | キットの版と、キットが置いたファイルの記録（`/docdd:update-kit` が使う。手で直さない） |
 | アプリ本体 | {{フレームワーク名}} |
 

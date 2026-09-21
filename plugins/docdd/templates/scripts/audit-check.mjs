@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// docdd-kit v0.11.0 — scripts/audit-check.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
+// docdd-kit v0.11.1 — scripts/audit-check.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
 //
 // 依存ライブラリの脆弱性ゲート（npm と package-lock.json を使うプロジェクト向け）。
 //
