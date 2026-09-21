@@ -47,15 +47,26 @@ flowchart TD
 
 ## 入れ方
 
-Claude Code の中で次を順に打ちます。入れるのに GitHub のアカウントは要りません（不具合の報告には、無料の GitHub アカウントが要ります）。
+**用意するもの**: Claude Code（有料プラン）・git・Node.js 18 以上。GitHub のアカウントは要りません（不具合の報告にだけ、無料のアカウントが要ります）。
+
+### 1. アプリのフォルダを用意する（すでにアプリがあれば飛ばす）
+
+1. 空のフォルダを作り、そこで Claude Code を開く（ターミナルなら `mkdir my-app && cd my-app && claude`）
+2. Claude Code に頼む: 「Next.js で新しいアプリの土台を作って、`npm run dev` で画面が出るところまで」
+   - Next.js 以外でもよい（例: 「Vite と React で」「Python の FastAPI で」）。Unity などのゲームは、Unity Hub で新しいプロジェクトを作る
+3. ブラウザで画面が出たら完了
+
+先に土台を作るのは、あとから土台を作ろうとすると、道具（create-next-app など）が「フォルダが空でない」と止まることがあるためです。
+
+### 2. docdd を入れる
+
+アプリのフォルダで Claude Code を開き、次を順に打ちます。
 
 1. `/plugin marketplace add no1013kota/claude-docdd-dev-kit`
 2. `/plugin install docdd@claude-docdd-dev-kit`
-3. プロジェクトのフォルダで Claude Code を起動し、`/docdd:init`
+3. `/docdd:init`（プロジェクト名や作りたいものを聞かれるので、答えていく）
 
-**まだアプリのコードが無いとき**は、先にアプリの土台を作ってから 3 を打ちます。例えば Claude Code に「Next.js の土台を作って、動くところまで」と頼み、できたフォルダで `/docdd:init` です。順番を逆にすると、土台を作る道具（create-next-app など）が「フォルダが空でない」と止まることがあるためです。
-
-`docdd@claude-docdd-dev-kit` の `@` の右は、入れた場所（配布元）の名前です。この手順で入れたなら、この名前のままで大丈夫です。別の場所（例えば Anthropic のコミュニティの一覧）から入れたときは名前が変わるので、更新ややめるときのコマンドでは `/plugin list` に出る名前を使います。
+1・2 は一度だけで、ほかのプロジェクトでも使えます。新しいプロジェクトでは 3 だけを打ちます。
 
 ## 詳しい説明書
 

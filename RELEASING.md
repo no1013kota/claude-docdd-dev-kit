@@ -42,7 +42,7 @@ Anthropic のコミュニティのマーケットプレイス（`anthropics/clau
 - 申請先: 個人の作者は Console のフォーム https://platform.claude.com/plugins/submit （Console にログインして開く）。claude.ai のフォームは Team・Enterprise の組織向け（公式: https://code.claude.com/docs/en/plugins の「Submit your plugin to the community marketplace」）。
 - 申請の前に、上の手順の 4〜7 を通す（審査でも `claude plugin validate` が回る）。
 - 載ったかは、コミュニティのカタログ https://github.com/anthropics/claude-plugins-community/blob/main/.claude-plugin/marketplace.json で名前を探して確かめる（同期は毎晩なので、承認から少し遅れる）。
-- 入れるときの `@` の右の名前は、公式の文書の中で食い違っている（discover-plugins と plugins は `claude-community`、申請の説明の頁は `claude-plugins-official`）。README では決め打ちせず、「`/plugin list` で確かめる」と書いている。載ったら実際の名前を確かめ、README を直すかを決める。
+- 入れるときの `@` の右の名前は、公式の文書の中で食い違っている（discover-plugins と plugins は `claude-community`、申請の説明の頁は `claude-plugins-official`）。いまの README は、このリポジトリから入れる打ち方（`docdd@claude-docdd-dev-kit`）だけを書いている。載ったら実際の名前を確かめ、README の「入れ方」「更新」「やめるとき」に、その名前での打ち方を足す。
 - 申請の文面を変えたら、`plugin.json`・`marketplace.json` の説明も揃える。
 
 ### フォームに入れる値
