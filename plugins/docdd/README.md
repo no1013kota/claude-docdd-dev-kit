@@ -38,7 +38,8 @@ docdd は、次の 4 つをプロジェクトにそろえ、Claude Code がい�
 | 作業キュー | `tasks/BACKLOG.md` | タスクと「要決定」（あなたに決めてほしいこと） |
 | 手順書 | プラグインのスキル（`/docdd:…`） | 起票・開発・検証・反映の決まった手順 |
 
-- 流れ: 要望 → `/docdd:add-task`（タスクにする）→ `/docdd:dev-loop`（1 タスクを実装・検証・仕様書の更新・コミット）→ 依頼が全部終わったら `/docdd:release`（本番へ反映）。
+- 流れ: 要望 → `/docdd:add-task`（タスクにする）→ `/docdd:dev-loop`（1 タスクを実装・検証・仕様書の更新・コミット）→ 必要なら仕上げ（`/docdd:refactor`・`/docdd:speed-up`・`/docdd:security-audit`）→ `/docdd:release`（本番へ反映）。
+- **スキルを通さず自分でコードを直したときは、コミットの前に `/docdd:doc-sync`** を打ちます（仕様書と実装がずれたままにしない）。dev-loop と refactor は中で呼ぶので要りません。
 - 考え方: 手順書は、`CLAUDE.md` の表に書いたコマンドだけを実行します。表で「無い」の行は飛ばし、未記入（`{{…}}` のまま）の行は実行せずに報告します。表を埋めるほど、検証が確実になります。
 - 背景（補足）: 記事『[コードを書けなくても Claude Code でアプリを壊さず作り続ける「4つのファイル」の仕組み](https://exosai.net/blog/claude-code-non-engineer-workflow)』。手順の細部はこの README が正です。
 
@@ -266,6 +267,18 @@ mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/
 | `package.json` の `scripts` | `package.json` があれば 4 行（`check:doc-dates`・`check:doc-refs`・`check:doc-placeholders`・`backlog:archive`）を足す。npm（`package-lock.json`、またはまだ lock が無い）なら `audit:check` も足して 5 行。無くても `node scripts/<名前>.mjs` で動く | あなた |
 
 ### プラグインが提供するスキル（15 本）
+
+使う場面で分けると次の 6 つです（同じ表が雛形の `CLAUDE.md` にもあり、プロジェクトの中からも辿れます）。
+
+| いつ | スキル |
+|---|---|
+| 起票する | add-task ／ tasks-from-prd |
+| 開発する | dev-loop |
+| 自分で直したあと | **doc-sync**（省かない） |
+| 検証する | verify-integration ／ verify-e2e ／ ui-polish ／ playwright-cli |
+| 仕上げる（必要なときだけ） | refactor ／ speed-up ／ security-audit |
+| 反映・点検・導入 | release ／ maintenance ／ init ／ update-kit |
+
 
 | スキル | いつ使う | 出力 |
 |---|---|---|
