@@ -5,13 +5,10 @@
 - **main に入れた時点で配布されます。** タグを打った時点ではありません。
   - 新しく入れる人は、main の最新を受け取ります。
   - すでに入れている人が更新を受け取るのは、`plugins/docdd/.claude-plugin/plugin.json` の `version` を上げたときだけです（公式: https://code.claude.com/docs/en/plugins-reference の「Users get updates only when you bump this field」）。
-  - コミュニティのマーケットプレイスに載ったあとは、push した変更が自動で取り込まれます（公式: https://code.claude.com/docs/en/plugins の「CI bumps the pin automatically as you push new commits to your repository」）。
 - そのため、main はいつ配布されてもよい状態に保ちます。変更は作業ブランチで作り、PR の CI（`.github/workflows/ci.yml`）が緑になってから main へ入れます。
 - `plugins/docdd/` の中を変えたら、同じ PR で版を上げ、`plugins/docdd/CHANGELOG.md` に書きます。
   - `plugins/docdd/README.md`・`plugins/docdd/CHANGELOG.md`・`plugins/docdd/evals/` だけの変更では、版を上げません（入れている人の動きが変わらないため）。スキルのフォルダの中の README など、ほかのファイルは数えます。
   - `npm run check` の中の `scripts/check-version-bump.mjs` が、最新のタグ `docdd--vX.Y.Z` と比べて、版の上げ忘れ（上の 3 つ以外が変わったのに版が同じ）と、版の下げを落とします。
-  - タグが無いときと浅い clone では、「飛ばした」と出して通します。CI は `fetch-depth: 0` で全部のタグを取ります。
-  - 手元では、まだコミットしていない変更と、git にまだ無いファイル（`.gitignore` で除いたものは除く）も数えます。
 
 ## 手順
 
@@ -22,9 +19,9 @@
 3. 雛形の刻印 `docdd-kit vX.Y.Z`（templates の rules と scripts/*.mjs）と、`plugins/docdd/scripts/init.mjs` の `FALLBACK_VERSION` を揃える。
 4. `npm run check`（`scripts/check-skill-refs.mjs`・`scripts/check-version-stamps.mjs`・`scripts/check-version-bump.mjs` をまとめて回す）。
 5. `npm test`（Node 18 以上・git 2.32 以上。v0.1.4 の移行テストは履歴全体が要る）。
-   - `scripts/run-tests.mjs` が `tests/*.test.mjs`（`tests/` の直下だけ）を並べて `node --test` に渡す。シェルの `*` の展開に頼らないので、Windows の npm でも動く形にしている（Windows の実機では確かめていない。CI の `test-windows` で見る）。補助のファイルの名前を `.test.mjs` で終えない。
-   - CI は、Node 22（全部）・Node 18（テストだけ）・Windows（テストだけ。落ちても CI は止めない）で回る。回るのは **PR と main への push** のときで、作業ブランチへの push やタグの push では回らない（同じコミットで 2 本走らないようにしているため）。同じ PR へ続けて push すると、前のコミットの run は畳まれる。
-6. `claude plugin validate --strict .` と `claude plugin validate --strict plugins/docdd`。CI（`.github/workflows/ci.yml`）の Claude Code は `@anthropic-ai/claude-code@2.1.270` に固定している。検証に使う版を上げるときは、ここも上げる。
+   - 回るのは `tests/` の直下の `*.test.mjs` だけ（`scripts/run-tests.mjs` が並べて渡す。補助のファイルの名前を `.test.mjs` で終えない）。
+   - CI（`.github/workflows/ci.yml`）が回るのは PR と main への push のときだけ（作業ブランチへ push しただけでは回らない）。Windows のジョブ（`test-windows`）は落ちても CI を止めない。
+6. `claude plugin validate --strict .` と `claude plugin validate --strict plugins/docdd`。CI の Claude Code は `.github/workflows/ci.yml` で版を固定している。検証に使う版を上げるときは、そこを上げる。
 7. `npm run check:urls`（README 2 本・CHANGELOG・RELEASING・skills・templates・examples の外部リンクを開けるか。CI には入れていない）。
    - 落ちたら、まずそのリンクをブラウザで開く。サイトの一時的な不調や、機械からのアクセスを断るサイトもある。
    - 本当に移動・削除されていたら直す。
@@ -37,7 +34,7 @@
 
 ## コミュニティのマーケットプレイスへの申請
 
-Anthropic のコミュニティのマーケットプレイス（`anthropics/claude-plugins-community`）に載せるときの材料です。申請は 1 回だけで、載ったあとの更新は push で取り込まれます（上の「main と配布」）。
+Anthropic のコミュニティのマーケットプレイス（`anthropics/claude-plugins-community`）に載せるときの材料です。申請は 1 回だけで、載ったあとの更新は push で取り込まれます（公式: https://code.claude.com/docs/en/plugins の「CI bumps the pin automatically as you push new commits to your repository」）。
 
 - 申請先: 個人の作者は Console のフォーム https://platform.claude.com/plugins/submit （Console にログインして開く）。claude.ai のフォームは Team・Enterprise の組織向け（公式: https://code.claude.com/docs/en/plugins の「Submit your plugin to the community marketplace」）。
 - 申請の前に、上の手順の 4〜7 を通す（審査でも `claude plugin validate` が回る）。
@@ -57,7 +54,7 @@ Anthropic のコミュニティのマーケットプレイス（`anthropics/clau
 | ドキュメント | https://github.com/no1013kota/claude-docdd-dev-kit/blob/main/plugins/docdd/README.md |
 | ライセンス | Apache-2.0 |
 | カテゴリ（聞かれたら） | development |
-| 版 | 申請する時点の plugin.json の版とタグ（0.4.0 なら docdd--v0.4.0） |
+| 版 | 申請する時点の plugin.json の版とタグ（`X.Y.Z` なら `docdd--vX.Y.Z`） |
 | 使える環境 | Claude Code（ターミナル・Desktop・IDE）。git・Node.js 18 以上・ターミナルが要る。Cowork では確かめていない |
 | 問い合わせ先 | https://github.com/no1013kota/claude-docdd-dev-kit/issues/new/choose |
 
