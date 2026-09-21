@@ -6,6 +6,18 @@
 - キット共通の約束（5原則・変更影響 → 必須の検証・Definition of Done・規約）は `.claude/rules/docdd-kit.md` にあり、毎回自動で読み込まれる。
 - 手順書（スキル）はプラグイン `docdd` が提供する。`/docdd:` と打つと一覧が出る。
 
+## スキル（何を使うか）
+
+| いつ | スキル |
+|---|---|
+| 起票する | `/docdd:add-task`（要望を 1 件ずつ）／`/docdd:tasks-from-prd`（PRD の機能をまとめて） |
+| 開発する | `/docdd:dev-loop`（タスクを 1 件。中で検証と docs 同期まで行う） |
+| **スキルを通さず自分で直した** | `/docdd:doc-sync`（実装に合わせて仕様書を直す。**省かない**） |
+| 検証する | `/docdd:verify-integration`（DB・migration・権限）／`/docdd:verify-e2e`（操作の流れ）／`/docdd:ui-polish`・`/docdd:playwright-cli`（Web の画面） |
+| 仕上げる（必要なときだけ） | `/docdd:refactor`（中身を整える）／`/docdd:speed-up`（表示が遅い。Web）／`/docdd:security-audit`（公開前や、ログイン・課金・外部連携を触ったあと） |
+| 反映・点検する | `/docdd:release`（本番へ）／`/docdd:maintenance`（週 1 回。`monthly` で月次も） |
+| 運営者が打つ | `/docdd:init`（導入）／`/docdd:update-kit`（雛形を新しい版へ） |
+
 ## ディレクトリ構成
 
 | パス | 内容 |

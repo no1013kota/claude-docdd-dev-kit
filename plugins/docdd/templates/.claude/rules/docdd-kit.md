@@ -1,4 +1,4 @@
-<!-- docdd-kit v0.9.0 — このファイルはキット（docdd プラグイン）が管理する。直すと /docdd:update-kit が差分を見せて聞く。プロジェクト固有の指示は CLAUDE.md の「スキルへの追加指示」へ -->
+<!-- docdd-kit v0.10.0 — このファイルはキット（docdd プラグイン）が管理する。直すと /docdd:update-kit が差分を見せて聞く。プロジェクト固有の指示は CLAUDE.md の「スキルへの追加指示」へ -->
 # docdd キット共通の約束
 
 ## 前提：運営者は個人（非エンジニア想定）
@@ -27,6 +27,8 @@
 ## 開発の進め方
 
 - 流れ: 要望 → `/docdd:add-task`（PRD の機能をまとめて起票するなら `/docdd:tasks-from-prd`）→ `/docdd:dev-loop`（中で `/docdd:doc-sync` と検証スキルを呼ぶ）→ 依頼が全部終わったら `/docdd:release`。連続自動開発は `/loop /docdd:dev-loop`。
+- **スキルを通さずにコードを直したときは、コミットの前に `/docdd:doc-sync` を実行する**（dev-loop・refactor を通した変更は、その中で呼ばれるので要らない）。仕様書と実装がずれたままコミットしない。
+- 本番へ出す前に、必要なら仕上げを回す: `/docdd:refactor`（振る舞いを変えずに中身を整える）・`/docdd:speed-up`（表示が遅い）・`/docdd:security-audit`（公開前や、ログイン・課金・外部連携を触ったあと）。どれも `/docdd:release` の前に終わらせる。
 - タスクは `tasks/BACKLOG.md` で管理する。状態と書式は同ファイルの「運用ルール」に従う。**終わったタスク（`done`・`dropped`）と決まった判断は `node scripts/backlog-archive.mjs` で `tasks/archive/BACKLOG-done.md` へ移す**（BACKLOG が育つと、読むだけで作業の場所を使い、末尾の未着手を見落とす）。アーカイブは丸ごと読まず、ID や言葉で検索する。新しい T-番号・D-番号は、アーカイブも含めた最大の次にする。
 - **要望を受け取ったら `/docdd:add-task` で起票してから実装へ進む。** `todo` が1件も無いと `/docdd:dev-loop` は動かない。
 - 1タスク = 1コミット。コミットメッセージにタスクIDを含める（例: `feat(T-01): メール認証を実装`）。
