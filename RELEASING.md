@@ -43,7 +43,7 @@ Anthropic のコミュニティのマーケットプレイス（`anthropics/clau
 - 申請の前に、上の手順の 4〜7 を通す（審査でも `claude plugin validate` が回る）。
 - 載ったかは、コミュニティのカタログ https://github.com/anthropics/claude-plugins-community/blob/main/.claude-plugin/marketplace.json で名前を探して確かめる（同期は毎晩なので、承認から少し遅れる）。
 - 入れるときの `@` の右の名前は、公式の文書の中で食い違っている（discover-plugins と plugins は `claude-community`、申請の説明の頁は `claude-plugins-official`）。README では決め打ちせず、「`/plugin list` で確かめる」と書いている。載ったら実際の名前を確かめ、README を直すかを決める。
-- 申請の文面を変えたら、`plugin.json`・`marketplace.json` の説明と、README 2 本の英語の要約も揃える。
+- 申請の文面を変えたら、`plugin.json`・`marketplace.json` の説明も揃える。
 
 ### フォームに入れる値
 

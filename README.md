@@ -6,8 +6,6 @@ Claude Code のプラグイン マーケットプレイスです。プラグイ�
 Claude Code（ターミナル・Desktop・IDE）向けです。git・Node.js・ターミナルが要るので、Cowork では動作を確かめていません。
 背景と考え方はブログ記事「[コードを書けなくても Claude Code でアプリを壊さず作り続ける「4つのファイル」の仕組み](https://exosai.net/blog/claude-code-non-engineer-workflow)」にあります。
 
-**English summary**: docdd is a Japanese-language Claude Code plugin for solo non-engineers who build and run web apps, games and more. It sets up a spec-driven workflow in your project: a `CLAUDE.md` with verification and release command tables, a PRD and requirements docs as the single source of truth, a task backlog with a "decisions needed" queue, and doc-consistency check scripts. Its skills turn a request into a task, implement and verify it, sync the docs, commit, and release. In docdd projects, a PreToolUse hook blocks risky git operations (bulk `git add`, `--amend`, `--no-verify`, force push) and commits that contain secrets such as private keys, known API key formats and `.env` files. Web apps come first: in non-web projects such as Unity games, the web-only skills report "not applicable" and stop. Requirements: a paid Claude Code plan (Pro, Max, Team or Enterprise) or a Console account, git, Node.js 18 or later, and a terminal. It is built for Claude Code in the terminal, the Desktop app and IDE extensions, and has not been tested in Cowork.
-
 ## 全体像
 
 docdd は、プロジェクトに**4 つの置き場**（約束・仕様書・作業キュー・手順書）をそろえ、要望から本番反映までを毎回同じ順で進めます。あなたが打つのは図の四角（`/docdd:…`）だけで、丸みのある箱はファイルです。
@@ -55,9 +53,9 @@ Claude Code の中で次を順に打ちます。入れるのに GitHub のアカ
 2. `/plugin install docdd@claude-docdd-dev-kit`
 3. プロジェクトのフォルダで Claude Code を起動し、`/docdd:init`
 
-まだアプリのコードが無いなら、先に土台（例: Next.js）を作って動かしてから、そのフォルダで 3 を打ちます。
+**まだアプリのコードが無いとき**は、先にアプリの土台を作ってから 3 を打ちます。例えば Claude Code に「Next.js の土台を作って、動くところまで」と頼み、できたフォルダで `/docdd:init` です。順番を逆にすると、土台を作る道具（create-next-app など）が「フォルダが空でない」と止まることがあるためです。
 
-ほかの配布元から docdd を入れた場合は、`@` の右の名前（配布元の名前）が `claude-docdd-dev-kit` と違います。更新ややめるときのコマンドでは、`/plugin list` に出る名前を使います。
+`docdd@claude-docdd-dev-kit` の `@` の右は、入れた場所（配布元）の名前です。この手順で入れたなら、この名前のままで大丈夫です。別の場所（例えば Anthropic のコミュニティの一覧）から入れたときは名前が変わるので、更新ややめるときのコマンドでは `/plugin list` に出る名前を使います。
 
 ## 詳しい説明書
 
