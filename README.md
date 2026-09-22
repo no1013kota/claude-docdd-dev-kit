@@ -3,7 +3,14 @@
 Claude Code のプラグイン マーケットプレイスです。プラグイン `docdd` を入れると、1 人の非エンジニアが Web アプリやゲームなどを作り続けるための「約束（CLAUDE.md）・仕様書（docs）・作業キュー（BACKLOG）・手順書（スキル）」がそろいます。
 要望をタスクにし、実装・検証・仕様書の更新・コミット・本番反映までを、毎回同じ手順で Claude Code に進めさせます。
 Claude Code（ターミナル・Desktop・IDE）向けです。
-背景と考え方はブログ記事「[コードを書けなくても Claude Code でアプリを壊さず作り続ける「4つのファイル」の仕組み](https://exosai.net/blog/claude-code-non-engineer-workflow)」にあります。
+
+## 使える条件
+
+- **Claude Code の有料プラン**（Pro・Max・Team・Enterprise）で利用できます。
+- ターミナル・VS Code などで使えます。
+- **git と Node.js 18 以上**をインストールしたmacOS・Linux で使えます。Windows では Git for Windows を入れてください。
+- **作るものの技術は問いません**（仕様書・タスク・コミットの流れはどれでも同じです）。ただしブラウザ画面でのE2Eテストのスキルなどは Web アプリ向けで、Unity などのゲームやネイティブアプリでは機能しません。
+- **本番へ出す時に使う `/docdd:release`** には、git の push 先が必要です。
 
 ## 全体像
 
@@ -67,16 +74,6 @@ Claude Code の入力欄で `/docdd:` と打つと、この一覧が出ます。
 
 場面ごとの使い分けは「[毎日の使い方](plugins/docdd/README.md#毎日の使い方)」にあります。
 
-## 使える条件
-
-- **Claude Code の有料プラン**（Pro・Max・Team・Enterprise）か Console のアカウント。ターミナル・Desktop アプリ・VS Code などで使えます（ブラウザで動く claude.ai/code には対応していません）。
-- **git と Node.js 18 以上**。macOS・Linux で使えます。Windows では Git for Windows を入れてください。
-- **1 人で、日本語で**使う前提です。チームで分担するための仕組みはありません。
-- **作るものの技術は問いません**（仕様書・タスク・コミットの流れはどれでも同じです）。テストやビルドのコマンドは、Next.js・Vite などの Node.js の Web アプリなら init がほぼ自動で埋め、ほかの技術では埋まらない所を init が聞くので、分かる範囲で答えます。ブラウザで画面を確かめるスキルは Web アプリ向けで、Unity などのゲームやネイティブアプリでは使いません。
-- **本番へ出す `/docdd:release`** には、git の push 先が要ります。公開のしかたが「確認してから公開」「コマンドで公開」なら、gh（GitHub をコマンドで操作する道具）にログインしておくと、PR の作成と CI の待ちまで自動で進みます。
-
-技術ごとの詳しい対応は「[どこまで使えるか](plugins/docdd/README.md#どこまで使えるか)」にあります。
-
 ## 入れ方
 
 **用意するもの**: Claude Code（有料プラン）・git・Node.js 18 以上。入れるのに GitHub のアカウントは要りません。
@@ -99,6 +96,17 @@ Claude Code の入力欄で `/docdd:` と打つと、この一覧が出ます。
 3. `/docdd:init`（プロジェクト名や作りたいものを聞かれるので、答えていく）
 
 1・2 は一度だけで、ほかのプロジェクトでも使えます。新しいプロジェクトでは 3 だけを打ちます。
+
+### 3. docdd を更新する（新しい版が出たとき）
+
+docdd は自動では更新されません（既定でオフ）。新しい版を受け取るときは、次を順に打ちます。
+
+1. `/plugin marketplace update claude-docdd-dev-kit`（配布元の一覧を取り直す）
+2. `/plugin` と打ち、画面で docdd を選んで更新する（ターミナルなら、Claude Code を終了してから `claude plugin update docdd@claude-docdd-dev-kit` と打ち、開き直す）
+3. 各プロジェクトのフォルダで `/docdd:update-kit`（プロジェクトに置いた雛形を、新しい版にそろえる）
+
+- 1・2 はプラグインの更新で、一度だけで済みます。3 は、docdd を入れたプロジェクトごとに打ちます。更新したあとにプロジェクトを開くと、3 を打つよう 1 行で知らせます。
+- 何が変わったかは [CHANGELOG](plugins/docdd/CHANGELOG.md) にあります。自動で更新したいときは、`/plugin` → Marketplaces → claude-docdd-dev-kit → Enable auto-update。
 
 ## 詳しい説明書
 
