@@ -99,14 +99,24 @@ Claude Code の入力欄で `/docdd:` と打つと、この一覧が出ます。
 
 ### 3. docdd を更新する（新しい版が出たとき）
 
-docdd は自動では更新されません（既定でオフ）。新しい版を受け取るときは、次を順に打ちます。
+**おすすめ: 自動更新をオンにする（一度だけ）**
+
+docdd の自動更新は、最初はオフです。次の手順で一度オンにすると、あとは Claude Code を起動したときに、裏で新しい版を取ってきます。
+
+1. `/plugin` と打つ
+2. **Marketplaces** を選び、**claude-docdd-dev-kit** を選ぶ
+3. **Enable auto-update** を選ぶ
+
+新しい版が入ると、`/reload-plugins` を打つよう知らせが出ます（打たなくても、次に起動したときから新しい版で動きます）。
+
+**手で更新するとき**（自動更新をオフのままにする場合）
 
 1. `/plugin marketplace update claude-docdd-dev-kit`（配布元の一覧を取り直す）
 2. `/plugin` と打ち、画面で docdd を選んで更新する（ターミナルなら、Claude Code を終了してから `claude plugin update docdd@claude-docdd-dev-kit` と打ち、開き直す）
-3. 各プロジェクトのフォルダで `/docdd:update-kit`（プロジェクトに置いた雛形を、新しい版にそろえる）
 
-- 1・2 はプラグインの更新で、一度だけで済みます。3 は、docdd を入れたプロジェクトごとに打ちます。更新したあとにプロジェクトを開くと、3 を打つよう 1 行で知らせます。
-- 何が変わったかは [CHANGELOG](plugins/docdd/CHANGELOG.md) にあります。自動で更新したいときは、`/plugin` → Marketplaces → claude-docdd-dev-kit → Enable auto-update。
+**どちらの場合も、最後に** 各プロジェクトのフォルダで `/docdd:update-kit` と打ちます。プロジェクトに置いた雛形を、新しい版にそろえます（あなたのファイルを書き換えるので、自動では動かず、承知を得てから書き換えます）。更新したあとにプロジェクトを開くと、打つよう 1 行で知らせます。
+
+何が変わったかは [CHANGELOG](plugins/docdd/CHANGELOG.md) にあります。
 
 ## 詳しい説明書
 
