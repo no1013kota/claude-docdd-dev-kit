@@ -4,7 +4,8 @@
 //    plugins/docdd/skills/<名前>/SKILL.md として実在するか
 // 2. スキル共通の前置き（前置き A・B）が、決まったスキルの frontmatter の直後に一字一句そのままあるか
 // 3. SKILL.md の frontmatter: name がフォルダ名と同じ／model: が無い／
-//    init・release・update-kit に disable-model-invocation: true がある／allowed-tools に runner 単体が無い
+//    init・release・update-kit に disable-model-invocation: true と Codex 用の agents/openai.yaml がある／
+//    allowed-tools に runner 単体が無い
 //    （allowed-tools は 1 行の文字列でも、YAML のリスト「  - Bash(…)」でも読む）
 // 問題があれば日本語で列挙して exit 1。
 import fs from "node:fs";
@@ -151,6 +152,13 @@ for (const name of skillDirs) {
   if ("model" in fm) problems.push(`model: がある: ${where}（消す。既定でセッションのモデルを使う）`);
   if (MANUAL_ONLY.includes(name) && fm["disable-model-invocation"] !== "true") {
     problems.push(`disable-model-invocation: true が無い: ${where}（自分で打ったときだけ動くスキル）`);
+  }
+  if (MANUAL_ONLY.includes(name)) {
+    // Codex は frontmatter の disable-model-invocation を読まないので、同じ意味の設定を agents/openai.yaml に置く
+    const yaml = path.join(SKILLS_DIR, name, "agents", "openai.yaml");
+    const y = fs.existsSync(yaml) ? fs.readFileSync(yaml, "utf8") : null;
+    if (y == null) problems.push(`Codex 用の agents/openai.yaml が無い: ${rel(yaml)}（allow_implicit_invocation: false を書く）`);
+    else if (!/^\s*allow_implicit_invocation:\s*false\s*$/m.test(y)) problems.push(`agents/openai.yaml に allow_implicit_invocation: false が無い: ${rel(yaml)}`);
   }
   if (fm["allowed-tools"]) {
     for (const m of fm["allowed-tools"].matchAll(/(Bash|PowerShell)\(([^)]*)\)/g)) {

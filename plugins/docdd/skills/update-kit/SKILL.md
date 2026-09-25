@@ -19,6 +19,8 @@ allowed-tools: Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs update*) Bash(no
 
 ### 0. 調べる
 
+`${CLAUDE_PLUGIN_ROOT}` はこのプラグインのフォルダを指す（Claude Code が渡す）。**Codex では空になる**ので、この `SKILL.md` があるフォルダの 2 つ上（`…/skills/<スキル名>/SKILL.md` の `…` の部分）の実際のパスに置き換えて実行する。
+
 1. `node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" update --json` を実行する。
 2. `state` で分ける。
    - `not-installed` → 止まる。「docdd の雛形が見つかりません。先に `/docdd:init` で導入してください」と伝える。
