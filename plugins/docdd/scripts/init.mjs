@@ -2129,8 +2129,10 @@ function cmdApply(opts) {
         warnings.push("AGENTS.md に「検証コマンド」表がありません。スキルはこの表を読むので、--agents-md append で表だけ足すことをすすめます。");
       }
     } else if (rel === "CLAUDE.md") {
-      // Claude Code 用に AGENTS.md を読み込む 1 行。利用者の CLAUDE.md があるときは触らず、案内だけ出す
-      if (!exists) {
+      // Claude Code 用に AGENTS.md を読み込む 1 行。中身がまだ CLAUDE.md にあるうち（v0.13 以前）は触らない
+      if (claude.legacyMain && (claude.hasMarkers || claude.legacyTables)) {
+        skipped.push({ path: rel, reason: "v0.13 以前の構成（中身はこのファイルにある）。/docdd:update-kit で AGENTS.md へ移す" });
+      } else if (!exists) {
         out.set(rel, tpl(rel));
         created.push(rel);
         placed.add(rel);
