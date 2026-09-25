@@ -12,6 +12,7 @@
 ### 追加
 
 - **Codex 対応**: `codex plugin marketplace add no1013kota/claude-docdd-dev-kit` → `codex plugin add docdd@claude-docdd-dev-kit` で入り、`$docdd:init` のように `$` で呼ぶ（Claude Code は `/docdd:init` のまま）。スキル 14 本はそのまま動く。Codex 用の hook（`hooks/codex-hooks.json`）を同梱し、取り消しにくい git 操作と秘密の値の入ったコミットは Codex でも止める（Codex では `/hooks` で信頼するまで動かない）。Codex には「確認を出す」が無いので、`rm -r` などは注意書きを返す。
+- `AGENTS.md` が 30 KiB を超えたら、init が知らせる（Codex は 32 KiB までしか読まず、超えた分＝末尾の約束が切れるため）。
 - 運営者が自分で打つスキル（init・release・update-kit）は、Codex でも会話の流れで勝手に動かない（`agents/openai.yaml` の `allow_implicit_invocation: false`）。
 - 同じプロジェクトを Claude Code と Codex で併用できる（約束も表も `AGENTS.md` の 1 か所にあるため）。
 

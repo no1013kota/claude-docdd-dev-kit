@@ -119,6 +119,8 @@ function toAgentsMd(claudeMd, rulesMd, rulesUntouched = false) {
 function templateRulesBlock() {
   return rulesBlock(tplText("AGENTS.md"))?.text ?? "";
 }
+/** Codex が AGENTS.md を読む上限は 32 KiB。手前で知らせる（超えると末尾の約束が切れる）。 */
+const AGENTS_MD_SOFT_LIMIT = 30 * 1024;
 const DATE_TOKEN = "{{YYYY-MM-DD}}";
 const MANIFEST = ".docdd/manifest.json";
 
@@ -1182,7 +1184,7 @@ function claudeMdInfo() {
   const legacyMain = !isFile("AGENTS.md") && isFile("CLAUDE.md");
   const main = legacyMain ? "CLAUDE.md" : "AGENTS.md";
   const buf = readBuf(main);
-  if (buf == null) return { file: "AGENTS.md", legacyMain: false, exists: false, builtinInit: false, hasMarkers: false, hasVerifyTable: false, hasReflectTable: false, legacyTables: false, docdd: false, lines: 0, knownTemplate: null };
+  if (buf == null) return { file: "AGENTS.md", legacyMain: false, exists: false, builtinInit: false, hasMarkers: false, hasVerifyTable: false, hasReflectTable: false, legacyTables: false, docdd: false, lines: 0, bytes: 0, knownTemplate: null };
   const text = buf.toString("utf8");
   const hash = sha256(buf);
   return {
@@ -1196,6 +1198,7 @@ function claudeMdInfo() {
     legacyTables: /^##\s*変更影響 → 必須の検証/m.test(text),
     docdd: text.includes("/docdd:"),
     lines: text.split(/\r?\n/).length,
+    bytes: buf.length,
     knownTemplate: hash === sha256(tpl(main)) ? KIT_VERSION : KNOWN_CLAUDE_MD_HASHES[hash] ?? null,
   };
 }
@@ -2180,6 +2183,14 @@ function cmdApply(opts) {
         if (!created.includes(rel)) mod(rel, `定型タスクを足した: ${r.results.filter((t) => t.action === "added").map((t) => `${t.id} ${t.title}`).join("・")}`);
       }
     }
+  }
+
+  // Codex は AGENTS.md を 32 KiB まで読む（超えた分は切り捨て。切れるのは末尾の「キット共通の約束」）
+  const agentsBytes = out.has("AGENTS.md") ? Buffer.byteLength(String(out.get("AGENTS.md"))) : claude.file === "AGENTS.md" ? claude.bytes : 0;
+  if (agentsBytes > AGENTS_MD_SOFT_LIMIT) {
+    warnings.push(
+      `AGENTS.md が ${Math.round(agentsBytes / 1024)} KiB です。Codex は 32 KiB までしか読まず、超えた分（末尾の「キット共通の約束」）が切れます。長い説明は docs/ へ移してください。`,
+    );
   }
 
   let filled = [];
