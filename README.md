@@ -1,13 +1,13 @@
-# docdd — 非エンジニアのための Claude Code 開発キット
+# docdd — 非エンジニアのための Claude Code / Codex 開発キット
 
-Claude Code のプラグイン マーケットプレイスです。プラグイン `docdd` を入れると、1 人の非エンジニアが Web アプリやゲームなどを作り続けるための「約束（CLAUDE.md）・仕様書（docs）・作業キュー（BACKLOG）・手順書（スキル）」がそろいます。
-要望をタスクにし、実装・検証・仕様書の更新・コミット・本番反映までを、毎回同じ手順で Claude Code に進めさせます。
-Claude Code（ターミナル・Desktop・IDE）向けです。
+プラグイン マーケットプレイスです。プラグイン `docdd` を入れると、1 人の非エンジニアが Web アプリやゲームなどを作り続けるための「約束（AGENTS.md）・仕様書（docs）・作業キュー（BACKLOG）・手順書（スキル）」がそろいます。
+要望をタスクにし、実装・検証・仕様書の更新・コミット・本番反映までを、毎回同じ手順で進めさせます。
+**Claude Code（ターミナル・Desktop・IDE）と Codex CLI の、どちらでも同じように使えます**（同じプロジェクトで併用もできます）。
 
 ## 使える条件
 
-- **Claude Code の有料プラン**（Pro・Max・Team・Enterprise）で利用できます。
-- ターミナル・VS Code などで使えます。
+- **Claude Code の有料プラン**（Pro・Max・Team・Enterprise）か、**Codex CLI** で利用できます。
+- ターミナル・VS Code などで使えます。Codex での入れ方と違いは「[Codex で使う](plugins/docdd/README.md#codex-で使う)」。
 - **git と Node.js 18 以上**をインストールしたmacOS・Linux で使えます。Windows では Git for Windows を入れてください。
 - **作るものの技術は問いません**（仕様書・タスク・コミットの流れはどれでも同じです）。ただしブラウザ画面でのE2Eテストのスキルなどは Web アプリ向けで、Unity などのゲームやネイティブアプリでは機能しません。
 - **本番へ出す時に使う `/docdd:release`** には、git の push 先が必要です。
@@ -18,7 +18,7 @@ Claude Code（ターミナル・Desktop・IDE）向けです。
 
 ```mermaid
 flowchart TD
-  I["/docdd:init<br/>最初の 1 回。雛形を置き、表を埋める"] --> C[("CLAUDE.md の表<br/>検証コマンド・反映コマンド<br/>スキルは検証・反映にここのコマンドを使う")]
+  I["/docdd:init<br/>最初の 1 回。雛形を置き、表を埋める"] --> C[("AGENTS.md の表<br/>検証コマンド・反映コマンド<br/>スキルは検証・反映にここのコマンドを使う")]
   I --> S
   Y["docs を自分で書き換えたとき<br/>（PRD に機能を足した など）"] --> S
   S[("docs/ 仕様の正本<br/>PRD＝何を作るか／requirements＝どう作るか")] --> A["/docdd:add-task<br/>タスクを作る<br/>やりたいことを書けば 1 件<br/>何も書かなければ<br/>仕様書からまとめて"]
@@ -41,8 +41,8 @@ flowchart TD
 
 | ファイル・フォルダ | 何が入るか | 誰が書くか |
 |---|---|---|
-| `CLAUDE.md` | このプロジェクトの約束。検証コマンド・反映コマンドの表と、スキルへの追加指示。Claude が毎回読む | init が置いて表を埋め、あなたが直す |
-| `.claude/rules/docdd-kit.md` | どのプロジェクトにも共通の約束（仕様書と実装をそろえる・変更に合わせて回す検証など）。Claude が毎回読む | init が置き、`/docdd:update-kit` が新しい版にする。あなたは直さない（このプロジェクトだけの指示は `CLAUDE.md` へ） |
+| `AGENTS.md` | このプロジェクトの約束（検証コマンド・反映コマンドの表と、スキルへの追加指示）と、どのプロジェクトにも共通の約束（仕様書と実装をそろえる・変更に合わせて回す検証など）。Claude Code も Codex も毎回読む | 上半分は init が置いて表を埋め、あなたが直す。共通の約束は印で囲んであり、`/docdd:update-kit` が新しい版にする |
+| `CLAUDE.md` | Claude Code 用に、`AGENTS.md` を読み込むだけの 1 行 | init が置く。あなたは直さない |
 | `docs/`（まず `docs/PRD.md`） | 何を作るか・どう作るかの正本（正しい 1 か所）。自分で書いた仕様書も置ける。技術判断の記録（ADR）と、控えと戻し方などの運用文書もここ | あなたと Claude |
 | `tasks/BACKLOG.md` | **作業キュー**。いま動いているタスクと「要決定」（あなたに決めてほしいこと）だけを置く。dev-loop はここから 1 件ずつ取る | スキルが書き、あなたが要決定に答える |
 | `tasks/archive/BACKLOG-done.md` | 終わったタスクと決まった判断 | スキルが移す |
@@ -53,7 +53,7 @@ flowchart TD
 
 ## 使えるコマンド
 
-Claude Code の入力欄で `/docdd:` と打つと、この一覧が出ます。「自分で打つ」と書いたものは、Claude が会話の流れで勝手に動かすことはありません。
+Claude Code の入力欄で `/docdd:`（Codex は `$docdd:`）と打つと、この一覧が出ます。「自分で打つ」と書いたものは、Claude が会話の流れで勝手に動かすことはありません。
 
 | コマンド | 使うとき |
 |---|---|
@@ -76,7 +76,7 @@ Claude Code の入力欄で `/docdd:` と打つと、この一覧が出ます。
 
 ## 入れ方
 
-**用意するもの**: Claude Code（有料プラン）・git・Node.js 18 以上。入れるのに GitHub のアカウントは要りません。
+**用意するもの**: Claude Code（有料プラン）か Codex CLI・git・Node.js 18 以上。入れるのに GitHub のアカウントは要りません。
 
 ### 1. アプリのフォルダを用意する（すでにアプリがあれば飛ばす）
 
@@ -96,6 +96,8 @@ Claude Code の入力欄で `/docdd:` と打つと、この一覧が出ます。
 3. `/docdd:init`（プロジェクト名や作りたいものを聞かれるので、答えていく）
 
 1・2 は一度だけで、ほかのプロジェクトでも使えます。新しいプロジェクトでは 3 だけを打ちます。
+
+Codex で使うときは、ターミナルで `codex plugin marketplace add no1013kota/claude-docdd-dev-kit` → `codex plugin add docdd@claude-docdd-dev-kit` と打ち、プロジェクトのフォルダで `$docdd:init` と打ちます（詳しくは「[Codex で使う](plugins/docdd/README.md#codex-で使う)」）。
 
 ### 3. docdd を更新する（新しい版が出たとき）
 

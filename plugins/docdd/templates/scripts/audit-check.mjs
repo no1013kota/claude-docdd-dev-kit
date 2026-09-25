@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// docdd-kit v0.13.2 — scripts/audit-check.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
+// docdd-kit v0.14.0 — scripts/audit-check.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
 //
 // 依存ライブラリの脆弱性ゲート（npm と package-lock.json を使うプロジェクト向け）。
 //
@@ -61,7 +61,7 @@ const LOCK_FILE = findLockFile();
 if (!LOCK_FILE) {
   console.error("audit-check: package-lock.json がありません（scripts/ の 1 つ上と、git の一番上のフォルダを探しました）。`npm install` を1回実行して作ってください");
   console.error("  （npm workspaces で複数のパッケージを 1 つのリポジトリに置いている場合は、一番上のフォルダで `npm audit` を回してください）");
-  console.error("  （pnpm / yarn のプロジェクトではこの検査は使えません。CLAUDE.md「検証コマンド」表の『依存の脆弱性』行を、そのツールの監査コマンドに書き換えてください）");
+  console.error("  （pnpm / yarn のプロジェクトではこの検査は使えません。AGENTS.md「検証コマンド」表の『依存の脆弱性』行を、そのツールの監査コマンドに書き換えてください）");
   process.exit(2);
 }
 const LOCK_DIR = path.dirname(LOCK_FILE);

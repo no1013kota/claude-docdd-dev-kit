@@ -80,6 +80,17 @@ test('v0.1 系（manifest なし）には移行を案内する', () => {
   assert.match(r.out, /勝手に移行しない/);
 });
 
+test('manifest が無くても、AGENTS.md に /docdd: があれば docdd とみなす（Codex の SessionStart でも同じ）', () => {
+  const dir = path.join(tmpRoot, 'agents-only');
+  gitInit(dir);
+  fs.mkdirSync(path.join(dir, 'tasks'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'tasks', 'BACKLOG.md'), '# BACKLOG\n');
+  fs.writeFileSync(path.join(dir, 'AGENTS.md'), '# 開発ガイド\n\n`/docdd:dev-loop` で進める。\n');
+  const r = runHook(dir, { input: JSON.stringify({ session_id: 'x', cwd: dir, hook_event_name: 'SessionStart', source: 'startup' }) });
+  assert.equal(r.status, 0);
+  assert.match(r.out, /\/docdd:update-kit/);
+});
+
 test('docdd のプロジェクトでなければ何も出さない', () => {
   const dir = path.join(tmpRoot, 'other');
   gitInit(dir);

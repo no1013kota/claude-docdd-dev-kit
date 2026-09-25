@@ -1,5 +1,5 @@
 ---
 type: regex
-target: { source: file, path: .claude/rules/docdd-kit.md }
-pattern: 'docdd-kit v\d+\.\d+\.\d+'
+target: { source: file, path: AGENTS.md }
+pattern: '<!-- docdd:rules:begin v\d+\.\d+\.\d+'
 ---

@@ -4,14 +4,14 @@
 // プロジェクトのフォルダ（cwd）で実行する:
 //
 //   node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" status    [--json]
-//   node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" apply     [--json] [--dry-run] [--settings yes|no] [--claude-md new|replace|append|keep]
+//   node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" apply     [--json] [--dry-run] [--settings yes|no] [--agents-md new|replace|append|keep]
 //                                                           [--mcp auto|next|empty] [--tasks scaffold,test-infra] [--fill-inferred]
 //   node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" dates     [--json] [--dry-run] [--date YYYY-MM-DD]
 //   node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" precommit [--json]
 //   node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" update    [--json] [--dry-run] [--apply <パス,...>] [--keep-customized]
 //
 // どのサブコマンドも既存ファイルを黙って上書きしない（apply は置くだけ・足すだけ。上書きは update --apply で名指ししたファイルと、
-// apply --claude-md replace の CLAUDE.md だけ。replace は元を CLAUDE.md.bak に残す）。
+// apply --agents-md replace の AGENTS.md だけ。replace は元を AGENTS.md.bak に残す）。
 // 終了コード: 0 = 成功（status と update は調べた結果を返すだけでも 0）／1 = precommit で問題が見つかった／2 = 使い方の誤り・前提が足りない
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -21,12 +21,106 @@ import { fileURLToPath } from "node:url";
 
 const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const TEMPLATES = path.join(PLUGIN_ROOT, "templates");
-const FALLBACK_VERSION = "0.13.2";
+const FALLBACK_VERSION = "0.14.0";
 const KIT_VERSION = readKitVersion();
 const CWD = realpath(process.cwd());
 
 const BEGIN = "<!-- docdd:tables:begin -->";
 const END = "<!-- docdd:tables:end -->";
+const RULES_BEGIN = /<!-- docdd:rules:begin v([0-9][^ ]*)[^>]*-->/;
+const RULES_END = "<!-- docdd:rules:end -->";
+
+/** AGENTS.md の中の「キット共通の約束」の塊（印で囲んだ所）。version は印に書いた版。 */
+function rulesBlock(text) {
+  const m = RULES_BEGIN.exec(text ?? "");
+  if (!m) return null;
+  const end = text.indexOf(RULES_END, m.index);
+  if (end === -1) return null;
+  return { version: m[1], start: m.index, end: end + RULES_END.length, text: text.slice(m.index, end + RULES_END.length) };
+}
+
+// v0.13 以前の CLAUDE.md を AGENTS.md へ移すときの、行の言い換え（手付かずの行だけが一致する）
+const AGENTS_LINE_CONVERSIONS = [
+  [
+    "- このファイルには、このプロジェクトだけのこと（構成・コマンド・スキルへの追加指示）を書く。",
+    "- このファイルは、Claude Code と Codex のどちらでも毎回読み込まれる。上半分はこのプロジェクトだけのこと（構成・コマンド・スキルへの追加指示）、下半分（「キット共通の約束」）はどのプロジェクトでも同じ約束。",
+  ],
+  [
+    "- キット共通の約束（5原則・変更影響 → 必須の検証・Definition of Done・規約）は `.claude/rules/docdd-kit.md` にあり、毎回自動で読み込まれる。",
+    "- 「キット共通の約束」は印（`docdd:rules`）で囲んであり、`/docdd:update-kit` が新しい版にする。直接は直さず、このプロジェクトだけの指示は「スキルへの追加指示」へ書く。",
+  ],
+  [
+    "| `.claude/rules/docdd-kit.md` | キット共通の約束。`/docdd:update-kit` が新しい版にするので、直接は直さない（このプロジェクトだけの指示は下の「スキルへの追加指示」へ） |",
+    "| `CLAUDE.md` | Claude Code 用に、このファイル（`AGENTS.md`）を読み込むだけの 1 行。中身はこのファイルに書く |",
+  ],
+];
+
+/** 無くなった `.claude/rules/docdd-kit.md` への参照を AGENTS.md に言い換える。 */
+function renameKitRefs(text) {
+  return text.replaceAll("`.claude/rules/docdd-kit.md`", "`AGENTS.md`").replaceAll(".claude/rules/docdd-kit.md", "AGENTS.md");
+}
+
+/** docs・tasks の Markdown の中の、無くなったファイルへの参照を直す（移行で書き換えたファイルのパスを返す）。 */
+function renameKitRefsInDocs() {
+  const touched = [];
+  const walk = (dir) => {
+    let ents = [];
+    try {
+      ents = fs.readdirSync(abs(dir), { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const ent of ents) {
+      const rel = `${dir}/${ent.name}`;
+      if (ent.isDirectory()) walk(rel);
+      else if (ent.name.endsWith(".md")) {
+        const cur = readText(rel);
+        if (cur == null || !cur.includes(".claude/rules/docdd-kit.md")) continue;
+        writeFile(rel, renameKitRefs(cur));
+        touched.push(rel);
+      }
+    }
+  };
+  for (const dir of ["docs", "tasks"]) walk(dir);
+  return touched;
+}
+
+/**
+ * v0.13 以前の CLAUDE.md（＋ .claude/rules/docdd-kit.md）から、AGENTS.md の中身を作る。
+ * 利用者が書いた中身は消さない。約束は印で囲んで末尾へ置き、手を入れていなければ新しい版の文面にする。
+ */
+function toAgentsMd(claudeMd, rulesMd, rulesUntouched = false) {
+  let text = (claudeMd ?? "").replace(/\r\n/g, "\n");
+  // 手付かずの行は、新しい雛形の言い方に入れ替える（参照先が AGENTS.md の中へ移るため）
+  for (const [from, to] of AGENTS_LINE_CONVERSIONS) text = text.replaceAll(from, to);
+  // 直した行は、参照だけ言い換える
+  text = renameKitRefs(text).replaceAll("`CLAUDE.md`「", "`AGENTS.md`「").replaceAll("CLAUDE.md「", "AGENTS.md「");
+  let block = templateRulesBlock();
+  if (rulesMd) {
+    const cur = rulesMd.replace(/\r\n/g, "\n");
+    const stamp = /<!-- docdd-kit v([0-9][^ ]*)/.exec(cur)?.[1] ?? null;
+    if (!rulesUntouched) {
+      // 手を入れた約束は、そのまま運ぶ（次の update が新しい版への置き換えを聞く）
+      const body = cur
+        .split("\n")
+        .filter((l) => !l.startsWith("<!-- docdd-kit v"))
+        .join("\n")
+        .replace(/^# .*\n/, "")
+        .replace(/^## /gm, "### ")
+        .trim();
+      block = `<!-- docdd:rules:begin v${stamp ?? "0.13.0"} — ここから下はキットが管理する。直すと /docdd:update-kit が差分を見せて聞く -->\n## キット共通の約束（docdd）\n\n${body}\n${RULES_END}`;
+    }
+  }
+  const base = text.endsWith("\n") ? text : `${text}\n`;
+  return `${base}\n${block}\n`;
+}
+
+/** 雛形の AGENTS.md から、約束の塊だけを取り出す。 */
+function templateRulesBlock() {
+  return rulesBlock(tplText("AGENTS.md"))?.text ?? "";
+}
+/** Codex が AGENTS.md を読む上限は 32 KiB。手前で知らせる（超えると末尾の約束が切れる）。 */
+const AGENTS_MD_SOFT_LIMIT = 30 * 1024;
 const DATE_TOKEN = "{{YYYY-MM-DD}}";
 const MANIFEST = ".docdd/manifest.json";
 
@@ -38,7 +132,7 @@ const EMPTY_MCP = '{\n  "mcpServers": {}\n}\n';
 
 /** キットが管理するファイル（利用者は直さない前提。update で手付かずなら置き換える）。 */
 const KIT_OWNED = new Set([
-  ".claude/rules/docdd-kit.md",
+  "CLAUDE.md",
   "scripts/check-doc-dates.mjs",
   "scripts/check-doc-refs.mjs",
   "scripts/check-doc-placeholders.mjs",
@@ -48,7 +142,7 @@ const KIT_OWNED = new Set([
 /** 見本（検査の対象外。日付も埋めない）。 */
 const SAMPLES = new Set(["docs/requirements/00_template.md", "docs/decisions/0000-template.md"]);
 
-/** CLAUDE.md「検証コマンド」表の行（行名は仕様 §3 と同じ）。aliases は前の版の行名（表を読むときだけ使う。書き換えはしない）。 */
+/** AGENTS.md「検証コマンド」表の行（行名は仕様 §3 と同じ）。aliases は前の版の行名（表を読むときだけ使う。書き換えはしない）。 */
 const VERIFY_ROWS = [
   { row: "開発サーバー起動", token: "開発サーバー起動" },
   { row: "テスト用 DB", token: "テスト用 DB" },
@@ -83,6 +177,26 @@ const KNOWN_KIT_HASHES = {
   "scripts/audit-check.mjs": {
     "cd3e46f6a2b20a8b2360c59fa7db3cf860aeecd93ec7116958a58d5acbfbf636": "0.1.0",
     "eae0fe2199745beaa4cfdac5cbf6e18727102b79389066874bbe4dc1049803fd": "0.1.1〜0.1.4",
+  },
+  // v0.14.0 で AGENTS.md の中へ移したファイル。手付かずなら、移すときに新しい約束へ入れ替える
+  ".claude/rules/docdd-kit.md": {
+    "1e7df0d28800355d769f4048bbc7417916d8ad83003fff080b374ed39bbd6493": "0.2.0",
+    "875af3b9c111fe9cc06bbe94ca627545d7c51f4235e088e5f65def1a763c24ca": "0.3.0",
+    "c44edff0e8003188e7871b937424d7963058a846c5e10c01c4b2c903d3d59745": "0.4.0",
+    "fd75861e897203d241115bb1d8af76ca693bcf366239677d6f4339e69b910883": "0.5.0",
+    "47678a2f40338eedaf4ced7cbdde3e8c0ba25067bcc6192e30648eaf6fdb78c9": "0.6.0",
+    "4207348360425cb3721a1c15aa970924632a10a8804add080d2b977d981982be": "0.7.0",
+    "087d7856dcf5366f2cde711298bf63b6dbd609b66b9988c5be134c74afe057a2": "0.8.0",
+    "67acf66b39e335efa8c944f941f6e8f36d3fb6de411779295a27ca53fb319124": "0.9.0",
+    "a48f2904e1c83382c399da93c384e7c7112693e4781f4c6ad5e106381b904eba": "0.10.0",
+    "2afdcaf2ecc92c7a14a83b18ae7bc6bb29bd087480b4412cef9e0f5ce107b353": "0.11.0",
+    "18ad74ab61289916df267e933db9b98aa1e5302d01f96ce299fa73662643194a": "0.11.1",
+    "76305c7f1f61158d47ccfc9b68ad3f9b067b5f502ef2251e2c53be87e34f7443": "0.11.2",
+    "f96f92f4f729a57060cb90b9821bbd5a927db44efec25ee841077961c3fd36b6": "0.12.0",
+    "707f13a95259af1f1e2e4c486ff34ca3133d74ff4083e46053794a649d9856f6": "0.12.1",
+    "275c32b909a61b439665e33bfde5a5b8822e6a27d02e569f77efa1a980958f9d": "0.13.0",
+    "ea955c3db28c59c8cb7dd7c24ff3afd513e7b8e928dd446bdb47bab0e63a9b95": "0.13.1",
+    "262c5b8a0766329ae89ffd937c583f472b97c1695ce4aab4ccaa4c1a6dfd3755": "0.13.2",
   },
 };
 const KNOWN_CLAUDE_MD_HASHES = {
@@ -153,7 +267,7 @@ const LEGACY_SECTIONS = [
  * 行が完全に一致するときだけ置き換える（利用者が書き足した行は変えない）。templateRow は、いまの雛形の同じ行（先頭のセル）に置き換える。
  */
 const LEGACY_PLACEHOLDER_LINES = {
-  "CLAUDE.md": [
+  "AGENTS.md": [
     ["| `.mcp.json` | Claude Code 向け MCP 設定。初期値は Next.js 向け（shadcn/ui・Next.js DevTools）。Next.js でなければ `/docdd:init` が空にする。<使う道具に合わせて足す> |", { templateRow: "`.mcp.json`" }],
     ["| `.mcp.json` | Claude Code 向け MCP 設定（<使う道具に合わせて直す。既定は shadcn/ui と Next.js DevTools>） |", { templateRow: "`.mcp.json`" }],
   ],
@@ -179,7 +293,7 @@ const LEGACY_PLACEHOLDER_LINES = {
  * templateRow は、いまの雛形の同じ行（先頭のセル）に置き換える。
  */
 const RENAMED_LINES = {
-  "CLAUDE.md": [
+  "AGENTS.md": [
     // v0.12.0: tasks-from-prd → tasks-from-docs。v0.13.0: tasks-from-docs を add-task にまとめた
     ["| 起票する | `/docdd:add-task`（要望を 1 件ずつ）／`/docdd:tasks-from-prd`（PRD の機能をまとめて） |", { templateRow: "起票する" }],
     ["| 起票する | `/docdd:add-task`（要望を 1 件ずつ）／`/docdd:tasks-from-docs`（仕様書からまとめて。docs を自分で書き換えたあとも） |", { templateRow: "起票する" }],
@@ -188,7 +302,7 @@ const RENAMED_LINES = {
 
 /** v0.1 の雛形の未記入（<…>）の文字列。置き換えられずに残ったものを update が報告する（コードブロック・HTML コメントの中は見ない）。 */
 const LEGACY_TOKENS = {
-  "CLAUDE.md": [
+  "AGENTS.md": [
     "<プロジェクト名>",
     "<何を作っているか1行>",
     "<使う道具に合わせて足す>",
@@ -1027,7 +1141,7 @@ function listProjectFiles(gi) {
 const CODE_EXT = /\.(js|jsx|ts|tsx|mjs|cjs|vue|svelte|astro|py|go|rb|php|java|kt|swift|rs|cs|gd|dart|c|cc|cpp|h|hpp|lua|html|css|scss)$/i;
 const CONFIG_LIKE = /(^|\/)([^/]+\.config\.[^/]+|\.?eslintrc[^/]*|\.prettierrc[^/]*|[^/]+\.d\.ts)$/i;
 const DOC_EXT = /\.(md|markdown|mdx|txt|rst|adoc)$/i;
-const NOT_SPEC = /(^|\/)(CHANGELOG|LICENSE|LICENCE|CONTRIBUTING|CODE_OF_CONDUCT|SECURITY|NOTICE|AUTHORS)[^/]*$|(^|\/)requirements[^/]*\.txt$|(^|\/)robots\.txt$|^\.github\/|(^|\/)CLAUDE(\.local)?\.md(\.bak.*)?$|^docs\/_imported\//i;
+const NOT_SPEC = /(^|\/)(CHANGELOG|LICENSE|LICENCE|CONTRIBUTING|CODE_OF_CONDUCT|SECURITY|NOTICE|AUTHORS)[^/]*$|(^|\/)requirements[^/]*\.txt$|(^|\/)robots\.txt$|^\.github\/|(^|\/)(AGENTS|CLAUDE)(\.local|\.override)?\.md(\.bak.*)?$|^docs\/_imported\//i;
 const SPEC_WORDS = /spec|仕様|要件|prd|requirement|design|設計|memo|メモ|notion|企画|plan|idea/i;
 /** エンジンやツールの設定・パッケージ・素材を置くフォルダ（Unity・Godot・iOS・Android）。この下は仕様書の候補にしない。 */
 const NOT_SPEC_DIRS = /^(ProjectSettings|Packages|Assets|addons|Pods|android|ios)\//;
@@ -1041,7 +1155,7 @@ const NOT_OWN_CODE_BY_KIND = { godot: /^addons\//, flutter: /^(android|ios|linux
 
 function classifyFiles(files, templates, kind) {
   const dests = new Set(templates);
-  const isKitPath = (f) => dests.has(f) || f.startsWith(".docdd/") || f.startsWith(".claude/") || f === "CLAUDE.md" || f.startsWith("CLAUDE.md.bak");
+  const isKitPath = (f) => dests.has(f) || f.startsWith(".docdd/") || f.startsWith(".claude/") || f === "AGENTS.md" || f === "CLAUDE.md" || f.startsWith("AGENTS.md.bak") || f.startsWith("CLAUDE.md.bak");
   const notOwnByKind = NOT_OWN_CODE_BY_KIND[kind];
   const sourceFiles = files.filter((f) => CODE_EXT.test(f) && !isKitPath(f) && !CONFIG_LIKE.test(f) && !NOT_OWN_CODE.test(f) && !notOwnByKind?.test(f));
   // .txt は、ファイル名に仕様らしい語があるときだけ候補にする（例: ProjectSettings/ProjectVersion.txt や sysinfo.txt を出さない）
@@ -1062,12 +1176,20 @@ function classifyFiles(files, templates, kind) {
   return { sourceFiles, specCandidates };
 }
 
+/**
+ * 約束のファイル（AGENTS.md）の状態。AGENTS.md が無ければ、v0.13 以前の CLAUDE.md を見る（移行の判定に使う）。
+ * legacyMain が true なら「中身は CLAUDE.md にある」という意味。
+ */
 function claudeMdInfo() {
-  const buf = readBuf("CLAUDE.md");
-  if (buf == null) return { exists: false, builtinInit: false, hasMarkers: false, hasVerifyTable: false, hasReflectTable: false, legacyTables: false, docdd: false, lines: 0, knownTemplate: null };
+  const legacyMain = !isFile("AGENTS.md") && isFile("CLAUDE.md");
+  const main = legacyMain ? "CLAUDE.md" : "AGENTS.md";
+  const buf = readBuf(main);
+  if (buf == null) return { file: "AGENTS.md", legacyMain: false, exists: false, builtinInit: false, hasMarkers: false, hasVerifyTable: false, hasReflectTable: false, legacyTables: false, docdd: false, lines: 0, bytes: 0, knownTemplate: null };
   const text = buf.toString("utf8");
   const hash = sha256(buf);
   return {
+    file: main,
+    legacyMain,
     exists: true,
     builtinInit: /This file provides guidance to Claude Code/i.test(text),
     hasMarkers: text.includes(BEGIN) && text.includes(END),
@@ -1076,7 +1198,8 @@ function claudeMdInfo() {
     legacyTables: /^##\s*変更影響 → 必須の検証/m.test(text),
     docdd: text.includes("/docdd:"),
     lines: text.split(/\r?\n/).length,
-    knownTemplate: hash === sha256(tpl("CLAUDE.md")) ? KIT_VERSION : KNOWN_CLAUDE_MD_HASHES[hash] ?? null,
+    bytes: buf.length,
+    knownTemplate: hash === sha256(tpl(main)) ? KIT_VERSION : KNOWN_CLAUDE_MD_HASHES[hash] ?? null,
   };
 }
 
@@ -1214,7 +1337,7 @@ function scriptsToAdd(pm) {
     delete scripts["audit:check"];
     skipped.push({
       name: "audit:check",
-      reason: `scripts/audit-check.mjs は npm と package-lock.json 専用です（このプロジェクトは ${pm.name ?? "不明"}${lock ? `・${lock}` : ""}）。依存の脆弱性は CLAUDE.md「検証コマンド」表の『依存の脆弱性』行のコマンドを使います。`,
+      reason: `scripts/audit-check.mjs は npm と package-lock.json 専用です（このプロジェクトは ${pm.name ?? "不明"}${lock ? `・${lock}` : ""}）。依存の脆弱性は AGENTS.md「検証コマンド」表の『依存の脆弱性』行のコマンドを使います。`,
     });
   }
   return { scripts, skipped };
@@ -1222,8 +1345,8 @@ function scriptsToAdd(pm) {
 
 
 const REQUIRED = [
+  "AGENTS.md",
   "CLAUDE.md",
-  ".claude/rules/docdd-kit.md",
   "docs/README.md",
   "docs/PRD.md",
   "docs/operations/development-and-testing.md",
@@ -1235,7 +1358,7 @@ const REQUIRED = [
   MANIFEST,
 ];
 // 導入の痕跡はキット固有の名前だけにする（tasks/BACKLOG.md や scripts/audit-check.mjs は、docdd を入れていないプロジェクトにもありうる）。
-const DOCDD_MARKERS = [MANIFEST, ".claude/rules/docdd-kit.md", "scripts/check-doc-dates.mjs", "scripts/check-doc-refs.mjs", "scripts/check-doc-placeholders.mjs"];
+const DOCDD_MARKERS = [MANIFEST, "scripts/check-doc-dates.mjs", "scripts/check-doc-refs.mjs", "scripts/check-doc-placeholders.mjs"];
 
 /**
  * v0.1 系の構成か。CLAUDE.md に v0.1 の「変更影響」表があり、表マーカーが無ければ、manifest の有無に関係なく v0.1 系
@@ -1259,7 +1382,11 @@ function docddRootAbove(gi) {
     if (has(MANIFEST)) return toPosix(path.relative(gi.root, dir)) || ".";
     if (has("tasks/BACKLOG.md")) {
       try {
-        if (fs.readFileSync(path.join(dir, "CLAUDE.md"), "utf8").includes("/docdd:")) return toPosix(path.relative(gi.root, dir)) || ".";
+        const agentsOrClaude = ["AGENTS.md", "CLAUDE.md"]
+          .map((f) => path.join(dir, f))
+          .filter((f) => fs.existsSync(f))
+          .map((f) => fs.readFileSync(f, "utf8"));
+        if (agentsOrClaude.some((t) => t.includes("/docdd:"))) return toPosix(path.relative(gi.root, dir)) || ".";
       } catch {
         // CLAUDE.md が無い・読めない
       }
@@ -1270,11 +1397,11 @@ function docddRootAbove(gi) {
   return null;
 }
 
-/** hook と同じ条件: tasks/BACKLOG.md があり、CLAUDE.md が /docdd: を含む。 */
+/** hook と同じ条件: tasks/BACKLOG.md があり、AGENTS.md か CLAUDE.md が /docdd: を含む。 */
 function isDocddByBacklog() {
   if (!isFile("tasks/BACKLOG.md")) return false;
   try {
-    return fs.readFileSync(abs("CLAUDE.md"), "utf8").includes("/docdd:");
+    return ["AGENTS.md", "CLAUDE.md"].some((f) => isFile(f) && fs.readFileSync(abs(f), "utf8").includes("/docdd:"));
   } catch {
     return false;
   }
@@ -1285,7 +1412,7 @@ const rootLabel = (r) => (r === "." ? "git のルート" : `git のルートか�
 
 function computeState({ claude, manifest, placeholders, gi }) {
   const missing = REQUIRED.filter((r) => !isFile(r));
-  if (claude.exists && !claude.hasVerifyTable) missing.push("CLAUDE.md の「検証コマンド」表");
+  if (claude.exists && !claude.hasVerifyTable) missing.push(`${claude.file} の「検証コマンド」表`);
   const manifestTracked = gi.isRepo && manifest.exists ? git(["ls-files", "--error-unmatch", "--", MANIFEST]).ok : false;
   if (isLegacy(claude, manifest)) return { state: "legacy", missing, manifestTracked };
   if (!DOCDD_MARKERS.some(isFile) && !isDocddByBacklog()) {
@@ -1355,7 +1482,7 @@ function collectStatus() {
     specCandidates,
     placeholders,
     manifest: { exists: manifest.exists, kitVersion: manifest.kitVersion, tracked: st.manifestTracked, parseError: manifest.parseError },
-    claudeMd: claude,
+    agentsMd: claude,
     settings: settingsDiff(),
     mcp: mcpInfo(stack),
     gitignore: gitignoreInfo(stack),
@@ -1542,7 +1669,7 @@ function appendGitignore(existing, missing, stack) {
 }
 
 function templateTablesBlock() {
-  const t = tplText("CLAUDE.md");
+  const t = tplText("AGENTS.md");
   const s = t.indexOf(BEGIN);
   const e = t.indexOf(END);
   return `${t.slice(s, e + END.length)}\n`;
@@ -1817,8 +1944,8 @@ function taskBlock(kind, id, scaffoldId) {
       "- 参照: PRD §1・§3.3 / 依存: なし / サイズ: M",
       "- 完了条件:",
       "  - 別のフォルダでアプリの土台（フレームワークのひな形）を作り、中身をこのフォルダへ移して、開発サーバーで最初の画面が開く",
-      "  - 移すときにキットのファイル（CLAUDE.md・docs/・tasks/・scripts/・.claude/）を上書きしていない（git diff で確かめる）",
-      "  - CLAUDE.md「検証コマンド」表の『開発サーバー起動』『ビルド』行が埋まる（/docdd:init をもう一度実行すると、分かる行は推定で埋まる）",
+      "  - 移すときにキットのファイル（AGENTS.md・docs/・tasks/・scripts/・.claude/）を上書きしていない（git diff で確かめる）",
+      "  - AGENTS.md「検証コマンド」表の『開発サーバー起動』『ビルド』行が埋まる（/docdd:init をもう一度実行すると、分かる行は推定で埋まる）",
       "- メモ: 土台を作る道具（例: create-next-app）は空でないフォルダでは止まるので、別のフォルダで作ってから移す。どのフレームワークにするか決まっていなければ、勝手に決めず「要決定」に案を書いて運営者に聞く。",
     ];
   }
@@ -1828,14 +1955,14 @@ function taskBlock(kind, id, scaffoldId) {
     "- 完了条件:",
     "  - 単体の見本テスト 1 件が緑（docs/operations/development-and-testing.md §4 の最小構成: 設定 1 ファイル＋見本テスト 1 件＋実行コマンド）",
     "  - 画面があるなら、E2E（実際に動かす）の見本テストも 1 件緑",
-    "  - CLAUDE.md「検証コマンド」表の該当行が埋まる（『単体・DBテスト』。画面があるなら『E2E（実際に動かす）』と『全検査（push 前に1回）』も）",
+    "  - AGENTS.md「検証コマンド」表の該当行が埋まる（『単体・DBテスト』。画面があるなら『E2E（実際に動かす）』と『全検査（push 前に1回）』も）",
     "  - DB を使うテストは本番と別の DB に向く（『テスト用 DB』行に従う）",
     "- メモ: テストの道具は §4 のおすすめから選ぶ（技術選定の ADR タスクには分けない。/docdd:dev-loop が着手時に §4 のおすすめでよいかを 1 回確認する）。",
   ];
 }
 
-/** CLAUDE.md「検証コマンド」表の {{…}} のままのセルを推定値で埋める（埋まっている行は変えない）。 */
-function fillVerification(content, inferred) {
+/** AGENTS.md「検証コマンド」表の {{…}} のままのセルを推定値で埋める（埋まっている行は変えない）。 */
+function fillVerification(content, inferred, rel) {
   const lines = content.split("\n");
   const hs = headingsOf(lines.map((l) => l.replace(/\r$/, "")));
   const sec = hs.find((h) => h.level === 2 && /^検証コマンド/.test(h.text));
@@ -1856,7 +1983,7 @@ function fillVerification(content, inferred) {
     const cell = inf.cell.replace(/\|/g, "\\|");
     // 行名は表に書いてあるまま（前の版の行名でも変えない）
     lines[i] = `| ${cells[0]} | ${cell} |${cr}`;
-    filled.push({ row: cells[0], cell, source: inf.source, file: "CLAUDE.md", line: i + 1 });
+    filled.push({ row: cells[0], cell, source: inf.source, file: rel, line: i + 1 });
   }
   return { content: lines.join("\n"), filled };
 }
@@ -1893,7 +2020,7 @@ function uncommittedKitChanges(pm) {
 function cmdApply(opts) {
   const dryRun = opts["dry-run"] === true;
   const settingsMode = choice(opts.settings, ["yes", "no"], "yes", "--settings");
-  const claudeMode = choice(opts["claude-md"], ["new", "replace", "append", "keep"], "new", "--claude-md");
+  const claudeMode = choice(opts["agents-md"] ?? opts["claude-md"], ["new", "replace", "append", "keep"], "new", "--agents-md");
   const mcpMode = choice(opts.mcp, ["auto", "next", "empty"], "auto", "--mcp");
   const taskKinds = parseList(opts.tasks, Object.keys(TASK_TITLES), "--tasks");
   const fill = opts["fill-inferred"] === true;
@@ -1923,7 +2050,7 @@ function cmdApply(opts) {
   const warnings = [];
   const placed = new Set();
   const mod = (rel, change) => modified.set(rel, [...(modified.get(rel) ?? []), change]);
-  const report = { claudeMd: null, settings: null, mcp: null, gitignore: null };
+  const report = { agentsMd: null, settings: null, mcp: null, gitignore: null };
 
   for (const rel of templates) {
     const exists = isFile(rel);
@@ -1968,33 +2095,55 @@ function cmdApply(opts) {
         placed.add(rel);
         report.settings = { action: "created", diff: null };
       }
-    } else if (rel === "CLAUDE.md") {
-      if (!exists) {
+    } else if (rel === "AGENTS.md") {
+      if (!exists && claude.legacyMain && (claude.hasMarkers || claude.legacyTables)) {
+        // v0.13 以前のプロジェクト。中身は CLAUDE.md にある（雛形を置くと二重になる）
+        skipped.push({ path: rel, reason: "v0.13 以前の構成（中身は CLAUDE.md にある）。/docdd:update-kit で AGENTS.md へ移す" });
+        report.agentsMd = { mode: claudeMode, action: "legacy" };
+        warnings.push("このプロジェクトは v0.13 以前の構成です（中身は CLAUDE.md にあります）。`/docdd:update-kit` を打つと AGENTS.md へ移します。");
+      } else if (!exists) {
         out.set(rel, tpl(rel));
         created.push(rel);
         placed.add(rel);
-        report.claudeMd = { mode: claudeMode, action: "created" };
+        report.agentsMd = { mode: claudeMode, action: "created" };
       } else if (claude.hasMarkers) {
         skipped.push({ path: rel, reason: "既にキットの表（docdd:tables マーカー）がある" });
-        report.claudeMd = { mode: claudeMode, action: "unchanged" };
+        report.agentsMd = { mode: claudeMode, action: "unchanged" };
       } else if (claudeMode === "append") {
         const cur = readText(rel);
         const base = cur.endsWith("\n") ? cur : `${cur}\n`;
         out.set(rel, withEol(`${base}\n${templateTablesBlock()}`, eolOf(cur)));
         mod(rel, "末尾に「検証コマンド」「反映コマンド」「スキルへの追加指示」の表（docdd:tables マーカーの間）を足した");
-        report.claudeMd = { mode: claudeMode, action: "appended" };
+        report.agentsMd = { mode: claudeMode, action: "appended" };
       } else if (claudeMode === "replace") {
-        let bak = "CLAUDE.md.bak";
-        for (let n = 2; isFile(bak); n += 1) bak = `CLAUDE.md.bak${n}`;
+        let bak = "AGENTS.md.bak";
+        for (let n = 2; isFile(bak); n += 1) bak = `AGENTS.md.bak${n}`;
         backups.push({ from: rel, to: bak });
         out.set(rel, tpl(rel));
         placed.add(rel);
-        mod(rel, `キットの CLAUDE.md に置き換えた（元は ${bak}）`);
-        report.claudeMd = { mode: claudeMode, action: "replaced", backup: bak };
+        mod(rel, `キットの AGENTS.md に置き換えた（元は ${bak}）`);
+        report.agentsMd = { mode: claudeMode, action: "replaced", backup: bak };
       } else {
-        skipped.push({ path: rel, reason: `既にある（--claude-md ${claudeMode}。表は足していない）` });
-        report.claudeMd = { mode: claudeMode, action: "kept" };
-        warnings.push("CLAUDE.md に「検証コマンド」表がありません。スキルはこの表を読むので、--claude-md append で表だけ足すことをすすめます。");
+        skipped.push({ path: rel, reason: `既にある（--agents-md ${claudeMode}。表は足していない）` });
+        report.agentsMd = { mode: claudeMode, action: "kept" };
+        warnings.push("AGENTS.md に「検証コマンド」表がありません。スキルはこの表を読むので、--agents-md append で表だけ足すことをすすめます。");
+      }
+    } else if (rel === "CLAUDE.md") {
+      // Claude Code 用に AGENTS.md を読み込む 1 行。中身がまだ CLAUDE.md にあるうち（v0.13 以前）は触らない
+      if (claude.legacyMain && (claude.hasMarkers || claude.legacyTables)) {
+        skipped.push({ path: rel, reason: "v0.13 以前の構成（中身はこのファイルにある）。/docdd:update-kit で AGENTS.md へ移す" });
+      } else if (!exists) {
+        out.set(rel, tpl(rel));
+        created.push(rel);
+        placed.add(rel);
+      } else if (readText(rel).includes("@AGENTS.md")) {
+        skipped.push({ path: rel, reason: "既に AGENTS.md を読み込んでいる" });
+      } else {
+        // 利用者の CLAUDE.md は消さない。Claude Code は CLAUDE.md があると AGENTS.md を読まないので、読み込む 1 行だけ足す
+        const cur = readText(rel);
+        const base = cur.endsWith("\n") ? cur : `${cur}\n`;
+        out.set(rel, withEol(`${base}\n${tplText("CLAUDE.md")}`, eolOf(cur)));
+        mod(rel, "末尾に `@AGENTS.md`（AGENTS.md を読み込む 1 行）を足した（元の中身はそのまま）");
       }
     } else if (exists) {
       skipped.push({ path: rel, reason: "既にある（上書きしない）" });
@@ -2038,12 +2187,20 @@ function cmdApply(opts) {
     }
   }
 
+  // Codex は AGENTS.md を 32 KiB まで読む（超えた分は切り捨て。切れるのは末尾の「キット共通の約束」）
+  const agentsBytes = out.has("AGENTS.md") ? Buffer.byteLength(String(out.get("AGENTS.md"))) : claude.file === "AGENTS.md" ? claude.bytes : 0;
+  if (agentsBytes > AGENTS_MD_SOFT_LIMIT) {
+    warnings.push(
+      `AGENTS.md が ${Math.round(agentsBytes / 1024)} KiB です。Codex は 32 KiB までしか読まず、超えた分（末尾の「キット共通の約束」）が切れます。長い説明は docs/ へ移してください。`,
+    );
+  }
+
   let filled = [];
   if (fill) {
-    const rel = "CLAUDE.md";
+    const rel = claude.file; // v0.13 以前は CLAUDE.md、いまは AGENTS.md
     const cur = out.has(rel) ? String(out.get(rel)) : readText(rel);
     if (cur != null) {
-      const r = fillVerification(cur, inferred);
+      const r = fillVerification(cur, inferred, rel);
       filled = r.filled;
       if (r.content !== cur) {
         out.set(rel, r.content);
@@ -2168,12 +2325,12 @@ function cmdApply(opts) {
     notWritten,
     conflicts,
     kitVersion: KIT_VERSION,
-    options: { settings: settingsMode, claudeMd: claudeMode, mcp: mcpMode, tasks: taskKinds, fillInferred: fill, addBacklogSections: addBacklog },
+    options: { settings: settingsMode, agentsMd: claudeMode, mcp: mcpMode, tasks: taskKinds, fillInferred: fill, addBacklogSections: addBacklog },
     created,
     modified: [...modified].map(([p, changes]) => ({ path: p, changes })),
     skipped,
     backups: backups.map((b) => b.to),
-    claudeMd: report.claudeMd,
+    agentsMd: report.agentsMd,
     settings: report.settings,
     mcp: report.mcp,
     gitignore: report.gitignore,
@@ -2296,8 +2453,8 @@ function cmdPrecommit() {
         problems.push({ code: "auth-state-staged", message: `ログイン状態を保存したファイル ${f} が stage されています。git rm --cached ${f} で外し、.gitignore に足してください。`, path: f });
       } else if (AUTH_LIKE.test(f)) {
         warnings.push({ code: "auth-like-staged", message: `${f} は名前がログイン状態のファイルに似ています。翻訳や設定のファイルならそのままでよい。ログイン状態（Cookie やトークン）なら git rm --cached ${f} で外してください。`, path: f });
-      } else if (/^CLAUDE\.md\.bak/.test(f)) {
-        warnings.push({ code: "backup-staged", message: `${f}（置き換える前の CLAUDE.md の控え）が stage されています。コミットしないなら git rm --cached ${f} で外してください。`, path: f });
+      } else if (/^(AGENTS|CLAUDE)\.md\.bak/.test(f)) {
+        warnings.push({ code: "backup-staged", message: `${f}（置き換える前の AGENTS.md の控え）が stage されています。コミットしないなら git rm --cached ${f} で外してください。`, path: f });
       }
     }
     if (!staged.length) problems.push({ code: "nothing-staged", message: "stage されたファイルがありません。先にパスを明示して git add してください。" });
@@ -2395,7 +2552,7 @@ function sectionAdditions(cur, tplStr, { onlyInsideMarkers = false } = {}) {
 
 const TABLE_SECTIONS = ["ディレクトリ構成", "検証コマンド", "反映コマンド"];
 
-/** CLAUDE.md の表で、新しい版にあって今は無い行と、v0.1 の <…> のままのセル。 */
+/** AGENTS.md（v0.13 以前は CLAUDE.md）の表で、新しい版にあって今は無い行と、v0.1 の <…> のままのセル。 */
 function rowAdditions(cur, tplStr) {
   const cl = cur.split(/\r?\n/);
   const tl = tplStr.split(/\r?\n/);
@@ -2487,9 +2644,11 @@ function normalizeBlankLines(text) {
  * kind は、v0.1 の <…> を {{…}} にするなら placeholder（LEGACY_PLACEHOLDER_LINES）、スキルの名前が変わった行なら rename（RENAMED_LINES）。
  */
 function legacyLineConversions(rel, text) {
+  // v0.13 以前は同じ中身が CLAUDE.md にあったので、同じ表を使う（置き換え先は AGENTS.md の雛形の行）
+  const key = rel === "CLAUDE.md" ? "AGENTS.md" : rel;
   const tables = [
-    ["placeholder", LEGACY_PLACEHOLDER_LINES[rel]],
-    ["rename", RENAMED_LINES[rel]],
+    ["placeholder", LEGACY_PLACEHOLDER_LINES[key]],
+    ["rename", RENAMED_LINES[key]],
   ].filter(([, t]) => t);
   if (!tables.length || text == null) return [];
   const res = [];
@@ -2498,7 +2657,7 @@ function legacyLineConversions(rel, text) {
       const hit = table.find(([from]) => line === from);
       if (!hit) continue;
       let to = hit[1];
-      if (typeof to !== "string") to = tplText(rel).split(/\r?\n/).find((t) => t.startsWith(`| ${to.templateRow} |`)) ?? null;
+      if (typeof to !== "string") to = tplText(key).split(/\r?\n/).find((t) => t.startsWith(`| ${to.templateRow} |`)) ?? null;
       if (to != null && to !== line) res.push({ kind, line: i + 1, from: line, to });
       return;
     }
@@ -2516,7 +2675,9 @@ function applyLineConversions(text, convs) {
 /** v0.1 の雛形の未記入（<…>）が残っている箇所。 */
 function findLegacyPlaceholders() {
   const res = [];
-  for (const [rel, tokens] of Object.entries(LEGACY_TOKENS)) {
+  for (const [key, tokens] of Object.entries(LEGACY_TOKENS)) {
+    // v0.13 以前は中身が CLAUDE.md にある
+    const rel = key === "AGENTS.md" && !isFile("AGENTS.md") && isFile("CLAUDE.md") ? "CLAUDE.md" : key;
     const text = readText(rel);
     if (text == null) continue;
     scanMarkdown(text).forEach((segs, i) => {
@@ -2610,7 +2771,7 @@ function migrateLegacyClaudeMd(cur, keepCustomized) {
     }
   }
   // ディレクトリ構成の表に新しい行を足し、<…> のままのセルを {{…}} にする
-  const dirAdds = rowAdditions(text, tplText("CLAUDE.md")).filter((a) => a.table === "ディレクトリ構成");
+  const dirAdds = rowAdditions(text, tplText("AGENTS.md")).filter((a) => a.table === "ディレクトリ構成");
   text = applyRowAdditions(text, dirAdds);
   return normalizeBlankLines(text);
 }
@@ -2650,7 +2811,18 @@ function planUpdate(opts) {
     const buf = readBuf(rel);
     const t = tpl(rel);
     const e = { path: rel, owner, status: null, action: "none" };
-    if (owner === "kit" || owner === "sample") {
+    if (rel === "CLAUDE.md" && buf != null) {
+      // 役目は「AGENTS.md を読み込む」だけ。その 1 行があれば、利用者が書き足した中身はそのままにする
+      const text = buf.toString("utf8");
+      if (text.includes("@AGENTS.md")) e.status = sha256(buf) === sha256(t) ? "current" : "present";
+      else
+        Object.assign(e, {
+          status: "present",
+          action: "append",
+          additions: [{ kind: "claude-pointer", text: tplText("CLAUDE.md") }],
+          note: "Claude Code は CLAUDE.md があると AGENTS.md を読まないので、読み込む 1 行を末尾に足す（元の中身はそのまま）",
+        });
+    } else if (owner === "kit" || owner === "sample") {
       if (buf == null) Object.assign(e, { status: "missing", action: "add" });
       else if (sha256(buf) === sha256(t)) e.status = "current";
       else if (manFiles[rel]?.sha256 === sha256(buf)) Object.assign(e, { status: "untouched", action: "replace", matchedVersion: manFiles[rel].version ?? manifest.kitVersion });
@@ -2665,8 +2837,29 @@ function planUpdate(opts) {
       if (!gin.exists) Object.assign(e, { status: "missing", action: "add", additions: gin.missingLines });
       else if (gin.missingLines.length) Object.assign(e, { status: "present", action: "append", additions: gin.missingLines });
       else e.status = "current";
-    } else if (rel === "CLAUDE.md") {
-      if (buf == null) Object.assign(e, { status: "missing", action: "add" });
+    } else if (rel === "AGENTS.md") {
+      if (buf == null && claude.legacyMain && claude.exists && (claude.hasMarkers || claude.legacyTables)) {
+        // v0.13 以前: 中身は CLAUDE.md にある。AGENTS.md へ移す
+        const raw = readText("CLAUDE.md");
+        // v0.1 系は、先に v0.2 の形へ直してから移す（移った節を消す）
+        const legacyV01 = claude.legacyTables && !claude.hasMarkers;
+        const from = legacyV01 ? migrateLegacyClaudeMd(raw, opts["keep-customized"] === true) : raw;
+        const rulesText = readText(".claude/rules/docdd-kit.md");
+        const rulesBuf = readBuf(".claude/rules/docdd-kit.md");
+        const rulesUntouched =
+          rulesBuf != null &&
+          (manFiles[".claude/rules/docdd-kit.md"]?.sha256 === sha256(rulesBuf) || knownVersion(".claude/rules/docdd-kit.md", sha256(rulesBuf)) != null);
+        const moved = toAgentsMd(from, rulesText, rulesUntouched);
+        e.rulesUntouched = rulesUntouched;
+        e.legacyV01 = legacyV01;
+        if (legacyV01) e.removals = legacyRemovals(raw);
+        Object.assign(e, {
+          status: "legacy",
+          action: "migrate-to-agents",
+          diff: unifiedDiff(raw, moved, "CLAUDE.md（いま）", "AGENTS.md（移したあと）"),
+          note: "CLAUDE.md の中身を AGENTS.md へ移し、キット共通の約束（.claude/rules/docdd-kit.md）もこの中へ入れる。CLAUDE.md は AGENTS.md を読み込む 1 行になり、.claude/rules/docdd-kit.md は消える",
+        });
+      } else if (buf == null) Object.assign(e, { status: "missing", action: "add" });
       else {
         const cur = buf.toString("utf8");
         if (claude.legacyTables && !claude.hasMarkers) {
@@ -2684,6 +2877,11 @@ function planUpdate(opts) {
             ...(claude.hasMarkers ? sectionAdditions(cur, t.toString("utf8"), { onlyInsideMarkers: true }) : []),
           ];
           if (!claude.hasMarkers && !claude.hasVerifyTable) adds.push({ kind: "tables", text: templateTablesBlock() });
+          const block = rulesBlock(cur);
+          if (!block) adds.push({ kind: "rules", text: templateRulesBlock(), note: "「キット共通の約束」を足す" });
+          else if (block.version !== KIT_VERSION && block.text !== templateRulesBlock()) {
+            adds.push({ kind: "rules", text: templateRulesBlock(), from: block.version, diff: unifiedDiff(block.text, templateRulesBlock(), `キット共通の約束（v${block.version}）`, `キット共通の約束（v${KIT_VERSION}）`) });
+          }
           Object.assign(e, { status: adds.length ? "present" : "current", action: adds.length ? "append" : "none", additions: adds });
         }
       }
@@ -2717,6 +2915,12 @@ function planUpdate(opts) {
 
 function applyUpdateEntry(e, opts, pkg, stack) {
   const rel = e.path;
+  if (rel === "CLAUDE.md" && e.action === "append") {
+    // 利用者が書いた中身は消さず、AGENTS.md を読み込む 1 行だけ足す
+    const cur = readText(rel);
+    writeFile(rel, withEol(`${cur.endsWith("\n") ? cur : `${cur}\n`}\n${e.additions.find((a) => a.kind === "claude-pointer").text}`, eolOf(cur)));
+    return;
+  }
   if (e.owner === "kit" || e.owner === "sample") {
     writeFile(rel, tpl(rel));
     return;
@@ -2734,18 +2938,36 @@ function applyUpdateEntry(e, opts, pkg, stack) {
     writeFile(rel, tpl(rel));
     return;
   }
+  if (rel === "AGENTS.md" && e.action === "migrate-to-agents") {
+    const raw = readText("CLAUDE.md");
+    const claudeMd = e.legacyV01 === true ? migrateLegacyClaudeMd(raw, opts["keep-customized"] === true) : raw;
+    writeFile(rel, withEol(toAgentsMd(claudeMd, readText(".claude/rules/docdd-kit.md"), e.rulesUntouched === true), eolOf(raw)));
+    writeFile("CLAUDE.md", tpl("CLAUDE.md"));
+    if (isFile(".claude/rules/docdd-kit.md")) fs.rmSync(abs(".claude/rules/docdd-kit.md"));
+    e.alsoWrote = renameKitRefsInDocs();
+    // 他に何も無ければ、空になった .claude/rules も片づける
+    try {
+      if (fs.readdirSync(abs(".claude/rules")).length === 0) fs.rmdirSync(abs(".claude/rules"));
+    } catch {}
+    return;
+  }
   const cur = readText(rel);
   const eol = eolOf(cur);
-  if (rel === "CLAUDE.md" && e.action === "migrate") {
+  if ((rel === "AGENTS.md" || rel === "CLAUDE.md") && e.action === "migrate") {
     writeFile(rel, withEol(migrateLegacyClaudeMd(cur, opts["keep-customized"] === true), eol));
     return;
   }
-  if (rel === "CLAUDE.md") {
+  if (rel === "AGENTS.md") {
     const tables = e.additions.find((a) => a.kind === "tables");
     let text = applyLineConversions(cur, legacyLineConversions(rel, cur));
     if (tables) text = `${text.endsWith("\n") ? text : `${text}\n`}\n${tables.text}`;
     text = applyRowAdditions(text, e.additions.filter((a) => a.kind === "row" || a.kind === "cell"));
     text = applySectionAdditions(text, e.additions.filter((a) => a.kind === "section" || a.kind === "subsection"));
+    const rules = e.additions.find((a) => a.kind === "rules");
+    if (rules) {
+      const block = rulesBlock(text);
+      text = block ? `${text.slice(0, block.start)}${rules.text}${text.slice(block.end)}` : `${text.endsWith("\n") ? text : `${text}\n`}\n${rules.text}\n`;
+    }
     writeFile(rel, withEol(text, eol));
     return;
   }
@@ -2772,7 +2994,7 @@ function cmdUpdate(opts) {
     else if (e.action === "none") errors.push({ path: p, message: `このファイルは ${e.status} なので、することがありません` });
     else {
       if (!dryRun) applyUpdateEntry(e, opts, pkg, stack);
-      applied.push({ path: p, action: e.action });
+      applied.push({ path: p, action: e.action, ...(e.alsoWrote?.length ? { alsoWrote: e.alsoWrote } : {}) });
     }
   }
 
@@ -2790,6 +3012,8 @@ function cmdUpdate(opts) {
         files[rel] = { sha256: sha256(buf), owner, version: KIT_VERSION };
       }
     }
+    // 無くなったファイル（AGENTS.md へ移した .claude/rules/docdd-kit.md など）の記録は消す
+    for (const rel of Object.keys(files)) if (!isFile(rel)) delete files[rel];
     // 版を新しくするのは、キットのファイルに「無い」「手付かず（置き換えられる）」が残っておらず、CLAUDE.md の移行も済んだときだけ。
     // それまでは元の版を保つ（一部だけ適用したあとの update でも、残りのファイルと移行を出すため）。
     const kitPending = [...KIT_OWNED].some((rel) => {
@@ -2806,6 +3030,11 @@ function cmdUpdate(opts) {
     manifestWritten = true;
   }
 
+  // AGENTS.md への移行が残っているうちは、CLAUDE.md を単独で置き換えない（中身が消えるため。移行が一緒に書き換える）
+  if (entries.some((e) => e.path === "AGENTS.md" && e.action === "migrate-to-agents")) {
+    const pointer = entries.find((e) => e.path === "CLAUDE.md");
+    if (pointer && pointer.action !== "none") Object.assign(pointer, { action: "none", additions: [], note: "AGENTS.md の移行が、このファイルも一緒に書き換える" });
+  }
   const actionable = entries.filter((e) => e.action !== "none");
   return {
     ok: errors.length === 0,
@@ -2822,20 +3051,25 @@ function cmdUpdate(opts) {
       add: actionable.filter((e) => e.action === "add").map((e) => e.path),
       review: actionable.filter((e) => e.action === "review").map((e) => e.path),
       append: actionable.filter((e) => e.action === "append").map((e) => e.path),
-      migrate: actionable.filter((e) => e.action === "migrate").map((e) => e.path),
+      migrate: actionable.filter((e) => e.action === "migrate" || e.action === "migrate-to-agents").map((e) => e.path),
     },
     legacy: legacy
       ? {
-          note: "v0.1 系の構成です。.claude/rules/docdd-kit.md を置き（add）、CLAUDE.md から移った節を消して表をマーカーで囲みます（migrate）。",
-          removals: entries.find((e) => e.path === "CLAUDE.md")?.removals ?? [],
+          note: "v0.1 系の構成です。CLAUDE.md から移った節を消して表をマーカーで囲み、そのまま AGENTS.md へまとめます（migrate-to-agents）。CLAUDE.md は AGENTS.md を読み込む 1 行になります。",
+          removals: entries.find((e) => e.path === "AGENTS.md")?.removals ?? entries.find((e) => e.path === "CLAUDE.md")?.removals ?? [],
         }
-      : null,
+      : entries.some((e) => e.action === "migrate-to-agents")
+        ? {
+            note: "v0.13 以前の構成です。CLAUDE.md の中身と .claude/rules/docdd-kit.md を AGENTS.md へまとめます（migrate-to-agents）。CLAUDE.md は AGENTS.md を読み込む 1 行になり、.claude/rules/docdd-kit.md は消えます。AGENTS.md を適用すると、この 3 つが一度に入れ替わります。",
+            removals: [],
+          }
+        : null,
     applicable: actionable.map((e) => e.path),
     legacyPlaceholders: findLegacyPlaceholders(),
     applied,
     errors,
     manifest: { path: MANIFEST, written: manifestWritten },
-    toStage: applied.length && !dryRun ? [...new Set([...applied.map((a) => a.path), MANIFEST])].sort() : [],
+    toStage: applied.length && !dryRun ? [...new Set([...applied.flatMap((a) => [a.path, ...(a.alsoWrote ?? [])]), MANIFEST])].sort() : [],
     next:
       st.state === "not-installed"
         ? "docdd のファイルが見つかりません。/docdd:init で導入してください。"
@@ -2923,10 +3157,10 @@ const USAGE = `使い方: node "\${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <status
   status                       いまの状態を調べる（読み取りのみ）
   apply                        雛形を上書きせずに置く
       --settings yes|no        .claude/settings.json を置くか（既定 yes。既存は上書きしない）
-      --claude-md new|replace|append|keep   既存の CLAUDE.md の扱い（既定 new＝無ければ置く・あれば触らない）
+      --agents-md new|replace|append|keep   既存の AGENTS.md の扱い（既定 new＝無ければ置く・あれば触らない）
       --mcp auto|next|empty    .mcp.json の中身（既定 auto＝依存に next があれば Next.js 向け）
       --tasks scaffold,test-infra   BACKLOG に定型タスクを起票する
-      --fill-inferred          CLAUDE.md「検証コマンド」表の未記入の行を推定値で埋める
+      --fill-inferred          AGENTS.md「検証コマンド」表の未記入の行を推定値で埋める
       --add-backlog-sections   既存の tasks/BACKLOG.md に無い書式の節（運用ルール・タスク・要決定）を雛形から足す
       --dry-run                書かずに結果だけ返す
   dates [--date YYYY-MM-DD]    manifest に載っている文書の {{YYYY-MM-DD}} を今日にする
@@ -2946,7 +3180,7 @@ function main() {
     return;
   }
   try {
-    if (!fs.existsSync(path.join(TEMPLATES, "CLAUDE.md"))) {
+    if (!fs.existsSync(path.join(TEMPLATES, "AGENTS.md"))) {
       throw new UsageError(`雛形が見つかりません（${TEMPLATES}）。/plugin で docdd を入れ直してください。`);
     }
     switch (sub) {

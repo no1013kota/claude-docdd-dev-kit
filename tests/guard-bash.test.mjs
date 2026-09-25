@@ -193,6 +193,29 @@ test('docdd のプロジェクトの判定', () => {
   assertAllowed('git add -A', nested);
 });
 
+test('Codex（turn_id がある入力）: 止めるものは同じく exit 2、確認は注意書きで返す', () => {
+  // 止める側は Claude Code と同じ（exit 2＋stderr）
+  const blocked = runRaw(JSON.stringify({ turn_id: 't1', session_id: 's', hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_use_id: 'u', cwd: docdd, tool_input: { command: 'git add -A' } }));
+  assert.equal(blocked.code, 2);
+  assert.match(blocked.stderr, /^docdd: /);
+
+  // Codex には ask が無いので additionalContext で返す
+  const ask = runRaw(JSON.stringify({ turn_id: 't1', session_id: 's', hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_use_id: 'u', cwd: docdd, tool_input: { command: 'rm -rf build' } }));
+  assert.equal(ask.code, 0);
+  const out = JSON.parse(ask.stdout);
+  assert.equal(out.hookSpecificOutput.hookEventName, 'PreToolUse');
+  assert.equal(out.hookSpecificOutput.permissionDecision, undefined, 'Codex は permissionDecision: ask を受け付けない');
+  assert.match(out.hookSpecificOutput.additionalContext, /^docdd: /);
+
+  // AGENTS.md だけのプロジェクト（CLAUDE.md が無くても docdd とみなす）
+  const agentsOnly = path.join(tmpRoot, 'agents-only-project');
+  gitInit(agentsOnly);
+  fs.mkdirSync(path.join(agentsOnly, 'tasks'));
+  fs.writeFileSync(path.join(agentsOnly, 'tasks', 'BACKLOG.md'), '# BACKLOG\n');
+  fs.writeFileSync(path.join(agentsOnly, 'AGENTS.md'), '# 開発ガイド\n\n`/docdd:dev-loop` で進める。\n');
+  assertBlocked('git add -A', agentsOnly);
+});
+
 test('読めない入力・対象外の入力では何もしない（exit 0）', () => {
   for (const stdin of ['', '{', 'not json', 'null', '[]', '"git add -A"']) {
     const r = runRaw(stdin);

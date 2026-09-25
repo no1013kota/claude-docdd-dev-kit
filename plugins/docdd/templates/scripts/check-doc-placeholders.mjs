@@ -1,17 +1,17 @@
-// docdd-kit v0.13.2 — scripts/check-doc-placeholders.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
+// docdd-kit v0.14.0 — scripts/check-doc-placeholders.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
 // 雛形の「埋める欄」（二重波かっこの {{…}}）が、書き換えられずに残っていないかを検査する。
 // 残った欄をスキルが読むと、未記入の値を前提に動いてしまう。
 //
 //   node scripts/check-doc-placeholders.mjs
 //
-// 対象: git が追跡している CLAUDE.md・.claude/rules/ の .md・docs/ の .md・tasks/ の .md。
+// 対象: git が追跡している AGENTS.md・CLAUDE.md・.claude/rules/ の .md・docs/ の .md・tasks/ の .md。
 //   docs/_imported/（取り込んだ原文）・docs/requirements/00_template.md・docs/decisions/0000-template.md（見本）は除く。
 // 数えない所: バッククォートの中、コードブロックの中、HTML コメントの中（書き方の説明に {{…}} を書けるように）。
 // 終了コード: 0 = 残っていない／1 = 残っている・対象の文書が git に無い／2 = git が使えない
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 
-const TARGETS = ["CLAUDE.md", ".claude/rules/*.md", "docs/*.md", "tasks/*.md"];
+const TARGETS = ["AGENTS.md", "CLAUDE.md", ".claude/rules/*.md", "docs/*.md", "tasks/*.md"];
 const EXCLUDED = [
   /^docs\/_imported\//,
   /^docs\/requirements\/00_template\.md$/,
@@ -111,7 +111,7 @@ if (probe.error) {
 }
 if (probe.status !== 0 || probe.stdout.trim() !== "true") {
   console.error("❌ git のリポジトリの外で実行されました");
-  console.error("   → プロジェクトのフォルダ（CLAUDE.md がある場所）で実行してください");
+  console.error("   → プロジェクトのフォルダ（AGENTS.md がある場所）で実行してください");
   process.exit(2);
 }
 
@@ -124,13 +124,13 @@ const docs = execFileSync("git", ["-c", "core.quotepath=false", "ls-files", "-z"
   .filter((f) => f && !EXCLUDED.some((re) => re.test(f)) && existsSync(f));
 
 if (docs.length === 0) {
-  const present = ["CLAUDE.md", ".claude/rules", "docs", "tasks"].filter((p) => existsSync(p));
-  console.error("❌ 検査する文書が git に 1 件もありません（対象: CLAUDE.md・.claude/rules/・docs/・tasks/ の .md）");
+  const present = ["AGENTS.md", "CLAUDE.md", ".claude/rules", "docs", "tasks"].filter((p) => existsSync(p));
+  console.error("❌ 検査する文書が git に 1 件もありません（対象: AGENTS.md・CLAUDE.md・.claude/rules/・docs/・tasks/ の .md）");
   console.error("   この検査は git に追加したファイルだけを見ます。作ったばかりのファイルはまだ数えられません");
   if (present.length > 0) {
     console.error(`   → 先に \`git add ${present.join(" ")}\` のようにパスを指定して追加してから、もう一度実行してください`);
   } else {
-    console.error("   → CLAUDE.md も docs/ も見つかりません。プロジェクトのフォルダで実行しているか、/docdd:init を済ませたかを確認してください");
+    console.error("   → AGENTS.md も docs/ も見つかりません。プロジェクトのフォルダで実行しているか、/docdd:init を済ませたかを確認してください");
   }
   process.exit(1);
 }

@@ -1,0 +1,4 @@
+# Codex 用。運営者が自分で打つスキルなので、モデルが会話の流れで勝手に呼ばないようにする
+# （Claude Code の SKILL.md の disable-model-invocation: true と同じ意味。$docdd:<名前> で明示的には呼べる）
+policy:
+  allow_implicit_invocation: false

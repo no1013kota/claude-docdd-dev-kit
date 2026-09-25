@@ -4,7 +4,8 @@
 //    plugins/docdd/skills/<名前>/SKILL.md として実在するか
 // 2. スキル共通の前置き（前置き A・B）が、決まったスキルの frontmatter の直後に一字一句そのままあるか
 // 3. SKILL.md の frontmatter: name がフォルダ名と同じ／model: が無い／
-//    init・release・update-kit に disable-model-invocation: true がある／allowed-tools に runner 単体が無い
+//    init・release・update-kit に disable-model-invocation: true と Codex 用の agents/openai.yaml がある／
+//    allowed-tools に runner 単体が無い
 //    （allowed-tools は 1 行の文字列でも、YAML のリスト「  - Bash(…)」でも読む）
 // 問題があれば日本語で列挙して exit 1。
 import fs from "node:fs";
@@ -28,18 +29,18 @@ const REF = /\/docdd:([a-z0-9-]+)/g;
 // 実装仕様 §6 の前置き（完全一致で使う）。「最初に…」の行の直後に、手動専用のスキル（init・release・update-kit）の 1 行を足した
 const PREAMBLE_A = [
   "> **前提（docdd）**",
-  "> - 最初に `tasks/BACKLOG.md` と、`CLAUDE.md` の「検証コマンド」表があるかを確かめる。どちらかが無ければファイルを作らず、「先に `/docdd:init` を実行してください」と伝えて止まる。",
+  "> - 最初に `tasks/BACKLOG.md` と、`AGENTS.md`（無ければ `CLAUDE.md`）の「検証コマンド」表があるかを確かめる。どちらかが無ければファイルを作らず、「先に `/docdd:init` を実行してください」と伝えて止まる。",
   "> - `/docdd:init`・`/docdd:release`・`/docdd:update-kit` は運営者が自分で打つコマンドで、Claude のスキル一覧には出ない。一覧に無いことを不具合として伝えない。止まるときは要望の中身の検討を始めない。",
-  "> - 表の場所: 「検証コマンド」「反映コマンド」「スキルへの追加指示」は `CLAUDE.md`、「変更影響 → 必須の検証」・Definition of Done・規約は `.claude/rules/docdd-kit.md`（v0.1 系で導入したプロジェクトでは全部 `CLAUDE.md` にある。`/docdd:update-kit` で移せる）。",
-  "> - `CLAUDE.md`「スキルへの追加指示」にこのスキルの行があれば、本文より優先する。",
+  "> - 表も約束も `AGENTS.md` にある（「検証コマンド」「反映コマンド」「スキルへの追加指示」と、「キット共通の約束」の「変更影響 → 必須の検証」・Definition of Done・規約）。v0.13 以前に導入したプロジェクトでは `CLAUDE.md` と `.claude/rules/docdd-kit.md` にあるので、そちらを読む。`/docdd:update-kit` で移せる。",
+  "> - `AGENTS.md`「スキルへの追加指示」にこのスキルの行があれば、本文より優先する。",
   "> - 表の値が「無い」の行は飛ばし、二重波かっこ（`{{…}}`）のままの行は未記入として実行しない。どちらも理由を報告する（黙って省略しない）。",
   "> - 課金・AI・ジョブ・決済など、このプロジェクトに無い機能についての手順は飛ばして「該当なし」と報告する。要決定には積まない。",
 ].join("\n");
 const PREAMBLE_B = [
   "> **前提（docdd）**",
-  "> - 最初に `tasks/BACKLOG.md` と、`CLAUDE.md` の「検証コマンド」表があるかを確かめる。どちらかが無ければファイルを作らず、「先に `/docdd:init` を実行してください」と伝えて止まる。",
+  "> - 最初に `tasks/BACKLOG.md` と、`AGENTS.md`（無ければ `CLAUDE.md`）の「検証コマンド」表があるかを確かめる。どちらかが無ければファイルを作らず、「先に `/docdd:init` を実行してください」と伝えて止まる。",
   "> - `/docdd:init`・`/docdd:release`・`/docdd:update-kit` は運営者が自分で打つコマンドで、Claude のスキル一覧には出ない。一覧に無いことを不具合として伝えない。止まるときは要望の中身の検討を始めない。",
-  "> - `CLAUDE.md`「スキルへの追加指示」にこのスキルの行があれば、本文より優先する。",
+  "> - `AGENTS.md`「スキルへの追加指示」にこのスキルの行があれば、本文より優先する。",
 ].join("\n");
 
 const USES_A = ["dev-loop", "doc-sync", "verify-integration", "verify-e2e", "ui-polish", "refactor", "speed-up", "security-audit", "maintenance", "release"];
@@ -151,6 +152,13 @@ for (const name of skillDirs) {
   if ("model" in fm) problems.push(`model: がある: ${where}（消す。既定でセッションのモデルを使う）`);
   if (MANUAL_ONLY.includes(name) && fm["disable-model-invocation"] !== "true") {
     problems.push(`disable-model-invocation: true が無い: ${where}（自分で打ったときだけ動くスキル）`);
+  }
+  if (MANUAL_ONLY.includes(name)) {
+    // Codex は frontmatter の disable-model-invocation を読まないので、同じ意味の設定を agents/openai.yaml に置く
+    const yaml = path.join(SKILLS_DIR, name, "agents", "openai.yaml");
+    const y = fs.existsSync(yaml) ? fs.readFileSync(yaml, "utf8") : null;
+    if (y == null) problems.push(`Codex 用の agents/openai.yaml が無い: ${rel(yaml)}（allow_implicit_invocation: false を書く）`);
+    else if (!/^\s*allow_implicit_invocation:\s*false\s*$/m.test(y)) problems.push(`agents/openai.yaml に allow_implicit_invocation: false が無い: ${rel(yaml)}`);
   }
   if (fm["allowed-tools"]) {
     for (const m of fm["allowed-tools"].matchAll(/(Bash|PowerShell)\(([^)]*)\)/g)) {

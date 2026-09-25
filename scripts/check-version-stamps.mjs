@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 // 配布リポジトリ用の検査（プラグインには同梱しない）。`npm run check` から呼ぶ。Node 18 以上・依存なし。
 // プラグインの版（plugins/docdd/.claude-plugin/plugin.json の version）と、次が一致するかを見る。
-// - 雛形の刻印「docdd-kit vX.Y.Z」: templates/.claude/rules/docdd-kit.md と templates/scripts/*.mjs は先頭 3 行以内に必須。
+// - 雛形の刻印「docdd-kit vX.Y.Z」: templates/scripts/*.mjs は先頭 3 行以内に必須。
 //   ほかの雛形ファイルに刻印があれば、それも同じ版か
+// - templates/AGENTS.md の「キット共通の約束」の印（<!-- docdd:rules:begin vX.Y.Z）が同じ版か
 // - plugins/docdd/CHANGELOG.md の先頭の版見出し（## 0.2.0 …）
 // - plugins/docdd/scripts/init.mjs が plugin.json を読めないときに使う版（FALLBACK_VERSION）
 // - .claude-plugin/marketplace.json に version を書いていないこと（公式: 両方に書くと plugin.json が黙って勝つ）
+// - .codex-plugin/plugin.json（Codex 用）の name・version が plugin.json と同じで、hooks の指すファイルがあること
 // 問題があれば日本語で列挙して exit 1。
 import fs from "node:fs";
 import path from "node:path";
@@ -58,10 +60,10 @@ if (version) {
   }
 
   // 雛形の刻印
-  const required = [
-    path.join(TEMPLATES, ".claude", "rules", "docdd-kit.md"),
-    ...fs.readdirSync(path.join(TEMPLATES, "scripts")).filter((n) => n.endsWith(".mjs")).map((n) => path.join(TEMPLATES, "scripts", n)),
-  ];
+  const required = fs
+    .readdirSync(path.join(TEMPLATES, "scripts"))
+    .filter((n) => n.endsWith(".mjs"))
+    .map((n) => path.join(TEMPLATES, "scripts", n));
   let stampCount = 0;
   for (const file of walk(TEMPLATES)) {
     const lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
@@ -74,6 +76,30 @@ if (version) {
       }
     });
     if (required.includes(file) && !inHead) problems.push(`先頭 3 行以内に刻印「docdd-kit v${version}」が無い: ${rel(file)}`);
+  }
+
+  // Codex 用のマニフェスト（.codex-plugin/plugin.json）
+  const codexManifest = path.join(PLUGIN, ".codex-plugin", "plugin.json");
+  if (!fs.existsSync(codexManifest)) problems.push(`plugins/docdd/.codex-plugin/plugin.json が無い（Codex 用のマニフェスト）`);
+  else {
+    const codex = readJson(codexManifest);
+    if (codex) {
+      if (codex.version !== version) problems.push(`.codex-plugin/plugin.json の version が ${codex.version ?? "なし"}（plugin.json は ${version}）`);
+      if (codex.name !== pluginJson.name) problems.push(`.codex-plugin/plugin.json の name が ${codex.name ?? "なし"}（plugin.json は ${pluginJson.name}）`);
+      const hooksPath = typeof codex.hooks === "string" ? path.join(PLUGIN, codex.hooks) : null;
+      if (!hooksPath || !fs.existsSync(hooksPath)) problems.push(`.codex-plugin/plugin.json の hooks が指すファイルが無い（いまの値: ${codex.hooks ?? "なし"}）`);
+    }
+  }
+
+  // AGENTS.md の「キット共通の約束」の印
+  const agents = path.join(TEMPLATES, "AGENTS.md");
+  const agentsText = fs.existsSync(agents) ? fs.readFileSync(agents, "utf8") : null;
+  if (agentsText == null) problems.push(`plugins/docdd/templates/AGENTS.md が無い`);
+  else {
+    const rm = agentsText.match(/<!-- docdd:rules:begin v(\d+\.\d+\.\d+)/);
+    if (!rm) problems.push(`templates/AGENTS.md に「キット共通の約束」の印（<!-- docdd:rules:begin v${version} …）が無い`);
+    else if (rm[1] !== version) problems.push(`templates/AGENTS.md の印が v${rm[1]}（plugin.json は ${version}）`);
+    if (!agentsText.includes("<!-- docdd:rules:end -->")) problems.push(`templates/AGENTS.md に「<!-- docdd:rules:end -->」が無い`);
   }
 
   // CHANGELOG
@@ -93,7 +119,7 @@ if (version) {
   else if (im[1] !== version) problems.push(`init.mjs の FALLBACK_VERSION が ${im[1]}（plugin.json は ${version}）`);
 
   if (!problems.length) {
-    console.log(`check-version-stamps OK — v${version}（plugin.json）に、雛形の刻印 ${stampCount} 件・CHANGELOG の先頭・init.mjs の既定の版が一致。marketplace.json に version なし。`);
+    console.log(`check-version-stamps OK — v${version}（plugin.json）に、雛形の刻印 ${stampCount} 件・AGENTS.md の約束の印・CHANGELOG の先頭・init.mjs の既定の版が一致。marketplace.json に version なし。`);
     process.exit(0);
   }
 }
