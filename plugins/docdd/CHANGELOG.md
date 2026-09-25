@@ -3,6 +3,29 @@
 版ごとの変更と、プロジェクトに置いた雛形への影響をまとめます。
 「雛形への影響: あり」の版へ上げたら、プロジェクトのフォルダで `/docdd:update-kit` を打ちます（プラグインを更新しただけでは、置いた雛形は変わりません）。
 
+## 0.14.0（2026-09-26）
+
+**Codex でも同じスキルが使えるようにした。約束と表は `AGENTS.md` の 1 か所にまとめた。**
+
+仮説: 手順書（スキル）・見張り（hook）・雛形はそのままで、「毎回読む約束」を Claude Code と Codex が共通で読む `AGENTS.md` に移せば、どちらの道具からでも同じ流れで進められる。ファイルを二重に持たなければ、どちらで直しても食い違わない。
+
+### 追加
+
+- **Codex 対応**: `codex plugin marketplace add no1013kota/claude-docdd-dev-kit` → `codex plugin add docdd@claude-docdd-dev-kit` で入り、`$docdd:init` のように `$` で呼ぶ（Claude Code は `/docdd:init` のまま）。スキル 14 本はそのまま動く。Codex 用の hook（`hooks/codex-hooks.json`）を同梱し、取り消しにくい git 操作と秘密の値の入ったコミットは Codex でも止める（Codex では `/hooks` で信頼するまで動かない）。Codex には「確認を出す」が無いので、`rm -r` などは注意書きを返す。
+- 同じプロジェクトを Claude Code と Codex で併用できる（約束も表も `AGENTS.md` の 1 か所にあるため）。
+
+### 変更
+
+- **`CLAUDE.md` と `.claude/rules/docdd-kit.md` を `AGENTS.md` にまとめた**。`AGENTS.md` の下半分に「キット共通の約束」が印（`<!-- docdd:rules:begin -->`〜`<!-- docdd:rules:end -->`）で囲んで入る。`CLAUDE.md` は `@AGENTS.md` を読み込む 1 行だけになる（Claude Code は `CLAUDE.md` があると `AGENTS.md` を読まないため）。
+- init の `--claude-md` は `--agents-md` になった（`--claude-md` も当分は受け付ける）。status・apply の JSON の `claudeMd` は `agentsMd` になった。
+- 既に自分の `CLAUDE.md` があるプロジェクトでは、その中身を消さず、末尾に `@AGENTS.md` の 1 行だけを足す（表と約束は新しい `AGENTS.md` に入る）。
+
+### 雛形への影響: あり
+
+- `/docdd:update-kit` が一度に入れ替える: `CLAUDE.md` の中身 → `AGENTS.md`、`.claude/rules/docdd-kit.md` → `AGENTS.md` の印の中（手を入れていなければ新しい版、手を入れていればそのまま運ぶ）、`CLAUDE.md` → 読み込む 1 行、`docs/`・`tasks/` にある `.claude/rules/docdd-kit.md` への参照 → `AGENTS.md`。`AGENTS.md` を適用すると、この 4 つが一度に済む。
+- `/docdd:update-kit` で置き換わる: 検査スクリプト 5 本（刻印だけ）。
+- 手で直すもの（任意）: `AGENTS.md` の「ディレクトリ構成」表に `.claude/settings.json` などの行が残っていれば、いまの構成に合わせて直す。
+
 ## 0.13.2（2026-09-21）
 
 ### 変更

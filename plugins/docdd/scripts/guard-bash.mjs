@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// docdd guard-bash — Claude Code の PreToolUse hook（Bash ツールと PowerShell ツール用）。
-// docdd のプロジェクトでだけ、取り消しにくい git 操作を止め（exit 2）、rm・Remove-Item の再帰・強制削除では確認を出す（permissionDecision "ask"）。
+// docdd guard-bash — Claude Code と Codex の PreToolUse hook（Bash ツールと PowerShell ツール用）。
+// docdd のプロジェクトでだけ、取り消しにくい git 操作を止め（exit 2）、rm・Remove-Item の再帰・強制削除では確認を出す（permissionDecision "ask"。
+// Codex には ask が無いので、代わりに注意書き additionalContext を返す）。
 // git commit の直前には、コミットに入る中身から秘密の値（API キー・秘密鍵・.env・ログイン状態のファイル）を探し、確実な形は止め、怪しい形は確認を出す。
 // 依存なし・Node 18 以上。読めない入力・解析の失敗・対象外のプロジェクト・git が動かないときは何もしない（exit 0）。
 
@@ -93,16 +94,18 @@ function exists(p) {
 }
 
 // cwd から git のルートまで上り、.docdd/manifest.json がある、
-// または tasks/BACKLOG.md があり CLAUDE.md に「/docdd:」を含むディレクトリがあれば対象。
+// または tasks/BACKLOG.md があり AGENTS.md（無ければ CLAUDE.md）に「/docdd:」を含むディレクトリがあれば対象。
 function isDocddProject(startDir) {
   let dir = path.resolve(startDir);
   for (let depth = 0; depth < 128; depth++) {
     if (isFile(path.join(dir, '.docdd', 'manifest.json'))) return true;
     if (isFile(path.join(dir, 'tasks', 'BACKLOG.md'))) {
-      try {
-        if (fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8').includes('/docdd:')) return true;
-      } catch {
-        // CLAUDE.md が無い・読めない
+      for (const name of ['AGENTS.md', 'CLAUDE.md']) {
+        try {
+          if (fs.readFileSync(path.join(dir, name), 'utf8').includes('/docdd:')) return true;
+        } catch {
+          // そのファイルが無い・読めない
+        }
       }
     }
     if (exists(path.join(dir, '.git'))) return false; // git のルートより上は見ない
@@ -1392,13 +1395,13 @@ async function main() {
   }
   if (result.ask) reasons.push(MSG.rmAsk);
   if (reasons.length) {
+    // Codex には「確認を出す（ask）」が無いので、注意書きだけを渡す（止めるのは exit 2 の側）
+    const codex = typeof input.turn_id === 'string';
     process.stdout.write(
       JSON.stringify({
-        hookSpecificOutput: {
-          hookEventName: 'PreToolUse',
-          permissionDecision: 'ask',
-          permissionDecisionReason: reasons.join('\n\n'),
-        },
+        hookSpecificOutput: codex
+          ? { hookEventName: 'PreToolUse', additionalContext: `${reasons.join('\n\n')}\n\ndocdd: 上の点を運営者に確かめてから進めてください。` }
+          : { hookEventName: 'PreToolUse', permissionDecision: 'ask', permissionDecisionReason: reasons.join('\n\n') },
       }) + '\n',
     );
   }

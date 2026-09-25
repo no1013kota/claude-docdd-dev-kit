@@ -45,10 +45,12 @@ export function findProjectDir(startDir) {
   for (let depth = 0; depth < 128; depth += 1) {
     if (isFile(path.join(dir, '.docdd', 'manifest.json'))) return dir;
     if (isFile(path.join(dir, 'tasks', 'BACKLOG.md'))) {
-      try {
-        if (fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8').includes('/docdd:')) return dir;
-      } catch {
-        // CLAUDE.md が無い・読めない
+      for (const name of ['AGENTS.md', 'CLAUDE.md']) {
+        try {
+          if (fs.readFileSync(path.join(dir, name), 'utf8').includes('/docdd:')) return dir;
+        } catch {
+          // そのファイルが無い・読めない
+        }
       }
     }
     if (exists(path.join(dir, '.git'))) return null; // git のルートより上は見ない

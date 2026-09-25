@@ -1,5 +1,5 @@
-// docdd-kit v0.13.2 — scripts/check-doc-refs.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
-// CLAUDE.md・.claude/rules/・docs/ の文書が指しているファイルが、本当にあるかを検査する。
+// docdd-kit v0.14.0 — scripts/check-doc-refs.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
+// AGENTS.md・CLAUDE.md・.claude/rules/・docs/ の文書が指しているファイルが、本当にあるかを検査する。
 // 存在しないファイルを指す仕様書は、読んだ人（と Claude）を行き止まりへ送る。
 //
 //   node scripts/check-doc-refs.mjs
@@ -31,7 +31,7 @@ const EXTS = [
   // ネイティブアプリ（Flutter・Android・Apple）・C/C++・Lua・.NET
   "dart", "kt", "kts", "java", "gradle", "swift", "c", "cc", "cpp", "h", "hpp", "lua", "csproj", "sln",
 ];
-const TARGETS = ["CLAUDE.md", ".claude/rules/*.md", "docs/*.md"];
+const TARGETS = ["AGENTS.md", "CLAUDE.md", ".claude/rules/*.md", "docs/*.md"];
 const EXCLUDED = [
   /^docs\/_imported\//,
   /^docs\/requirements\/00_template\.md$/,
@@ -209,7 +209,7 @@ if (probe.error) {
 }
 if (probe.status !== 0 || probe.stdout.trim() !== "true") {
   console.error("❌ git のリポジトリの外で実行されました");
-  console.error("   → プロジェクトのフォルダ（CLAUDE.md がある場所）で実行してください");
+  console.error("   → プロジェクトのフォルダ（AGENTS.md がある場所）で実行してください");
   process.exit(2);
 }
 
@@ -220,13 +220,13 @@ const tracked = new Set(trackedList);
 const docs = listFiles(TARGETS).filter((f) => !EXCLUDED.some((re) => re.test(f)) && tracked.has(f));
 
 if (docs.length === 0) {
-  const present = ["CLAUDE.md", ".claude/rules", "docs"].filter((p) => existsSync(p));
-  console.error("❌ 検査する文書が git に 1 件もありません（対象: CLAUDE.md・.claude/rules/ の .md・docs/ の .md）");
+  const present = ["AGENTS.md", "CLAUDE.md", ".claude/rules", "docs"].filter((p) => existsSync(p));
+  console.error("❌ 検査する文書が git に 1 件もありません（対象: AGENTS.md・CLAUDE.md・.claude/rules/ の .md・docs/ の .md）");
   console.error("   この検査は git に追加したファイルだけを見ます。作ったばかりのファイルはまだ数えられません");
   if (present.length > 0) {
     console.error(`   → 先に \`git add ${present.join(" ")}\` のようにパスを指定して追加してから、もう一度実行してください`);
   } else {
-    console.error("   → CLAUDE.md も docs/ も見つかりません。プロジェクトのフォルダで実行しているか、/docdd:init を済ませたかを確認してください");
+    console.error("   → AGENTS.md も docs/ も見つかりません。プロジェクトのフォルダで実行しているか、/docdd:init を済ませたかを確認してください");
   }
   process.exit(1);
 }

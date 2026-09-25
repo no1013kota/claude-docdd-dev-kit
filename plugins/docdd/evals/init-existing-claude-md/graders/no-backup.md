@@ -1,5 +1,5 @@
 ---
 type: file_exists
-path: 'CLAUDE.md.bak*'
+path: 'AGENTS.md.bak*'
 exists: false
 ---

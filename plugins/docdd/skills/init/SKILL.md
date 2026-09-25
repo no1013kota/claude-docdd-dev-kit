@@ -1,6 +1,6 @@
 ---
 name: init
-description: 開発キットの雛形（CLAUDE.md・.claude/rules/docdd-kit.md・docs/・tasks/・scripts/ など）をいまのプロジェクトへ置き、検証コマンドは推定で埋め、分からない欄だけをまとめて聞いて、検査を通してからコミットする。導入するとき、または途中で止まった導入をやり直すときに使う。既存ファイルは上書きしない（何度実行しても安全）。
+description: 開発キットの雛形（AGENTS.md・docs/・tasks/・scripts/ など）をいまのプロジェクトへ置き、検証コマンドは推定で埋め、分からない欄だけをまとめて聞いて、検査を通してからコミットする。導入するとき、または途中で止まった導入をやり直すときに使う。既存ファイルは上書きしない（何度実行しても安全）。
 argument-hint: "[プロジェクト名] [何を作るか] [commit]"
 disable-model-invocation: true
 allowed-tools: Bash(node -v) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs *) Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" *) Bash(git init) Bash(git add *) Bash(git commit *) Bash(git mv *) Bash(mkdir -p docs/_imported) Bash(git config user.name *) Bash(git config user.email *) Bash(node scripts/check-doc-refs.mjs) Bash(node scripts/check-doc-dates.mjs) Bash(node scripts/check-doc-placeholders.mjs)
@@ -11,7 +11,7 @@ allowed-tools: Bash(node -v) Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs *)
 このプラグインの雛形（`${CLAUDE_PLUGIN_ROOT}/templates/`）を、いまのプロジェクトへ置く。
 コピー・`package.json` への追記・`.gitignore` への追記・日付の記入・状態の判定は、すべて `init.mjs` が決まった形で行う。**Claude は手でコピーしない**（取りこぼしと書式崩れを防ぐ）。
 
-- **既存ファイルは上書きしない。** 例外は、運営者が承知した `CLAUDE.md` の置き換え（元は `CLAUDE.md.bak` に残る）だけ。
+- **既存ファイルは上書きしない。** 例外は、運営者が承知した `AGENTS.md` の置き換え（元は `AGENTS.md.bak` に残る）と、既にある `CLAUDE.md` の末尾に足す `@AGENTS.md` の 1 行（元の中身は消さない）だけ。
 - **何度実行しても安全。** 途中で止まっても、もう一度 `/docdd:init` を打てば、足りないファイルと未記入の欄だけを扱う。
 - **実装は始めない**（実装は `/docdd:dev-loop` の仕事）。
 
@@ -36,7 +36,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
 |---|---|
 | ヒアリング | しない。答えの無い欄は `{{…}}` のまま残し、報告に「未記入」と載せる |
 | `.claude/settings.json` | 置く（`--settings yes`） |
-| 既存の `CLAUDE.md` | 表だけ末尾に足す（`--claude-md append`） |
+| 既存の `AGENTS.md` | 表だけ末尾に足す（`--agents-md append`） |
 | 既存の `tasks/BACKLOG.md` に書式の節が無い | 足さない。報告に載せる |
 | 置き場所 | いまのフォルダ（cwd） |
 | 土台（アプリのコード）が無い | 雛形を置き、「アプリの土台を作る」を起票する（下の B） |
@@ -62,7 +62,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
    - **B. 土台なしで雛形を置く**: 進む。手順 2 で「アプリの土台を作る」タスクを起票する。雛形を置いたあとは、土台を作る道具（例: create-next-app）が空でないフォルダで止まることがあるので、土台は別のフォルダで作ってから中身を移す（タスクの完了条件に書いてある）。
 6. `git.isRepo` が false なら、「このフォルダを git で管理します（変更の記録を取れるようにする）。`git init` を実行してよいですか」と承知を得てから `git init` を実行する。承知が無ければ止まる。検査スクリプトは git が追跡しているファイルとコミットの日付を読むので、git 無しでは導入できない。
 7. `git.userName` か `git.userEmail` が null なら、コミットに残す名前とメールを運営者に聞く。答えを `git config user.name "<名前>"` と `git config user.email "<メール>"` で**このリポジトリだけ**に設定する（`--global` は使わない。メールは push すると公開される）。設定済みなら「この名前とメールで記録します: <名前> <メール>」と 1 行見せる。
-8. `atGitRoot` が false（git の一番上ではない場所。例: モノレポの `apps/web`）なら、AskUserQuestion で「ここに置く／一番上に置く／中止」を聞く。Claude Code は起動した場所とその上のフォルダの `CLAUDE.md` を読むので、**普段 Claude Code を起動する場所**に置くのがよい、と理由を添える。「一番上」なら、そこで Claude Code を起動し直して `/docdd:init` を打つよう伝えて止まる。
+8. `atGitRoot` が false（git の一番上ではない場所。例: モノレポの `apps/web`）なら、AskUserQuestion で「ここに置く／一番上に置く／中止」を聞く。Claude Code も Codex も、起動した場所とその上のフォルダの `AGENTS.md` を読むので、**普段 Claude Code や Codex を起動する場所**に置くのがよい、と理由を添える。「一番上」なら、そこで Claude Code を起動し直して `/docdd:init` を打つよう伝えて止まる。
 9. `existingCode` が true なら「既存コードあり」と控える（手順 4 の次の一手に使う）。
 10. `stack.web` が false なら「Web 以外のプロジェクト」と控える（`stack.kind` が `unity`・`godot`・`flutter`・`android`・`apple`・`dotnet` のどれかで、Web のフレームワークが無い。例: Unity のゲーム）。問 11 と手順 4 の報告に使う。
 
@@ -78,7 +78,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
 
 #### 選んで答える問い
 
-- **問 5 反映の方式**（公開のしかた）: 次の 4 択。`CLAUDE.md` に書く値は「」の中のまま（4 つの言葉のどれか 1 つだけ。説明は書かない）。選択肢には説明を添える。
+- **問 5 反映の方式**（公開のしかた）: 次の 4 択。`AGENTS.md` に書く値は「」の中のまま（4 つの言葉のどれか 1 つだけ。説明は書かない）。選択肢には説明を添える。
   - 「自動公開」— 本番ブランチへ push すると、Vercel などのホスティングが自動で公開する
   - 「確認してから公開」— 確認用の環境（staging）で見てから、本番へ取り込む依頼（PR）を出す
   - 「コマンドで公開」— 公開用のコマンドを打って公開する
@@ -86,11 +86,11 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
 - **問 6 テスト用 DB**: 「① 手元で起動する DB（例: supabase start）」「② ホスト型の開発専用 DB（本番と別・開発専用・破棄可能。接続先は .env のキー名）」「③ DB を使わない」「分からない（あとで決める）」。
 - **問 8 `.claude/settings.json` を置いてよいか**（`settings.exists` が false のときだけ）: 「置くと、`git add`／`git commit` と docs の検査は確認なしで進みます。`rm -r`（まとめて削除）や `git push` などは必ず確認が出ます。`sudo` と `.env` の読み取りは止めます。ファイルを編集するたびに確認が出るかどうかは、Claude Code のモードで決まります（この設定では変えません）」。選択肢は「置く（おすすめ）」「置かない」「分からない（あとで決める）」。「分からない」は置かない（`--settings no`）として扱う。
   `settings.exists` が true なら聞かない。既存は上書きもマージもせず、差分を手順 4 で報告する。
-- **問 9 既存の `CLAUDE.md`**（`claudeMd.exists` が true で、`claudeMd.hasMarkers` が false のときだけ）: 次の 3 択。おすすめは「表だけ末尾に足す」。`claudeMd.builtinInit` が true なら「Claude Code 組み込みの `/init` が作ったものに見えます」と添える。
-  - いまのまま、キットの表（検証コマンド・反映コマンド・スキルへの追加指示）だけ末尾に足す（おすすめ）→ `--claude-md append`
-  - 置き換える（元は `CLAUDE.md.bak` に残す）→ `--claude-md replace`
-  - いまのまま、表も足さない → `--claude-md keep`。表が無いと `/docdd:dev-loop` などのスキルは「先に `/docdd:init`」で止まり、init も導入済みになりません（おすすめしない）
-  - 「分からない（あとで決める）」は、表だけ末尾に足す（`--claude-md append`。引数モードと同じ）として扱う
+- **問 9 既存の `AGENTS.md`**（`agentsMd.exists` が true で、`agentsMd.file` が `AGENTS.md` で、`agentsMd.hasMarkers` が false のときだけ）: 次の 3 択。おすすめは「表だけ末尾に足す」。`agentsMd.builtinInit` が true なら「組み込みの `/init` が作ったものに見えます」と添える。既に `CLAUDE.md` があるだけのとき（`agentsMd.file` が `CLAUDE.md`）は聞かない。`AGENTS.md` を新しく置き、`CLAUDE.md` の末尾に `@AGENTS.md` の 1 行を足す（元の中身はそのまま残り、Claude Code は両方を読む）。
+  - いまのまま、キットの表（検証コマンド・反映コマンド・スキルへの追加指示）だけ末尾に足す（おすすめ）→ `--agents-md append`
+  - 置き換える（元は `AGENTS.md.bak` に残す）→ `--agents-md replace`
+  - いまのまま、表も足さない → `--agents-md keep`。表が無いと `/docdd:dev-loop` などのスキルは「先に `/docdd:init`」で止まり、init も導入済みになりません（おすすめしない）
+  - 「分からない（あとで決める）」は、表だけ末尾に足す（`--agents-md append`。引数モードと同じ）として扱う
 - **問 10 終わったらコミットしてよいか**: 「はい」「いいえ（stage までで止める）」「分からない（あとで決める）」。「分からない」は「いいえ」として扱う。
 - **問 12 既存の `tasks/BACKLOG.md` の書式**（`backlog.missingSections` が空でないときだけ）: 「`tasks/BACKLOG.md` にキットの書式の節（`missingSections` の見出し）がありません。書式の見本つきの節を足しますか（書いてある内容は変えません）」。「足す（おすすめ）」「足さない」「分からない（あとで決める）」。「足す」なら手順 2 で `--add-backlog-sections` を付ける。それ以外は足さず、報告に載せる。
 
@@ -103,14 +103,14 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
 - **問 5 の補足 ブランチ**（問 5 で「まだ公開しない」以外を選んだとき）: 本番ブランチ。`git.branch` を候補に示す（多くは main）。**「確認してから公開」を選んだときだけ**、作業ブランチ（本番ブランチと別の名前。staging へ反映するブランチ）も聞く。
 - **問 6 の補足 テスト用 DB の中身**（問 6 で ① か ② を選んだとき）: ① なら DB の起動コマンド（例: `supabase start`）、② なら接続先を入れた `.env` のキー名（例: `DATABASE_URL`。値は書かない）。
 - **問 7 有料の外部 API**（AI など、使った分だけ費用が出るもの）を使うなら、実物で 1 周確かめるときの費用上限（例: 1 周 $0.50 まで）。使わないなら「無い」。
-- **問 11 検証コマンド表の、自動で推定できなかった行**（`inferred` の `value` が null の行のうち、『テスト用 DB』『実物1周の費用上限』を除いたものがあるときだけ）: 行名を並べ、「このプロジェクトでそれぞれを実行するコマンドを書いてください。無いものは『無い』、分からなければ空のままで構いません」。Web 以外のプロジェクト（手順 0-10）では、`${CLAUDE_PLUGIN_ROOT}/README.md` の「Web 以外のプロジェクトで使う」節と、`${CLAUDE_PLUGIN_ROOT}/templates/CLAUDE.md`「検証コマンド」表の下の例（Unity の例など）を読み、合う例を添えて聞く。
+- **問 11 検証コマンド表の、自動で推定できなかった行**（`inferred` の `value` が null の行のうち、『テスト用 DB』『実物1周の費用上限』を除いたものがあるときだけ）: 行名を並べ、「このプロジェクトでそれぞれを実行するコマンドを書いてください。無いものは『無い』、分からなければ空のままで構いません」。Web 以外のプロジェクト（手順 0-10）では、`${CLAUDE_PLUGIN_ROOT}/README.md` の「Web 以外のプロジェクトで使う」節と、`${CLAUDE_PLUGIN_ROOT}/templates/AGENTS.md`「検証コマンド」表の下の例（Unity の例など）を読み、合う例を添えて聞く。
 
 ### 2. 雛形を置き、答えを書き込む
 
 1. apply を実行する。オプションは次のとおり組み立てる。
 
    ```
-   node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" apply --json --fill-inferred --settings <yes|no> --claude-md <new|replace|append|keep> [--tasks <scaffold,test-infra>] [--add-backlog-sections]
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" apply --json --fill-inferred --settings <yes|no> --agents-md <new|replace|append|keep> [--tasks <scaffold,test-infra>] [--add-backlog-sections]
    ```
 
    - `--tasks`: 手順 0-5 で B を選んだら `scaffold`。`inferred` の『単体・DBテスト』行の `value` が「無い」か null なら `test-infra`。両方なら `scaffold,test-infra`（「テスト基盤の導入」は「アプリの土台を作る」に依存する）。タイトルが「テスト基盤の導入」で始まり状態が `done`・`dropped` 以外のタスクが既にあれば、新しく起票せず、その ID を `tasks` に `exists` で返す。
@@ -120,7 +120,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
    - `notWritten` が空でなければ、Claude Code のサンドボックスなどが設定ファイル（`.claude/settings.json`・`.mcp.json`）への書き込みを止めている。残りの雛形は置けている。`notWritten` の各 `path` へ、その `content` を Write で書く（英語の確認が出たら Yes）。書けたファイルは、手順 3 で `toStage` と一緒に `git add` する。Write も拒否されたら置かずに進め、手順 4 で報告する。この 2 つが無くても導入は続けられる（許可設定と MCP が効かないだけ）。
 2. 結果の `filled` が、推定で埋めた検証コマンドの行。`placeholders` が、まだ埋まっていない欄（ファイル・行・トークン）。
 3. ヒアリングの答えを、Edit で該当の `{{…}}` へ書き込む。
-   - `CLAUDE.md`: `{{プロジェクト名}}` `{{何を作っているか1行}}`、`{{フレームワーク名}}`（`stack.framework` を使う。null なら聞いた答え）、「検証コマンド」表の『テスト用 DB』『実物1周の費用上限』と問 11 で答えた行、「反映コマンド」表の 6 行。
+   - `AGENTS.md`: `{{プロジェクト名}}` `{{何を作っているか1行}}`、`{{フレームワーク名}}`（`stack.framework` を使う。null なら聞いた答え）、「検証コマンド」表の『テスト用 DB』『実物1周の費用上限』と問 11 で答えた行、「反映コマンド」表の 6 行。
    - 『テスト用 DB』は、選んだ番号の形で書く。①「① ローカル: `<起動コマンド>`」／②「② ホスト型の開発専用: 接続先は .env の `<キー名>`（本番と別・開発専用・破棄可能）」／③「③ DB 無し」。起動コマンドやキー名が分からなければ `{{テスト用 DB}}` のまま残す。
    - 「反映コマンド」表: 『反映の方式』は問 5 の「」の中のまま書く（「自動公開」「確認してから公開」「コマンドで公開」「まだ公開しない」のどれか 1 つ）。『本番ブランチ』は答えた名前。『作業ブランチ』は、「確認してから公開」なら問 5 の補足で答えた名前（答えが無い、または本番ブランチと同じなら `{{作業ブランチ}}` のまま残し、報告の未記入欄に載せる。同じ名前だと `/docdd:release` が PR を作れず止まるため）。「自動公開」「コマンドで公開」「まだ公開しない」なら `git.branch`。「自動公開」なら『staging へ反映』『本番へ反映』は「無い」。
    - 『本番 DB のバックアップ』は、問 6 で「③ DB を使わない」を選んだときだけ「無い（DB を使わない）」と書く。それ以外は `{{本番 DB のバックアップ}}` のまま残し、報告の未記入欄に載せる（ここでは聞かない。migration を含む反映のときに `/docdd:release` が候補を示して聞き、この行へ書く）。
@@ -142,12 +142,12 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
 検査スクリプト（`check-doc-refs`／`check-doc-dates`／`check-doc-placeholders`）と `init.mjs` は、他のコマンドと `;` や `&&` でつながず、1 回に 1 つずつ実行する。exit 1 はそのまま結果として読み、`echo $?` などを足さない（足すと許可の確認が出る）。
 
 1. apply の `ignored`（`.gitignore` に除外されていて git add できないファイル）が空でなければ、ここで止まって聞く。「`.gitignore` が `<ignored のパス>` を除外しているので、コミットに入りません。`.gitignore` に例外の行を足しますか」。フォルダごと除外する行（例: `.claude/`）があると中のファイルは例外の行でも戻せないので、足すなら `.claude/` を `.claude/*` に変え、その下に `!.claude/rules/` と `!.claude/settings.json` を足す、のように Edit で直す。直したら apply をもう一度実行し、`ignored` が空になったのを確かめてから進む（直した `.gitignore` と、1 回目で変えた `package.json` は 2 回目の `toStage` にも入る）。足さないと答えたら、そのまま進み、報告に載せる。
-2. apply の `toStage` を**パスを明示して** `git add` する（`git add -A` や `git add .` は使わない）。`CLAUDE.md.bak` は `toStage` に入っていないので stage しない。
+2. apply の `toStage` を**パスを明示して** `git add` する（`git add -A` や `git add .` は使わない）。`AGENTS.md.bak` は `toStage` に入っていないので stage しない。
 3. `node scripts/check-doc-refs.mjs` を実行する。落ちたら**文面をそのまま**報告し、次の順に確かめる。
    1. stage していないファイルを指していないか（`toStage` を add し忘れていないか）
    2. `.gitignore` が置いたファイルを除外していないか（apply の `ignored`）
    3. 指している先が本当に無いか（あれば文面どおりに直す）
-   4. キットが置いていない既存の文書（`--claude-md append`・`keep` のときの `CLAUDE.md` のキットが足した表より上、apply の `created` に無い `docs/` の文書など）の記述が原因なら、勝手に直さない。運営者の承知を得て直すか、報告に `ファイル:行 → 参照先` を載せてコミットへ進んでよい。まだ無いファイルを例として書いた行なら、その行に「例」の字があると検査の対象から外れる
+   4. キットが置いていない既存の文書（`--agents-md append`・`keep` のときの `AGENTS.md` のキットが足した表より上、apply の `created` に無い `docs/` の文書など）の記述が原因なら、勝手に直さない。運営者の承知を得て直すか、報告に `ファイル:行 → 参照先` を載せてコミットへ進んでよい。まだ無いファイルを例として書いた行なら、その行に「例」の字があると検査の対象から外れる
 4. **コミットの承知がある**（問 10 で「はい」、または引数の末尾が `commit`）なら続ける。無ければここで止め、「stage までで止めました。日付（`{{YYYY-MM-DD}}`）は未記入のままです。もう一度 `/docdd:init` を打つとコミットまで進めます」と伝える。
 5. `node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" dates --json` で、未記入の日付（`{{YYYY-MM-DD}}`）と、今回中身を変えた文書の冒頭の『更新日』を今日にする。結果の `toStage` をもう一度 `git add` する。
 6. `node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" precommit --json` を実行する。`ok` が false なら**コミットせずに止まり**、`problems` の文面を報告する（`.env` が除外されていない、`.env` やログイン状態のファイルが stage されている、名前とメールが無い、など）。`warnings` は報告に載せるだけでよい。
@@ -160,21 +160,21 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
 次を短い日本語で載せる。
 
 - 置いたファイル（`created`）／変えたファイル（`modified`）／飛ばしたファイル（`skipped` と理由）
-- apply の `warnings` と `ignored`（コミットに入らなかったファイル）。`packageJson.skipped` があれば、その理由（例: pnpm のプロジェクトには `audit:check` を足さない。依存の脆弱性は `CLAUDE.md`「検証コマンド」表の『依存の脆弱性』行のコマンドを使う）
+- apply の `warnings` と `ignored`（コミットに入らなかったファイル）。`packageJson.skipped` があれば、その理由（例: pnpm のプロジェクトには `audit:check` を足さない。依存の脆弱性は `AGENTS.md`「検証コマンド」表の『依存の脆弱性』行のコマンドを使う）
 - 置けなかった設定ファイル（`notWritten` のうち、Write でも置けなかったもの）。「Claude Code のサンドボックスなどが書き込みを止めました。必要なら、サンドボックスを使わない状態で `/docdd:init` をもう一度打つか、次の中身を手で置いてください」と添え、`content` を載せる
 - 既存の `.claude/settings.json`・`.mcp.json` があった場合の差分（`settings.diff` の `missingAllow`・`missingAsk`・`missingDeny` と、`mcp.missingServers`）。足したいときは「Claude に『.claude/settings.json の deny に … を足して』と頼む」と添える
 - `settings.diff.currentDefaultMode` が null でなければ、その値（始まりのモード）を載せる。値が `auto`・`bypassPermissions` なら、「プロジェクトの `.claude/settings.json` に書いたこの値は効きません（毎回確認するモードなどで始まります）」と添える。それ以外の値なら、「ターミナルで起動した Claude Code は、このモードで始まります。auto モードで始めたいときは、Pro・Max・Team なら Claude に『.claude/settings.json の permissions から defaultMode を消して』と頼みます（`~/.claude/settings.json` に別の defaultMode があれば、そちらで始まります）。Enterprise や Console の API キーでは、消すと毎回確認するモード（Manual）で始まるので、`~/.claude/settings.json` の permissions に "defaultMode": "auto" を書きます（auto モードが使えるときだけ）」と添える
-- 推定で埋めた行（`filled`。「推定です。違っていたら `CLAUDE.md` の該当行を直してください」と添える）
-- 未記入の欄（`ファイル:行  {{トークン}}` の形。「答えられる欄は `/docdd:init` をもう一度打つと聞き直します。自動で推定できない行は `CLAUDE.md` を直接直してください」と添える）
+- 推定で埋めた行（`filled`。「推定です。違っていたら `AGENTS.md` の該当行を直してください」と添える）
+- 未記入の欄（`ファイル:行  {{トークン}}` の形。「答えられる欄は `/docdd:init` をもう一度打つと聞き直します。自動で推定できない行は `AGENTS.md` を直接直してください」と添える）
 - 起票した定型タスク（`tasks`。`exists` は既にあったタスク）
 - `tasks/BACKLOG.md` に書式の節が無いまま足さなかった場合は、無い節（`backlog.missingSections`）と「`/docdd:init` をもう一度打つと足せます」
-- `--claude-md keep` にした場合は、「表が無いので `/docdd:dev-loop` などのスキルは止まります。`/docdd:init` をもう一度打つと、同じ 3 択で『表だけ末尾に足す』を選び直せます」
+- `--agents-md keep` にした場合は、「表が無いので `/docdd:dev-loop` などのスキルは止まります。`/docdd:init` をもう一度打つと、同じ 3 択で『表だけ末尾に足す』を選び直せます」
 - コミットした場合は、記録に使った名前とメール（`<名前> <メール>`。メールは push すると公開される）
-- `CLAUDE.md.bak` を作った場合は「不要なら消してよい（コミットしていない）」
+- `AGENTS.md.bak` を作った場合は「不要なら消してよい（コミットしていない）」
 - Web 以外のプロジェクト（手順 0-10）なら、「Web 以外のプロジェクトです。検証コマンドは一部しか推定できません。README『Web 以外のプロジェクトで使う』を見て埋め、必要なら『スキルへの追加指示』を書いてください（README: https://github.com/no1013kota/claude-docdd-dev-kit/blob/main/plugins/docdd/README.md#web-以外のプロジェクトで使う例-unity）」と伝え、次を添える
   - `.gitignore` には「# docdd: 共通」の塊を使った（`stack.languages` に Python があるときは「# docdd: Python」の塊も使った）。Web 向けの塊（`node_modules/` など）は足していない
   - `/docdd:ui-polish`・`/docdd:speed-up` は Web 専用で、このプロジェクトでは「該当なし」と報告して止まる。画面・操作は、`/docdd:verify-e2e` が『E2E（実際に動かす）』行のコマンドで確かめ、自動で確かめられないものは運営者に確かめてもらう
-  - 既存の `CLAUDE.md` や運用文書に、コミットの前に承知を得る・決まったブランチで作業する・手で直さないファイルがある、などの約束があれば、「スキルへの追加指示」表に行を足すよう勧める（スキルは本文より追加指示を優先する）。許可設定（`.claude/settings.json`）の直し方も README の同じ節にある
+  - 既存の `AGENTS.md`・`CLAUDE.md` や運用文書に、コミットの前に承知を得る・決まったブランチで作業する・手で直さないファイルがある、などの約束があれば、「スキルへの追加指示」表に行を足すよう勧める（スキルは本文より追加指示を優先する）。許可設定（`.claude/settings.json`）の直し方も README の同じ節にある
 - 次の一手（上から最初に当てはまるもの）:
   - 既存コードあり（手順 0-9）→ `/docdd:doc-sync --full`（いまのコードから docs を起こす）
   - PRD に機能を複数書いた → 何も書かずに `/docdd:add-task`（仕様書からタスクをまとめて起票する）
@@ -183,11 +183,11 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/init.mjs" <サブコマンド> --json
 - 次に Claude Code を起動したときに出る英語の確認:
   - フォルダを信頼するか → Yes。これで `.claude/settings.json` の許可が有効になる
   - Next.js で `.mcp.json` を置いた場合、MCP サーバーへの接続を承認するか → Yes（Next.js でなければ No でよい）
-- 新しい約束が読み込まれているかは、Claude Code を起動し直して `/context` と打ち、Memory files に `.claude/rules/docdd-kit.md` が出ることで確かめられる
+- 新しい約束が読み込まれているかは、Claude Code を起動し直して `/context` と打ち、Memory files に `AGENTS.md` が出ることで確かめられる
 - プラグインの更新: `/plugin` → Marketplaces → claude-docdd-dev-kit → Enable auto-update で自動更新にできる（このマーケットプレイスは既定では自動更新しない）。新しい版を受け取ったら `/docdd:update-kit` で、置いた雛形も新しい版へ追随させる。
 
 ## やらないこと
 
-- 既存ファイルの上書き・削除・改名（承知を得た `CLAUDE.md` の置き換え、承知を得た仕様書の `docs/_imported/` への移動、承知を得た `.gitignore` への例外の行の追加だけが例外）
+- 既存ファイルの上書き・削除・改名（承知を得た `AGENTS.md` の置き換え、承知を得た仕様書の `docs/_imported/` への移動、承知を得た `.gitignore` への例外の行の追加だけが例外）
 - 雛形を置いた勢いで実装を始めること
-- 手順書（スキル）の本文をプロジェクトへ写すこと。プロジェクトだけ手順を変えたいときは、`CLAUDE.md` の「スキルへの追加指示」表に行を足すよう案内する（その行が本文より優先される）。全部自分で持ちたいと言われたら、写し方と注意は `${CLAUDE_PLUGIN_ROOT}/README.md` の「手順書を直したいとき」にある。
+- 手順書（スキル）の本文をプロジェクトへ写すこと。プロジェクトだけ手順を変えたいときは、`AGENTS.md` の「スキルへの追加指示」表に行を足すよう案内する（その行が本文より優先される）。全部自分で持ちたいと言われたら、写し方と注意は `${CLAUDE_PLUGIN_ROOT}/README.md` の「手順書を直したいとき」にある。
