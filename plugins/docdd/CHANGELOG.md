@@ -3,6 +3,22 @@
 版ごとの変更と、プロジェクトに置いた雛形への影響をまとめます。
 「雛形への影響: あり」の版へ上げたら、プロジェクトのフォルダで `/docdd:update-kit` を打ちます（プラグインを更新しただけでは、置いた雛形は変わりません）。
 
+## 0.15.0（2026-09-26）
+
+**配布元の名前を `docdd-dev-kit` にした。**
+
+仮説: Codex でも同じように使えるようになったので、道具の名前を含まない短い名前のほうが、どちらの道具から入れるときも迷わない。
+
+### 変更
+
+- 配布元（マーケットプレイス）の名前は **`docdd-dev-kit`**、GitHub のリポジトリは `no1013kota/docdd-dev-kit`。入れ方は [README](./README.md#入れ方) のとおり。
+- プラグインの名前（`docdd`）とスキルの呼び方（`/docdd:…`・`$docdd:…`）は変わらない。
+
+### 雛形への影響: あり
+
+- `/docdd:update-kit` で置き換わる: 検査スクリプト 5 本（刻印だけ）と、`AGENTS.md` の「キット共通の約束」（印の版だけ。文面は変わらない）。
+- そのままでよいもの: `docs/PRD.md` の冒頭にある見本へのリンク（いまのままでも開ける）。
+
 ## 0.14.0（2026-09-26）
 
 **Codex でも同じスキルが使えるようにした。約束と表は `AGENTS.md` の 1 か所にまとめた。**
@@ -11,7 +27,7 @@
 
 ### 追加
 
-- **Codex 対応**: `codex plugin marketplace add no1013kota/claude-docdd-dev-kit` → `codex plugin add docdd@claude-docdd-dev-kit` で入り、`$docdd:init` のように `$` で呼ぶ（Claude Code は `/docdd:init` のまま）。スキル 14 本はそのまま動く。Codex 用の hook（`hooks/codex-hooks.json`）を同梱し、取り消しにくい git 操作と秘密の値の入ったコミットは Codex でも止める（Codex では `/hooks` で信頼するまで動かない）。Codex には「確認を出す」が無いので、`rm -r` などは注意書きを返す。
+- **Codex 対応**: `codex plugin marketplace add no1013kota/docdd-dev-kit` → `codex plugin add docdd@docdd-dev-kit` で入り、`$docdd:init` のように `$` で呼ぶ（Claude Code は `/docdd:init` のまま）。スキル 14 本はそのまま動く。Codex 用の hook（`hooks/codex-hooks.json`）を同梱し、取り消しにくい git 操作と秘密の値の入ったコミットは Codex でも止める（Codex では `/hooks` で信頼するまで動かない）。Codex には「確認を出す」が無いので、`rm -r` などは注意書きを返す。
 - `AGENTS.md` が 30 KiB を超えたら、init が知らせる（Codex は 32 KiB までしか読まず、超えた分＝末尾の約束が切れるため）。
 - 運営者が自分で打つスキル（init・release・update-kit）は、Codex でも会話の流れで勝手に動かない（`agents/openai.yaml` の `allow_implicit_invocation: false`）。
 - 同じプロジェクトを Claude Code と Codex で併用できる（約束も表も `AGENTS.md` の 1 か所にあるため）。

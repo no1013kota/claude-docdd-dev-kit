@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CONCURRENCY = 8;
 const TIMEOUT_MS = 15000;
-const USER_AGENT = "docdd-check-urls (+https://github.com/no1013kota/claude-docdd-dev-kit)";
+const USER_AGENT = "docdd-check-urls (+https://github.com/no1013kota/docdd-dev-kit)";
 
 // URL に使う文字（ASCII のうち、空白・括弧・引用符・バッククォート・< > { } | \ ^ 以外）。全角の文字もここで切れる
 // `https://{{…}}` のように // の直後が見本の記号でも、除いたものとして数えるため、// のあとは 0 文字でも拾う

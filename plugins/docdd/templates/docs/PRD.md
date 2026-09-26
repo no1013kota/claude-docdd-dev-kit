@@ -1,6 +1,6 @@
 # PRD：{{プロダクト名}}
 
-<!-- 記入済みの見本（架空の美容室予約アプリ）: https://github.com/no1013kota/claude-docdd-dev-kit/blob/main/plugins/docdd/examples/PRD.sample.md -->
+<!-- 記入済みの見本（架空の美容室予約アプリ）: https://github.com/no1013kota/docdd-dev-kit/blob/main/plugins/docdd/examples/PRD.sample.md -->
 
 | 項目 | 内容 |
 |---|---|

@@ -1,5 +1,5 @@
 {
-  "name": "claude-docdd-dev-kit",
+  "name": "docdd-dev-kit",
   "owner": {
     "name": "no1013kota",
     "url": "https://github.com/no1013kota"
@@ -13,8 +13,8 @@
       "author": {
         "name": "no1013kota"
       },
-      "homepage": "https://github.com/no1013kota/claude-docdd-dev-kit/blob/main/plugins/docdd/README.md",
-      "repository": "https://github.com/no1013kota/claude-docdd-dev-kit",
+      "homepage": "https://github.com/no1013kota/docdd-dev-kit/blob/main/plugins/docdd/README.md",
+      "repository": "https://github.com/no1013kota/docdd-dev-kit",
       "license": "Apache-2.0",
       "keywords": [
         "spec-driven-development",

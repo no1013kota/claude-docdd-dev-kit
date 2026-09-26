@@ -259,7 +259,7 @@ test("check-urls: 全角の括弧・句読点・Markdown のリンク・バッ�
   const { extractUrls } = await import(pathToFileURL(URLS).href);
   const text = [
     "公式（https://code.claude.com/docs/en/permissions）。",
-    "[説明](https://github.com/no1013kota/claude-docdd-dev-kit/blob/main/plugins/docdd/README.md) を読む",
+    "[説明](https://github.com/no1013kota/docdd-dev-kit/blob/main/plugins/docdd/README.md) を読む",
     "`https://nodejs.org/ja` から入れる。",
     "詳しくは https://docs.unity3d.com/6000.3/Documentation/Manual/build-command-line.html.",
     "https://gitforwindows.org、https://code.claude.com/docs/en/hooks",
@@ -269,7 +269,7 @@ test("check-urls: 全角の括弧・句読点・Markdown のリンク・バッ�
   const { urls, excluded } = extractUrls(text);
   assert.deepEqual(urls, [
     { url: "https://code.claude.com/docs/en/permissions", line: 1 },
-    { url: "https://github.com/no1013kota/claude-docdd-dev-kit/blob/main/plugins/docdd/README.md", line: 2 },
+    { url: "https://github.com/no1013kota/docdd-dev-kit/blob/main/plugins/docdd/README.md", line: 2 },
     { url: "https://nodejs.org/ja", line: 3 },
     { url: "https://docs.unity3d.com/6000.3/Documentation/Manual/build-command-line.html", line: 4 },
     { url: "https://gitforwindows.org", line: 5 },
@@ -313,9 +313,9 @@ test("check-urls: 対象は README 2 本・RELEASING・CHANGELOG・skills・temp
     "README.md": `入れ方: ${shared}\n`,
     "RELEASING.md": "https://code.claude.com/docs/en/plugin-evals\n",
     "plugins/docdd/README.md": `\n\n公式（${shared}）\n`,
-    "plugins/docdd/CHANGELOG.md": "https://github.com/no1013kota/claude-docdd-dev-kit\n",
+    "plugins/docdd/CHANGELOG.md": "https://github.com/no1013kota/docdd-dev-kit\n",
     "plugins/docdd/skills/init/SKILL.md": "https://nodejs.org/ja\n",
-    "plugins/docdd/templates/docs/PRD.md": "https://github.com/no1013kota/claude-docdd-dev-kit/blob/main/plugins/docdd/examples/PRD.sample.md\n",
+    "plugins/docdd/templates/docs/PRD.md": "https://github.com/no1013kota/docdd-dev-kit/blob/main/plugins/docdd/examples/PRD.sample.md\n",
     "plugins/docdd/examples/PRD.sample.md": "http://127.0.0.1:3000\n",
     "plugins/docdd/evals/case/prompt.md": "https://not-scanned.invalid/evals\n",
     ".github/ISSUE_TEMPLATE/config.yml": "url: https://not-scanned.invalid/github\n",
@@ -326,8 +326,8 @@ test("check-urls: 対象は README 2 本・RELEASING・CHANGELOG・skills・temp
   assert.deepEqual(Object.fromEntries(found), {
     [shared]: ["README.md:1", "plugins/docdd/README.md:3"],
     "https://code.claude.com/docs/en/plugin-evals": ["RELEASING.md:1"],
-    "https://github.com/no1013kota/claude-docdd-dev-kit": ["plugins/docdd/CHANGELOG.md:1"],
-    "https://github.com/no1013kota/claude-docdd-dev-kit/blob/main/plugins/docdd/examples/PRD.sample.md": ["plugins/docdd/templates/docs/PRD.md:1"],
+    "https://github.com/no1013kota/docdd-dev-kit": ["plugins/docdd/CHANGELOG.md:1"],
+    "https://github.com/no1013kota/docdd-dev-kit/blob/main/plugins/docdd/examples/PRD.sample.md": ["plugins/docdd/templates/docs/PRD.md:1"],
     "https://nodejs.org/ja": ["plugins/docdd/skills/init/SKILL.md:1"],
   });
   assert.equal(places, 6);
