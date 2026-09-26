@@ -89,14 +89,19 @@ init は、テスト・lint・ビルドなどのコマンドを `AGENTS.md` の�
 
 ```mermaid
 flowchart LR
-  A["アプリの土台を作る<br/>（まだ無いとき）"] --> B["docdd を入れる<br/>（1 回だけ）"] --> C["/docdd:init"] --> D["init のあとにやること"]
+  A["アプリの土台を作る<br/>（まだ無いとき）"] --> B["道具に docdd を入れる<br/>PC ごとに 1 回"] --> C["init<br/>プロジェクトごとに 1 回"] --> D["init のあとにやること"]
 ```
 
-1. **アプリの土台**: まだコードが無ければ、空のフォルダで Claude Code に「Next.js（など）で新しいアプリの土台を作って、動くところまで」と頼みます（Unity などは Unity Hub で作る）。
-2. **docdd を入れる**: アプリのフォルダで Claude Code を開き、次を打ちます。ほかのプロジェクトでも使えるので、1 回だけで済みます（Desktop アプリ・VS Code の画面から入れるときは[前提](#前提)）。
-   1. `/plugin marketplace add no1013kota/docdd-dev-kit`
-   2. `/plugin install docdd@docdd-dev-kit`（範囲を聞かれたら User。会話を読み直す旨の警告が出たときだけ `/reload-plugins --force`）
-3. **`/docdd:init`** を打ちます（前置きの無い `/init` は Claude Code の別のコマンドなので打たない）。
+**1. アプリの土台**: まだコードが無ければ、空のフォルダで「Next.js（など）で新しいアプリの土台を作って、動くところまで」と頼みます（Unity などは Unity Hub で作る）。
+
+**2. 道具に docdd を入れる**: 使う道具ごとに 1 回だけです（配布元は同じなので、両方で使うなら両方に入れます）。
+
+| 道具 | 打つもの |
+|---|---|
+| Claude Code | `/plugin marketplace add no1013kota/docdd-dev-kit` → `/plugin install docdd@docdd-dev-kit`（範囲を聞かれたら User。会話を読み直す旨の警告が出たときだけ `/reload-plugins --force`。画面から入れるときは[前提](#前提)） |
+| Codex | ターミナルで `codex plugin marketplace add no1013kota/docdd-dev-kit` → `codex plugin add docdd@docdd-dev-kit`。そのあと `codex` を開いて `/hooks` で docdd の hook を信頼する（[Codex で使う](#codex-で使う)） |
+
+**3. init を打つ**: `/docdd:init`（Codex は `$docdd:init`）。プロジェクトごとに 1 回で、どちらか一方の道具で打てば済みます（前置きの無い `/init` は Claude Code の別のコマンドなので打たない）。
 
 `/docdd:init`・`/docdd:release`（本番へ出す）・`/docdd:update-kit`（雛形の更新）は、**あなたが自分で打ったときだけ動きます**。
 
@@ -157,14 +162,14 @@ flowchart LR
 
 ## Codex で使う
 
-同じプラグインが Codex CLI でも動きます。ターミナルで 1 回だけ次を打ちます（プロジェクトごとではありません）。
+同じプラグインが Codex CLI でも動きます。入れ方は[上](#入れ方)のとおりで、ターミナルで 1 回だけ次を打ちます（PC ごとに 1 回。プロジェクトごとではありません）。
 
 ```bash
 codex plugin marketplace add no1013kota/docdd-dev-kit
 codex plugin add docdd@docdd-dev-kit
 ```
 
-そのあとプロジェクトのフォルダで `codex` を開き、`$docdd:init` と打ちます。以降はこの README のとおりですが、次の 4 つだけ違います。
+プロジェクトのフォルダで `codex` を開くと、初回だけ「このフォルダを信頼するか」を聞かれます。信頼したら `/hooks` と打ち、docdd の hook を **信頼** します（1 回だけで、ほかのフォルダにも効きます）。あとは `$docdd:init` から、この README のとおりに進みます。違うのは次の 4 つだけです。
 
 | こと | Claude Code | Codex |
 |---|---|---|
@@ -365,14 +370,14 @@ mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/
 
 ```mermaid
 flowchart LR
-  A["/plugin marketplace update<br/>docdd-dev-kit"] --> B["/plugin の画面で<br/>docdd を更新"] --> C["プロジェクトで<br/>/docdd:update-kit"]
+  A["道具の側で新しくする<br/>Claude Code: /plugin<br/>Codex: codex plugin marketplace upgrade"] --> B["プロジェクトごとに<br/>/docdd:update-kit"]
 ```
 
-- **v0.14.0 以前から使っている人**は、配布元の名前が `docdd-dev-kit` に変わったので 1 回だけ入れ直します（プロジェクトのファイルはそのまま）。Claude Code は `/plugin marketplace remove claude-docdd-dev-kit` → `/plugin marketplace add no1013kota/docdd-dev-kit` → `/plugin install docdd@docdd-dev-kit`、Codex は `codex plugin remove docdd@claude-docdd-dev-kit` → `codex plugin marketplace remove claude-docdd-dev-kit` → `codex plugin marketplace add no1013kota/docdd-dev-kit` → `codex plugin add docdd@docdd-dev-kit`。
-- Codex では `codex plugin marketplace upgrade docdd-dev-kit` で新しくし、そのあとプロジェクトで `$docdd:update-kit` と打ちます。
-- 更新したあとは `/reload-plugins` を打つか、Claude Code を開き直します（開いているセッションは、起動時に読み込んだ版を使い続けるため）。
+- **Claude Code**: `/plugin marketplace update docdd-dev-kit` → `/plugin` の画面で docdd を更新 → `/reload-plugins`（開いているセッションは、起動したときの版を使い続けるため。打てないときは開き直す）。自動更新は `/plugin` → Marketplaces → docdd-dev-kit → Enable auto-update でオンにできます（既定はオフ）。
+- **Codex**: ターミナルで `codex plugin marketplace upgrade docdd-dev-kit`（配布元を取り直し、プラグインのファイルも新しくします）。
+- どちらも最後に、プロジェクトごとに `/docdd:update-kit`（Codex は `$docdd:update-kit`）と打ちます。
 - プラグインの版が、プロジェクトに置いた雛形より新しいと、起動時に `/docdd:update-kit` を 1 行だけ案内します（止めたいときは `.docdd/manifest.json` に `"notifyUpdates": false`）。
-- 自動更新は既定でオフです（`/plugin` → Marketplaces → docdd-dev-kit → Enable auto-update でオンにできる）。何が変わったかは [`CHANGELOG.md`](./CHANGELOG.md)。
+- 何が変わったかは [`CHANGELOG.md`](./CHANGELOG.md) にあります。
 - プラグインを更新しても、プロジェクトに置いた雛形は変わりません。`/docdd:update-kit` が、手付かずのファイルはまとめて置き換え、手を入れたファイルは差分を見せて 1 件ずつ聞きます（Windows で、差分が同じ文にしか見えないときは改行の違いだけなので、「新しい版で置き換える」を選ぶ）。
 - `AGENTS.md`・`docs/`・`tasks/` に足すのは、新しい版で増えた節と、`AGENTS.md` の 3 つの表（ディレクトリ構成・検証コマンド・反映コマンド）に増えた行です。名前の変わったスキルを指す行は、置き換えを提案します（どれもファイルごとに聞く）。文言の変更は、CHANGELOG の「手で直すもの」を見て直します。
 

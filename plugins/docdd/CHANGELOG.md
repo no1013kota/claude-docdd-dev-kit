@@ -5,41 +5,19 @@
 
 ## 0.15.0（2026-09-26）
 
-**配布元の名前を `claude-docdd-dev-kit` から `docdd-dev-kit` に変えた。**
+**配布元の名前を `docdd-dev-kit` にした。**
 
-仮説: Codex でも同じように使えるようになったので、「claude-」で始まる名前は中身と合わない。名前を短くしておくほうが、どちらの道具から入れるときも迷わない。
+仮説: Codex でも同じように使えるようになったので、道具の名前を含まない短い名前のほうが、どちらの道具から入れるときも迷わない。
 
 ### 変更
 
-- 配布元（マーケットプレイス）の名前: `claude-docdd-dev-kit` → **`docdd-dev-kit`**。GitHub のリポジトリも `no1013kota/docdd-dev-kit` になった（古い URL は GitHub が転送するので、リンクは切れない）。
+- 配布元（マーケットプレイス）の名前は **`docdd-dev-kit`**、GitHub のリポジトリは `no1013kota/docdd-dev-kit`。入れ方は [README](./README.md#入れ方) のとおり。
 - プラグインの名前（`docdd`）とスキルの呼び方（`/docdd:…`・`$docdd:…`）は変わらない。
-
-### 既に使っている人がすること（入れ直し。1 回だけ）
-
-名前が変わるため、配布元を入れ直します。プロジェクトに置いた雛形はそのままで、消えません。
-
-Claude Code:
-
-```
-/plugin marketplace remove claude-docdd-dev-kit
-/plugin marketplace add no1013kota/docdd-dev-kit
-/plugin install docdd@docdd-dev-kit
-/reload-plugins
-```
-
-Codex:
-
-```
-codex plugin remove docdd@claude-docdd-dev-kit
-codex plugin marketplace remove claude-docdd-dev-kit
-codex plugin marketplace add no1013kota/docdd-dev-kit
-codex plugin add docdd@docdd-dev-kit
-```
 
 ### 雛形への影響: あり
 
 - `/docdd:update-kit` で置き換わる: 検査スクリプト 5 本（刻印だけ）と、`AGENTS.md` の「キット共通の約束」（印の版だけ。文面は変わらない）。
-- そのままでよいもの: `docs/PRD.md` の冒頭にある見本へのリンク（古い URL は転送されるので直さなくても開ける）。
+- そのままでよいもの: `docs/PRD.md` の冒頭にある見本へのリンク（いまのままでも開ける）。
 
 ## 0.14.0（2026-09-26）
 

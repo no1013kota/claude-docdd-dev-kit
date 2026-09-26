@@ -74,57 +74,74 @@ Claude Code の入力欄で `/docdd:`（Codex は `$docdd:`）と打つと、こ
 
 場面ごとの使い分けは「[毎日の使い方](plugins/docdd/README.md#毎日の使い方)」にあります。
 
-## 入れ方
+## 入れ方と更新
 
 **用意するもの**: Claude Code（有料プラン）か Codex CLI・git・Node.js 18 以上。入れるのに GitHub のアカウントは要りません。
 
+```mermaid
+flowchart LR
+  A["1. アプリのフォルダ<br/>（無ければ作る）"] --> B["2. 道具に docdd を入れる<br/>PC ごとに 1 回"] --> C["3. プロジェクトに置く<br/>init。プロジェクトごとに 1 回"]
+```
+
 ### 1. アプリのフォルダを用意する（すでにアプリがあれば飛ばす）
 
-1. 空のフォルダを作り、そこで Claude Code を開く（ターミナルなら `mkdir my-app && cd my-app && claude`）
-2. Claude Code に頼む: 「Next.js で新しいアプリの土台を作って、`npm run dev` で画面が出るところまで」
+1. 空のフォルダを作り、そこで Claude Code（または Codex）を開く（ターミナルなら `mkdir my-app && cd my-app && claude`）
+2. 「Next.js で新しいアプリの土台を作って、`npm run dev` で画面が出るところまで」と頼む
    - Next.js 以外でもよい（例: 「Vite と React で」「Python の FastAPI で」）。Unity などのゲームは、Unity Hub で新しいプロジェクトを作る
 3. ブラウザで画面が出たら完了
 
 土台を作る道具（create-next-app など）は空のフォルダで使うので、docdd より先に作ります。
 
-### 2. docdd を入れる
+### 2. 道具に docdd を入れる（PC ごとに 1 回）
 
-アプリのフォルダで Claude Code を開き、次を順に打ちます。
+使う道具ごとに 1 回入れます。配布元は同じなので、両方で使うなら両方に入れます。
 
-1. `/plugin marketplace add no1013kota/docdd-dev-kit`
-2. `/plugin install docdd@docdd-dev-kit`（範囲を聞かれたら User）
-3. `/docdd:init`（プロジェクト名や作りたいものを聞かれるので、答えていく）
+**Claude Code** — 入力欄で順に打ちます。
 
-1・2 は一度だけで、ほかのプロジェクトでも使えます。新しいプロジェクトでは 3 だけを打ちます。
+```
+/plugin marketplace add no1013kota/docdd-dev-kit
+/plugin install docdd@docdd-dev-kit
+```
 
-Codex で使うときは、ターミナルで `codex plugin marketplace add no1013kota/docdd-dev-kit` → `codex plugin add docdd@docdd-dev-kit` と打ち、プロジェクトのフォルダで `$docdd:init` と打ちます（詳しくは「[Codex で使う](plugins/docdd/README.md#codex-で使う)」）。
+範囲を聞かれたら **User**（この PC のどのプロジェクトでも使えます）。Desktop アプリ・VS Code の画面から入れるときは[前提](plugins/docdd/README.md#前提)。
 
-### 3. docdd を更新する（新しい版が出たとき）
+**Codex** — ターミナルで打ちます。
 
-> **v0.14.0 以前から使っている人へ**: 配布元の名前が `claude-docdd-dev-kit` から `docdd-dev-kit` に変わりました。1 回だけ入れ直してください（プロジェクトのファイルはそのままです）。
-> Claude Code: `/plugin marketplace remove claude-docdd-dev-kit` → `/plugin marketplace add no1013kota/docdd-dev-kit` → `/plugin install docdd@docdd-dev-kit` → `/reload-plugins`
-> Codex: `codex plugin remove docdd@claude-docdd-dev-kit` → `codex plugin marketplace remove claude-docdd-dev-kit` → `codex plugin marketplace add no1013kota/docdd-dev-kit` → `codex plugin add docdd@docdd-dev-kit`
+```bash
+codex plugin marketplace add no1013kota/docdd-dev-kit
+codex plugin add docdd@docdd-dev-kit
+```
 
+そのあと `codex` を開いて `/hooks` と打ち、docdd の hook を **信頼** します（1 回だけ。これで取り消しにくい git 操作の見張りが効きます）。
 
-**おすすめ: 自動更新をオンにする（一度だけ）**
+### 3. プロジェクトに置く（プロジェクトごとに 1 回）
 
-docdd の自動更新は、最初はオフです。次の手順で一度オンにすると、あとは Claude Code を起動したときに、裏で新しい版を取ってきます。
+アプリのフォルダで Claude Code か Codex を開き、次を打ちます。プロジェクト名や作りたいものを聞かれるので、答えていきます。
 
-1. `/plugin` と打つ
-2. **Marketplaces** を選び、**docdd-dev-kit** を選ぶ
-3. **Enable auto-update** を選ぶ
+| 道具 | 打つもの |
+|---|---|
+| Claude Code | `/docdd:init`（前置きの無い `/init` は別のコマンドなので打たない） |
+| Codex | `$docdd:init`（初回はフォルダを信頼するか聞かれる） |
 
-新しい版が入ると、`/reload-plugins` を打つよう知らせが出ます（打たなくても、次に起動したときから新しい版で動きます）。
+**どちらか一方で打てば済みます。** 約束も表も `AGENTS.md` の 1 か所に置くので、もう片方の道具からもそのまま使えます。
 
-**手で更新するとき**（自動更新をオフのままにする場合）
+### 4. 更新する（新しい版が出たとき）
 
-1. `/plugin marketplace update docdd-dev-kit`（配布元の一覧を取り直す）
-2. `/plugin` と打ち、画面で docdd を選んで更新する（ターミナルなら、Claude Code を終了してから `claude plugin update docdd@docdd-dev-kit` と打ち、開き直す）
-3. `/reload-plugins` と打つ（開いているセッションは、起動時に読み込んだ版を使い続けるため。打てないときは Claude Code を開き直す）
+**Claude Code**
 
-**Codex で使っているとき**は、ターミナルで `codex plugin marketplace upgrade docdd-dev-kit` と打ちます（配布元を取り直し、プラグインのファイルも新しくします）。
+- おすすめ: 自動更新をオンにする（1 回だけ）。`/plugin` → **Marketplaces** → **docdd-dev-kit** → **Enable auto-update**
+- 手で更新するとき: `/plugin marketplace update docdd-dev-kit`（配布元を取り直す）→ `/plugin` の画面で docdd を更新
+- どちらの場合も、更新のあとに `/reload-plugins` を打ちます（開いているセッションは、起動したときの版を使い続けるため。打てないときは Claude Code を開き直す）
 
-**どちらの場合も、最後に** 各プロジェクトのフォルダで `/docdd:update-kit`（Codex は `$docdd:update-kit`）と打ちます。プロジェクトに置いた雛形を、新しい版にそろえます（あなたのファイルを書き換えるので、自動では動かず、承知を得てから書き換えます）。更新したあとにプロジェクトを開くと、打つよう 1 行で知らせます。
+**Codex**
+
+```bash
+codex plugin marketplace upgrade docdd-dev-kit
+```
+
+配布元を取り直し、プラグインのファイルも新しくします。
+
+**最後に、プロジェクトごとに** `/docdd:update-kit`（Codex は `$docdd:update-kit`）と打ちます。プロジェクトに置いた雛形を新しい版にそろえます（あなたのファイルを書き換えるので、自動では動かず、承知を得てから書き換えます）。更新したあとにプロジェクトを開くと、打つよう 1 行で知らせます。
 
 何が変わったかは [CHANGELOG](plugins/docdd/CHANGELOG.md) にあります。
 
