@@ -1,14 +1,14 @@
 {
   "name": "docdd",
   "displayName": "docdd — 非エンジニアのための開発キット",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "description": "1人の非エンジニアが Claude Code や Codex で Web アプリやゲームなどを作り続けるための開発キット。約束（AGENTS.md）・仕様書（docs）・作業キュー（BACKLOG）の雛形を置く init と、タスク起票・開発サイクル・docs 同期・検証・反映の手順書（スキル）、取り消しにくい git 操作と秘密の値の入ったコミットを止める hook。 A Japanese-language, spec-driven development kit for solo non-engineers who build apps and games with Claude Code or Codex.",
   "author": {
     "name": "no1013kota",
     "url": "https://github.com/no1013kota"
   },
-  "homepage": "https://github.com/no1013kota/claude-docdd-dev-kit/blob/main/plugins/docdd/README.md",
-  "repository": "https://github.com/no1013kota/claude-docdd-dev-kit",
+  "homepage": "https://github.com/no1013kota/docdd-dev-kit/blob/main/plugins/docdd/README.md",
+  "repository": "https://github.com/no1013kota/docdd-dev-kit",
   "license": "Apache-2.0",
   "keywords": [
     "spec-driven-development",

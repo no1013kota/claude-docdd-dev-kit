@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const TEMPLATES = path.join(PLUGIN_ROOT, "templates");
-const FALLBACK_VERSION = "0.14.0";
+const FALLBACK_VERSION = "0.15.0";
 const KIT_VERSION = readKitVersion();
 const CWD = realpath(process.cwd());
 
@@ -1424,7 +1424,7 @@ function computeState({ claude, manifest, placeholders, gi }) {
   return { state: "partial", missing, manifestTracked };
 }
 
-const NON_WEB_NEXT = "Web 以外のプロジェクトです。検証コマンドは一部しか推定できません。README『Web 以外のプロジェクトで使う』を見て埋め、必要なら『スキルへの追加指示』を書いてください（README: https://github.com/no1013kota/claude-docdd-dev-kit/blob/main/plugins/docdd/README.md#web-以外のプロジェクトで使う例-unity）。";
+const NON_WEB_NEXT = "Web 以外のプロジェクトです。検証コマンドは一部しか推定できません。README『Web 以外のプロジェクトで使う』を見て埋め、必要なら『スキルへの追加指示』を書いてください（README: https://github.com/no1013kota/docdd-dev-kit/blob/main/plugins/docdd/README.md#web-以外のプロジェクトで使う例-unity）。";
 
 function nextForState(state, s) {
   const nonWeb = s.web === false ? NON_WEB_NEXT : "";

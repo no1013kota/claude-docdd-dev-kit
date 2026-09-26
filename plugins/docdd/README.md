@@ -26,7 +26,7 @@
 | playwright-cli（ブラウザを動かす道具） | 任意（Web のみ） | 入れてよいかを聞く。断ると、画面の確認をあなたに見てもらう形に切り替える |
 
 - **Windows**: Git for Windows を入れてください。
-- **Desktop アプリ・VS Code**: 画面からも入れられます（Desktop は入力欄の横の ＋ → Plugins、VS Code は入力欄に `/plugins`。配布元に `no1013kota/claude-docdd-dev-kit` を足してから docdd を入れる）。画面で入らないときは、ターミナルで `claude plugin marketplace add no1013kota/claude-docdd-dev-kit` → `claude plugin install docdd@claude-docdd-dev-kit` と打ちます（ターミナルで入れた docdd も、そのまま使えます）。
+- **Desktop アプリ・VS Code**: 画面からも入れられます（Desktop は入力欄の横の ＋ → Plugins、VS Code は入力欄に `/plugins`。配布元に `no1013kota/docdd-dev-kit` を足してから docdd を入れる）。画面で入らないときは、ターミナルで `claude plugin marketplace add no1013kota/docdd-dev-kit` → `claude plugin install docdd@docdd-dev-kit` と打ちます（ターミナルで入れた docdd も、そのまま使えます）。
 
 ## どこまで使えるか
 
@@ -94,8 +94,8 @@ flowchart LR
 
 1. **アプリの土台**: まだコードが無ければ、空のフォルダで Claude Code に「Next.js（など）で新しいアプリの土台を作って、動くところまで」と頼みます（Unity などは Unity Hub で作る）。
 2. **docdd を入れる**: アプリのフォルダで Claude Code を開き、次を打ちます。ほかのプロジェクトでも使えるので、1 回だけで済みます（Desktop アプリ・VS Code の画面から入れるときは[前提](#前提)）。
-   1. `/plugin marketplace add no1013kota/claude-docdd-dev-kit`
-   2. `/plugin install docdd@claude-docdd-dev-kit`（範囲を聞かれたら User。会話を読み直す旨の警告が出たときだけ `/reload-plugins --force`）
+   1. `/plugin marketplace add no1013kota/docdd-dev-kit`
+   2. `/plugin install docdd@docdd-dev-kit`（範囲を聞かれたら User。会話を読み直す旨の警告が出たときだけ `/reload-plugins --force`）
 3. **`/docdd:init`** を打ちます（前置きの無い `/init` は Claude Code の別のコマンドなので打たない）。
 
 `/docdd:init`・`/docdd:release`（本番へ出す）・`/docdd:update-kit`（雛形の更新）は、**あなたが自分で打ったときだけ動きます**。
@@ -160,8 +160,8 @@ flowchart LR
 同じプラグインが Codex CLI でも動きます。ターミナルで 1 回だけ次を打ちます（プロジェクトごとではありません）。
 
 ```bash
-codex plugin marketplace add no1013kota/claude-docdd-dev-kit
-codex plugin add docdd@claude-docdd-dev-kit
+codex plugin marketplace add no1013kota/docdd-dev-kit
+codex plugin add docdd@docdd-dev-kit
 ```
 
 そのあとプロジェクトのフォルダで `codex` を開き、`$docdd:init` と打ちます。以降はこの README のとおりですが、次の 4 つだけ違います。
@@ -365,19 +365,20 @@ mkdir -p Logs Builds && /Applications/Unity/Hub/Editor/<版>/Unity.app/Contents/
 
 ```mermaid
 flowchart LR
-  A["/plugin marketplace update<br/>claude-docdd-dev-kit"] --> B["/plugin の画面で<br/>docdd を更新"] --> C["プロジェクトで<br/>/docdd:update-kit"]
+  A["/plugin marketplace update<br/>docdd-dev-kit"] --> B["/plugin の画面で<br/>docdd を更新"] --> C["プロジェクトで<br/>/docdd:update-kit"]
 ```
 
-- Codex では `codex plugin marketplace upgrade claude-docdd-dev-kit` で新しくし、そのあとプロジェクトで `$docdd:update-kit` と打ちます。
+- **v0.14.0 以前から使っている人**は、配布元の名前が `docdd-dev-kit` に変わったので 1 回だけ入れ直します（プロジェクトのファイルはそのまま）。Claude Code は `/plugin marketplace remove claude-docdd-dev-kit` → `/plugin marketplace add no1013kota/docdd-dev-kit` → `/plugin install docdd@docdd-dev-kit`、Codex は `codex plugin remove docdd@claude-docdd-dev-kit` → `codex plugin marketplace remove claude-docdd-dev-kit` → `codex plugin marketplace add no1013kota/docdd-dev-kit` → `codex plugin add docdd@docdd-dev-kit`。
+- Codex では `codex plugin marketplace upgrade docdd-dev-kit` で新しくし、そのあとプロジェクトで `$docdd:update-kit` と打ちます。
 - 更新したあとは `/reload-plugins` を打つか、Claude Code を開き直します（開いているセッションは、起動時に読み込んだ版を使い続けるため）。
 - プラグインの版が、プロジェクトに置いた雛形より新しいと、起動時に `/docdd:update-kit` を 1 行だけ案内します（止めたいときは `.docdd/manifest.json` に `"notifyUpdates": false`）。
-- 自動更新は既定でオフです（`/plugin` → Marketplaces → claude-docdd-dev-kit → Enable auto-update でオンにできる）。何が変わったかは [`CHANGELOG.md`](./CHANGELOG.md)。
+- 自動更新は既定でオフです（`/plugin` → Marketplaces → docdd-dev-kit → Enable auto-update でオンにできる）。何が変わったかは [`CHANGELOG.md`](./CHANGELOG.md)。
 - プラグインを更新しても、プロジェクトに置いた雛形は変わりません。`/docdd:update-kit` が、手付かずのファイルはまとめて置き換え、手を入れたファイルは差分を見せて 1 件ずつ聞きます（Windows で、差分が同じ文にしか見えないときは改行の違いだけなので、「新しい版で置き換える」を選ぶ）。
 - `AGENTS.md`・`docs/`・`tasks/` に足すのは、新しい版で増えた節と、`AGENTS.md` の 3 つの表（ディレクトリ構成・検証コマンド・反映コマンド）に増えた行です。名前の変わったスキルを指す行は、置き換えを提案します（どれもファイルごとに聞く）。文言の変更は、CHANGELOG の「手で直すもの」を見て直します。
 
 ## やめるとき
 
-`/plugin uninstall docdd@claude-docdd-dev-kit` で外すと、hook も外れます。プロジェクトに置いたファイルは残るので、要らなければ Claude Code に「docdd の参照（`/docdd:`）と、下の表で『消す』にしたファイルを消して」と頼み、差分を確かめてからコミットします。
+`/plugin uninstall docdd@docdd-dev-kit` で外すと、hook も外れます。プロジェクトに置いたファイルは残るので、要らなければ Claude Code に「docdd の参照（`/docdd:`）と、下の表で『消す』にしたファイルを消して」と頼み、差分を確かめてからコミットします。
 
 | 残るもの | どうするか |
 |---|---|
@@ -394,6 +395,6 @@ flowchart LR
 | 更新したのに `/docdd:update-kit` が古い版のままと言う | 開いているセッションが、起動時に読み込んだ版を使い続けています。`/reload-plugins` を打つか、Claude Code を開き直します。それでも直らなければ、そのフォルダだけに古い版を入れていないか `/plugin` で確かめます（Project・Local の範囲で入れた版は、User の新しい版より優先されます。その範囲から外すと新しい版が使われます） |
 | 『依存の脆弱性』の検査が通らない | `/docdd:maintenance` を打つ。使っている部品を新しい版に上げ、上げられないものだけ、理由と期限をつけて残す（重大なものは残さない） |
 | コミットの名前やメールを間違えた | push の前なら、Claude Code の外のターミナルで `git commit --amend --reset-author`（hook は Claude の `--amend` を止めるため） |
-| 不具合・分かりにくい所・要望がある | [Issues](https://github.com/no1013kota/claude-docdd-dev-kit/issues/new/choose) へ（無料の GitHub アカウントが要る。API キーや `.env` の中身は貼らない） |
+| 不具合・分かりにくい所・要望がある | [Issues](https://github.com/no1013kota/docdd-dev-kit/issues/new/choose) へ（無料の GitHub アカウントが要る。API キーや `.env` の中身は貼らない） |
 
 保守する人は [RELEASING.md](../../RELEASING.md) を読みます。

@@ -88,7 +88,7 @@ export function noticeFor({ pluginVersion, manifestVersion, legacy, root = null 
   if (compareVersions(pluginVersion, manifestVersion) !== 1) return null;
   return (
     `docdd: プラグインは v${pluginVersion}、このプロジェクトに置いた雛形は v${manifestVersion} です。` +
-    `運営者に「${where}/docdd:update-kit を実行すると、検査スクリプトや表の行を新しい版へ追随できます（変更点: https://github.com/no1013kota/claude-docdd-dev-kit/blob/main/plugins/docdd/CHANGELOG.md）」と 1 行だけ伝えてください。` +
+    `運営者に「${where}/docdd:update-kit を実行すると、検査スクリプトや表の行を新しい版へ追随できます（変更点: https://github.com/no1013kota/docdd-dev-kit/blob/main/plugins/docdd/CHANGELOG.md）」と 1 行だけ伝えてください。` +
     'あなた（Claude）は雛形を勝手に更新しないでください。'
   );
 }

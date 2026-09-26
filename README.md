@@ -91,33 +91,38 @@ Claude Code の入力欄で `/docdd:`（Codex は `$docdd:`）と打つと、こ
 
 アプリのフォルダで Claude Code を開き、次を順に打ちます。
 
-1. `/plugin marketplace add no1013kota/claude-docdd-dev-kit`
-2. `/plugin install docdd@claude-docdd-dev-kit`（範囲を聞かれたら User）
+1. `/plugin marketplace add no1013kota/docdd-dev-kit`
+2. `/plugin install docdd@docdd-dev-kit`（範囲を聞かれたら User）
 3. `/docdd:init`（プロジェクト名や作りたいものを聞かれるので、答えていく）
 
 1・2 は一度だけで、ほかのプロジェクトでも使えます。新しいプロジェクトでは 3 だけを打ちます。
 
-Codex で使うときは、ターミナルで `codex plugin marketplace add no1013kota/claude-docdd-dev-kit` → `codex plugin add docdd@claude-docdd-dev-kit` と打ち、プロジェクトのフォルダで `$docdd:init` と打ちます（詳しくは「[Codex で使う](plugins/docdd/README.md#codex-で使う)」）。
+Codex で使うときは、ターミナルで `codex plugin marketplace add no1013kota/docdd-dev-kit` → `codex plugin add docdd@docdd-dev-kit` と打ち、プロジェクトのフォルダで `$docdd:init` と打ちます（詳しくは「[Codex で使う](plugins/docdd/README.md#codex-で使う)」）。
 
 ### 3. docdd を更新する（新しい版が出たとき）
+
+> **v0.14.0 以前から使っている人へ**: 配布元の名前が `claude-docdd-dev-kit` から `docdd-dev-kit` に変わりました。1 回だけ入れ直してください（プロジェクトのファイルはそのままです）。
+> Claude Code: `/plugin marketplace remove claude-docdd-dev-kit` → `/plugin marketplace add no1013kota/docdd-dev-kit` → `/plugin install docdd@docdd-dev-kit` → `/reload-plugins`
+> Codex: `codex plugin remove docdd@claude-docdd-dev-kit` → `codex plugin marketplace remove claude-docdd-dev-kit` → `codex plugin marketplace add no1013kota/docdd-dev-kit` → `codex plugin add docdd@docdd-dev-kit`
+
 
 **おすすめ: 自動更新をオンにする（一度だけ）**
 
 docdd の自動更新は、最初はオフです。次の手順で一度オンにすると、あとは Claude Code を起動したときに、裏で新しい版を取ってきます。
 
 1. `/plugin` と打つ
-2. **Marketplaces** を選び、**claude-docdd-dev-kit** を選ぶ
+2. **Marketplaces** を選び、**docdd-dev-kit** を選ぶ
 3. **Enable auto-update** を選ぶ
 
 新しい版が入ると、`/reload-plugins` を打つよう知らせが出ます（打たなくても、次に起動したときから新しい版で動きます）。
 
 **手で更新するとき**（自動更新をオフのままにする場合）
 
-1. `/plugin marketplace update claude-docdd-dev-kit`（配布元の一覧を取り直す）
-2. `/plugin` と打ち、画面で docdd を選んで更新する（ターミナルなら、Claude Code を終了してから `claude plugin update docdd@claude-docdd-dev-kit` と打ち、開き直す）
+1. `/plugin marketplace update docdd-dev-kit`（配布元の一覧を取り直す）
+2. `/plugin` と打ち、画面で docdd を選んで更新する（ターミナルなら、Claude Code を終了してから `claude plugin update docdd@docdd-dev-kit` と打ち、開き直す）
 3. `/reload-plugins` と打つ（開いているセッションは、起動時に読み込んだ版を使い続けるため。打てないときは Claude Code を開き直す）
 
-**Codex で使っているとき**は、ターミナルで `codex plugin marketplace upgrade claude-docdd-dev-kit` と打ちます（配布元を取り直し、プラグインのファイルも新しくします）。
+**Codex で使っているとき**は、ターミナルで `codex plugin marketplace upgrade docdd-dev-kit` と打ちます（配布元を取り直し、プラグインのファイルも新しくします）。
 
 **どちらの場合も、最後に** 各プロジェクトのフォルダで `/docdd:update-kit`（Codex は `$docdd:update-kit`）と打ちます。プロジェクトに置いた雛形を、新しい版にそろえます（あなたのファイルを書き換えるので、自動では動かず、承知を得てから書き換えます）。更新したあとにプロジェクトを開くと、打つよう 1 行で知らせます。
 
@@ -131,7 +136,7 @@ docdd の自動更新は、最初はオフです。次の手順で一度オン�
 
 ## 困ったら
 
-[Issues](https://github.com/no1013kota/claude-docdd-dev-kit/issues/new/choose) へ。不具合・質問（分かりにくい所）・要望の中から選べます（日本語で書けます。無料の GitHub アカウントが要ります）。書いてほしいことは、選んだ画面に出ます。API キーや `.env` の中身は貼らないでください。
+[Issues](https://github.com/no1013kota/docdd-dev-kit/issues/new/choose) へ。不具合・質問（分かりにくい所）・要望の中から選べます（日本語で書けます。無料の GitHub アカウントが要ります）。書いてほしいことは、選んだ画面に出ます。API キーや `.env` の中身は貼らないでください。
 
 ## ライセンス
 
