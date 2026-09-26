@@ -1,11 +1,14 @@
-// docdd-kit v0.15.0 — scripts/check-doc-placeholders.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
+// docdd-kit v0.15.1 — scripts/check-doc-placeholders.mjs（キットが管理するファイル。直すと /docdd:update-kit が差分を見せて聞く）
 // 雛形の「埋める欄」（二重波かっこの {{…}}）が、書き換えられずに残っていないかを検査する。
 // 残った欄をスキルが読むと、未記入の値を前提に動いてしまう。
 //
 //   node scripts/check-doc-placeholders.mjs
 //
 // 対象: git が追跡している AGENTS.md・CLAUDE.md・.claude/rules/ の .md・docs/ の .md・tasks/ の .md。
-//   docs/_imported/（取り込んだ原文）・docs/requirements/00_template.md・docs/decisions/0000-template.md（見本）は除く。
+//   docs/_imported/（取り込んだ原文）・docs/requirements/00_template.md・docs/decisions/0000-template.md（見本）・
+//   tasks/archive/（終わったものの控え。当時の文をそのまま残す場所）は除く。
+//   文書の中に <!-- docdd:placeholders:off --> と書くと、その文書は検査しない
+//   （{{…}} を別の意味で使う文書用。例: AI へ渡すプロンプトの本文で {{変数}} を埋め込みに使う）。
 // 数えない所: バッククォートの中、コードブロックの中、HTML コメントの中（書き方の説明に {{…}} を書けるように）。
 // 終了コード: 0 = 残っていない／1 = 残っている・対象の文書が git に無い／2 = git が使えない
 import { execFileSync, spawnSync } from "node:child_process";
@@ -16,7 +19,10 @@ const EXCLUDED = [
   /^docs\/_imported\//,
   /^docs\/requirements\/00_template\.md$/,
   /^docs\/decisions\/0000-template\.md$/,
+  /^tasks\/archive\//,
 ];
+/** この印がある文書は検査しない（{{…}} を埋める欄ではない意味で使う文書）。 */
+const OPT_OUT = "<!-- docdd:placeholders:off -->";
 const PLACEHOLDER = /\{\{[^{}\n]*\}\}/g;
 
 // ---- docdd:scan-markdown begin（check-doc-*.mjs の 3 本で同じ中身。直すときは 3 本とも直す） ----
@@ -136,8 +142,14 @@ if (docs.length === 0) {
 }
 
 const found = [];
+const skipped = [];
 for (const doc of docs) {
-  scanMarkdown(readFileSync(doc, "utf8")).forEach((segs, i) => {
+  const source = readFileSync(doc, "utf8");
+  if (source.includes(OPT_OUT)) {
+    skipped.push(doc);
+    continue;
+  }
+  scanMarkdown(source).forEach((segs, i) => {
     for (const seg of segs) {
       if (seg.kind !== "text") continue;
       for (const m of seg.raw.matchAll(PLACEHOLDER)) found.push(`${doc}:${i + 1}  ${m[0]}`);
@@ -146,11 +158,12 @@ for (const doc of docs) {
 }
 
 if (found.length > 0) {
-  console.error(`❌ 未記入の欄（{{…}}）が ${found.length} 件残っています（${docs.length} 件の文書を検査）\n`);
+  console.error(`❌ 未記入の欄（{{…}}）が ${found.length} 件残っています（${docs.length - skipped.length} 件の文書を検査${skipped.length ? `・印で外した ${skipped.length} 件は検査せず` : ""}）\n`);
   for (const f of found) console.error(`   ${f}`);
   console.error("\n   → {{…}} を実際の値に書き換えてください");
   console.error(`     日付の欄は今日の日付（${today()}）、このプロジェクトに無いものは「無い」と書きます`);
   process.exit(1);
 }
 
-console.log(`✅ 未記入の欄（{{…}}）は残っていませんでした（${docs.length} 件の文書を検査）`);
+console.log(`✅ 未記入の欄（{{…}}）は残っていませんでした（${docs.length - skipped.length} 件の文書を検査）`);
+if (skipped.length > 0) console.log(`   印（${OPT_OUT}）で外した文書: ${skipped.length} 件`);

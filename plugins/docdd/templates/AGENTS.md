@@ -121,7 +121,7 @@
 <!-- 例: | `/docdd:release` | PR は作らず main へ直接 push する | -->
 <!-- docdd:tables:end -->
 
-<!-- docdd:rules:begin v0.15.0 — ここから下はキットが管理する。直すと /docdd:update-kit が差分を見せて聞く -->
+<!-- docdd:rules:begin v0.15.1 — ここから下はキットが管理する。直すと /docdd:update-kit が差分を見せて聞く -->
 ## キット共通の約束（docdd）
 
 ### 前提：運営者は個人（非エンジニア想定）
