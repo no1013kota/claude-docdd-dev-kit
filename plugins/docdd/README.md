@@ -369,6 +369,7 @@ flowchart LR
 ```
 
 - Codex では `codex plugin marketplace upgrade claude-docdd-dev-kit` で新しくし、そのあとプロジェクトで `$docdd:update-kit` と打ちます。
+- 更新したあとは `/reload-plugins` を打つか、Claude Code を開き直します（開いているセッションは、起動時に読み込んだ版を使い続けるため）。
 - プラグインの版が、プロジェクトに置いた雛形より新しいと、起動時に `/docdd:update-kit` を 1 行だけ案内します（止めたいときは `.docdd/manifest.json` に `"notifyUpdates": false`）。
 - 自動更新は既定でオフです（`/plugin` → Marketplaces → claude-docdd-dev-kit → Enable auto-update でオンにできる）。何が変わったかは [`CHANGELOG.md`](./CHANGELOG.md)。
 - プラグインを更新しても、プロジェクトに置いた雛形は変わりません。`/docdd:update-kit` が、手付かずのファイルはまとめて置き換え、手を入れたファイルは差分を見せて 1 件ずつ聞きます（Windows で、差分が同じ文にしか見えないときは改行の違いだけなので、「新しい版で置き換える」を選ぶ）。
@@ -390,6 +391,7 @@ flowchart LR
 
 | 困りごと | すること |
 |---|---|
+| 更新したのに `/docdd:update-kit` が古い版のままと言う | 開いているセッションが、起動時に読み込んだ版を使い続けています。`/reload-plugins` を打つか、Claude Code を開き直します。それでも直らなければ、そのフォルダだけに古い版を入れていないか `/plugin` で確かめます（Project・Local の範囲で入れた版は、User の新しい版より優先されます。その範囲から外すと新しい版が使われます） |
 | 『依存の脆弱性』の検査が通らない | `/docdd:maintenance` を打つ。使っている部品を新しい版に上げ、上げられないものだけ、理由と期限をつけて残す（重大なものは残さない） |
 | コミットの名前やメールを間違えた | push の前なら、Claude Code の外のターミナルで `git commit --amend --reset-author`（hook は Claude の `--amend` を止めるため） |
 | 不具合・分かりにくい所・要望がある | [Issues](https://github.com/no1013kota/claude-docdd-dev-kit/issues/new/choose) へ（無料の GitHub アカウントが要る。API キーや `.env` の中身は貼らない） |
