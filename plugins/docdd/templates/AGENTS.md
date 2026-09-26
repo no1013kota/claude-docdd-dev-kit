@@ -32,7 +32,7 @@
 | `CLAUDE.md` | Claude Code 用に、このファイル（`AGENTS.md`）を読み込むだけの 1 行。中身はこのファイルに書く |
 | `.claude/settings.json` | Claude Code の許可設定（例: 検査コマンドは確認なしで進め、削除や push は必ず確認する） |
 | `.mcp.json` | Claude Code から使う MCP サーバー（外部の道具とつなぐ設定）。使う道具に合わせて足す |
-| `.docdd/manifest.json` | キットの版と、キットが置いたファイルの記録（`/docdd:update-kit` が使う。更新のお知らせを止める `"notifyUpdates": false` を足すほかは、手で直さない） |
+| `.docdd/manifest.json` | キットの版と、キットが置いたファイルの記録（`/docdd:update-kit` が使う。更新のお知らせを止める `"notifyUpdates": false` と、未記入欄の検査から外すパス `"placeholdersIgnore": ["docs/prompt/**"]` を足すほかは、手で直さない） |
 | アプリ本体 | {{フレームワーク名}} |
 
 <!-- docdd:tables:begin -->

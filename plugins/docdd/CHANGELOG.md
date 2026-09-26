@@ -12,7 +12,8 @@
 ### 変更
 
 - `scripts/check-doc-placeholders.mjs`: `tasks/archive/`（終わったものの控え）を検査しない。
-- 同: 文書の中に `<!-- docdd:placeholders:off -->` と書くと、その文書を検査しない（`{{…}}` を別の意味で使う文書用）。報告には「印で外した ◯ 件」と出す。
+- 同: 文書の中に `<!-- docdd:placeholders:off -->` と書くと、その文書を検査しない（`{{…}}` を別の意味で使う文書用）。
+- 同: `.docdd/manifest.json` に `"placeholdersIgnore": ["docs/prompt/**"]` を足すと、そのパスを検査しない（本文に印を書けない文書＝コードの定数と一字一句そろえる必要があるプロンプトなど、フォルダごと外したいとき）。`/docdd:update-kit` はこの設定を消さない。
 
 ### 雛形への影響: あり
 

@@ -1312,7 +1312,7 @@ test("check-doc-placeholders: tasks/archive は検査せず、印（docdd:placeh
   });
   const ok = run("check-doc-placeholders.mjs", dir);
   assert.equal(ok.code, 0, ok.out);
-  assert.match(ok.out, /印（<!-- docdd:placeholders:off -->）で外した文書: 1 件/);
+  assert.match(ok.out, /検査から外した文書: 1 件/);
 
   // 印の無い文書に残った {{…}} は、これまでどおり止める
   write(dir, { "docs/spec.md": "# 仕様\n\n| 更新日 | {{YYYY-MM-DD}} |\n" });
@@ -1320,4 +1320,22 @@ test("check-doc-placeholders: tasks/archive は検査せず、印（docdd:placeh
   const ng = run("check-doc-placeholders.mjs", dir);
   assert.equal(ng.code, 1, ng.out);
   assert.match(ng.out, /docs\/spec\.md:3/);
+});
+
+test("check-doc-placeholders: .docdd/manifest.json の placeholdersIgnore でフォルダごと外せる", () => {
+  const dir = repo({
+    "AGENTS.md": "# ガイド\n",
+    "docs/prompt/base.md": "こんにちは {{名前}} さん。\n",
+    "docs/prompt/post/one.md": "テーマ: {{テーマ}}\n",
+    "docs/spec.md": "# 仕様\n",
+    ".docdd/manifest.json": '{\n  "kitVersion": "0.15.1",\n  "placeholdersIgnore": ["docs/prompt/**"],\n  "files": {}\n}\n',
+  });
+  const ok = run("check-doc-placeholders.mjs", dir);
+  assert.equal(ok.code, 0, ok.out);
+  assert.match(ok.out, /検査から外した文書: 2 件/);
+
+  // 並びに無い文書の {{…}} は、これまでどおり止める
+  write(dir, { "docs/spec.md": "# 仕様\n\n| 更新日 | {{YYYY-MM-DD}} |\n" });
+  git(dir, ["add", "--", "docs/spec.md"]);
+  assert.equal(run("check-doc-placeholders.mjs", dir).code, 1);
 });

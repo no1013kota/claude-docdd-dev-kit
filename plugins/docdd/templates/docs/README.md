@@ -43,7 +43,7 @@ PRD や要件を自前の書式で持ち込んだら、「主な節」の列を�
 |---|---|---|
 | `scripts/check-doc-refs.mjs` | docs の検査 | docs が指すファイルの実在（対象は下の「参照の検査の対象」）と、`docs/decisions/` の ADR がすべて `decisions/README.md` の「ADR 一覧」に載っているか |
 | `scripts/check-doc-dates.mjs` | docs の検査 | 更新日が、その文書の内容を最後に変えたコミットより古くないか。冒頭の version と変更履歴が合っているか |
-| `scripts/check-doc-placeholders.mjs` | 未記入欄の検査 | 二重波かっこ（`{{…}}`）の埋める欄が残っていないか。対象は `AGENTS.md`・`CLAUDE.md`・`.claude/rules/`・`docs/`・`tasks/` の Markdown（`tasks/archive/` は除く）。インラインコード・コードブロック・HTML コメントの中は数えない。`{{…}}` を別の意味で使う文書（AI へ渡すプロンプトの本文など）は、その文書に `<!-- docdd:placeholders:off -->` と書くと検査しない |
+| `scripts/check-doc-placeholders.mjs` | 未記入欄の検査 | 二重波かっこ（`{{…}}`）の埋める欄が残っていないか。対象は `AGENTS.md`・`CLAUDE.md`・`.claude/rules/`・`docs/`・`tasks/` の Markdown（`tasks/archive/` は除く）。インラインコード・コードブロック・HTML コメントの中は数えない。`{{…}}` を別の意味で使う文書（AI へ渡すプロンプトの本文など）は、その文書に `<!-- docdd:placeholders:off -->` と書くか、`.docdd/manifest.json` に `"placeholdersIgnore": ["docs/prompt/**"]` を足すと検査しない |
 | `scripts/audit-check.mjs` | 依存の脆弱性 | 本番の依存ライブラリの high 以上の脆弱性（docs の検査ではない。npm と package-lock.json のプロジェクト用）。high を据え置くなら `scripts/audit-allowlist.json` に、パッケージ名ごとに脆弱性の ID（`ids`。GHSA- で始まる）・理由（`why`）・期限（`until`）を書く（3 つとも必須。critical は据え置けない）。npm 以外は『依存の脆弱性』行のコマンドを使い、据え置くなら `tasks/BACKLOG.md` の「要決定・外部準備」に ID・理由・期限を書く |
 
 **参照の検査の対象**: `AGENTS.md`・`CLAUDE.md`・`.claude/rules/`・`docs/` の Markdown のうち、(1) バッククォートで囲んだファイルパスで、拡張子が `scripts/check-doc-refs.mjs` の EXTS にあるもの（md・js・ts・py・cs・unity・prefab・gd・dart・swift など）、(2) `[PRD](./PRD.md)` のような `](./…)`・`](../…)` の形の相対リンク。
