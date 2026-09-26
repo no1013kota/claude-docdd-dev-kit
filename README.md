@@ -116,7 +116,9 @@ docdd の自動更新は、最初はオフです。次の手順で一度オン�
 1. `/plugin marketplace update claude-docdd-dev-kit`（配布元の一覧を取り直す）
 2. `/plugin` と打ち、画面で docdd を選んで更新する（ターミナルなら、Claude Code を終了してから `claude plugin update docdd@claude-docdd-dev-kit` と打ち、開き直す）
 
-**どちらの場合も、最後に** 各プロジェクトのフォルダで `/docdd:update-kit` と打ちます。プロジェクトに置いた雛形を、新しい版にそろえます（あなたのファイルを書き換えるので、自動では動かず、承知を得てから書き換えます）。更新したあとにプロジェクトを開くと、打つよう 1 行で知らせます。
+**Codex で使っているとき**は、ターミナルで `codex plugin marketplace upgrade claude-docdd-dev-kit` と打ちます（配布元を取り直し、プラグインのファイルも新しくします）。
+
+**どちらの場合も、最後に** 各プロジェクトのフォルダで `/docdd:update-kit`（Codex は `$docdd:update-kit`）と打ちます。プロジェクトに置いた雛形を、新しい版にそろえます（あなたのファイルを書き換えるので、自動では動かず、承知を得てから書き換えます）。更新したあとにプロジェクトを開くと、打つよう 1 行で知らせます。
 
 何が変わったかは [CHANGELOG](plugins/docdd/CHANGELOG.md) にあります。
 

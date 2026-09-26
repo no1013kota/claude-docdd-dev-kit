@@ -367,6 +367,7 @@ flowchart LR
   A["/plugin marketplace update<br/>claude-docdd-dev-kit"] --> B["/plugin の画面で<br/>docdd を更新"] --> C["プロジェクトで<br/>/docdd:update-kit"]
 ```
 
+- Codex では `codex plugin marketplace upgrade claude-docdd-dev-kit` で新しくし、そのあとプロジェクトで `$docdd:update-kit` と打ちます。
 - プラグインの版が、プロジェクトに置いた雛形より新しいと、起動時に `/docdd:update-kit` を 1 行だけ案内します（止めたいときは `.docdd/manifest.json` に `"notifyUpdates": false`）。
 - 自動更新は既定でオフです（`/plugin` → Marketplaces → claude-docdd-dev-kit → Enable auto-update でオンにできる）。何が変わったかは [`CHANGELOG.md`](./CHANGELOG.md)。
 - プラグインを更新しても、プロジェクトに置いた雛形は変わりません。`/docdd:update-kit` が、手付かずのファイルはまとめて置き換え、手を入れたファイルは差分を見せて 1 件ずつ聞きます（Windows で、差分が同じ文にしか見えないときは改行の違いだけなので、「新しい版で置き換える」を選ぶ）。
