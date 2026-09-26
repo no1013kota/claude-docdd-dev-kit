@@ -32,7 +32,7 @@
 | `CLAUDE.md` | Claude Code 用に、このファイル（`AGENTS.md`）を読み込むだけの 1 行。中身はこのファイルに書く |
 | `.claude/settings.json` | Claude Code の許可設定（例: 検査コマンドは確認なしで進め、削除や push は必ず確認する） |
 | `.mcp.json` | Claude Code から使う MCP サーバー（外部の道具とつなぐ設定）。使う道具に合わせて足す |
-| `.docdd/manifest.json` | キットの版と、キットが置いたファイルの記録（`/docdd:update-kit` が使う。更新のお知らせを止める `"notifyUpdates": false` を足すほかは、手で直さない） |
+| `.docdd/manifest.json` | キットの版と、キットが置いたファイルの記録（`/docdd:update-kit` が使う。更新のお知らせを止める `"notifyUpdates": false` と、未記入欄の検査から外すパス `"placeholdersIgnore": ["docs/prompt/**"]` を足すほかは、手で直さない） |
 | アプリ本体 | {{フレームワーク名}} |
 
 <!-- docdd:tables:begin -->
@@ -121,7 +121,7 @@
 <!-- 例: | `/docdd:release` | PR は作らず main へ直接 push する | -->
 <!-- docdd:tables:end -->
 
-<!-- docdd:rules:begin v0.15.0 — ここから下はキットが管理する。直すと /docdd:update-kit が差分を見せて聞く -->
+<!-- docdd:rules:begin v0.15.1 — ここから下はキットが管理する。直すと /docdd:update-kit が差分を見せて聞く -->
 ## キット共通の約束（docdd）
 
 ### 前提：運営者は個人（非エンジニア想定）

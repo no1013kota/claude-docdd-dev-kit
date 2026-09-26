@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const TEMPLATES = path.join(PLUGIN_ROOT, "templates");
-const FALLBACK_VERSION = "0.15.0";
+const FALLBACK_VERSION = "0.15.1";
 const KIT_VERSION = readKitVersion();
 const CWD = realpath(process.cwd());
 
@@ -126,7 +126,13 @@ const MANIFEST = ".docdd/manifest.json";
 
 /** manifest を書き直すときも残す、運営者が足した設定（notifyUpdates: false で更新のお知らせを止める。hook の notify-update.mjs が読む）。 */
 function keptManifestSettings(base) {
-  return base?.notifyUpdates === false ? { notifyUpdates: false } : {};
+  const kept = {};
+  if (base?.notifyUpdates === false) kept.notifyUpdates = false;
+  // 未記入欄の検査から外すパス（{{…}} を別の意味で使う文書。例: AI へ渡すプロンプトの本文）
+  if (Array.isArray(base?.placeholdersIgnore) && base.placeholdersIgnore.every((s) => typeof s === "string")) {
+    kept.placeholdersIgnore = base.placeholdersIgnore;
+  }
+  return kept;
 }
 const EMPTY_MCP = '{\n  "mcpServers": {}\n}\n';
 
