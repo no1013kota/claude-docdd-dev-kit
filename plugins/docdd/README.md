@@ -174,6 +174,7 @@ codex plugin add docdd@claude-docdd-dev-kit
 | 許可設定 | `.claude/settings.json` | 使わない（Codex の承認モードとサンドボックスで決まる） |
 
 - どちらからでも同じプロジェクトを触れます（約束も表も `AGENTS.md` の 1 か所にあるため）。
+- **コミットのとき確認が出ます。** Codex はサンドボックスの中で `.git` を書けないようにしているためで、許可するとそのまま進みます（`codex exec` の非対話実行では許可を求められないので、コミットの手前で止まります）。
 - Codex が `AGENTS.md` を読むのは 32 KiB までです（超えた分は切れます）。雛形は約 27 KiB なので、長い説明は `docs/` に書きます。30 KiB を超えると `/docdd:init` が知らせます。
 - `.mcp.json` は Claude Code 用です。Codex で外部の道具を使うときは、Codex 側の設定に足します。
 
